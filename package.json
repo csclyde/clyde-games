@@ -6,7 +6,7 @@
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "start": "sirv public --no-clear",
-    "deploy": "rollup -c && cp public/. /var/www/clyde.games/"
+    "deploy": "rollup -c && cp -r public/. /var/www/clyde.games/"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.0.0",
