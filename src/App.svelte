@@ -1,29 +1,19 @@
 <script>
+	import router from "page";
+	import Home from './Home.svelte';
+	import About from './About.svelte';
+	import Poetry from './Poetry.svelte';
+
+	let page;
+
+	router('/', () => page = Home);
+	router('/about', () => page = About);
+	router('/poetry', () => page = Poetry);
+
+	router.start();
 </script>
 
-<main>
-	<h1>CLYDE GAMES</h1>
-	<p></p>
-</main>
+<svelte:component this={page} />
 
 <style>
-	main {
-		text-align: center;
-		padding: 1em;
-		max-width: 240px;
-		margin: 0 auto;
-	}
-
-	h1 {
-		color: #ff3e00;
-		text-transform: uppercase;
-		font-size: 4em;
-		font-weight: 100;
-	}
-
-	@media (min-width: 640px) {
-		main {
-			max-width: none;
-		}
-	}
 </style>

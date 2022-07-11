@@ -5,7 +5,7 @@
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
-    "start": "sirv public --no-clear",
+    "start": "sirv public --no-clear --single",
     "deploy": "rollup -c && cp -r public/. /var/www/clyde.games/"
   },
   "devDependencies": {
@@ -19,6 +19,7 @@
     "svelte": "^3.0.0"
   },
   "dependencies": {
+    "page": "^1.11.6",
     "sirv-cli": "^2.0.0"
   }
 }
