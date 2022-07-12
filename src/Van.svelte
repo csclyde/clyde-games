@@ -108,4 +108,8 @@
 		border-radius: 12px;
 		flex-shrink: 0;
 	}
+
+	p {
+		font-size: large;
+	}
 </style>
