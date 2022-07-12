@@ -73,6 +73,13 @@
 			tools="Notebook"
 		/>
 	</div>
+
+	<hr/>
+
+	<small>Contact me at </small>
+	<img class="contact-image" src="img/em.png" alt="The place where I can be contacted"/>
+	<br/>
+	<a href="/about">About me</a>
 </main>
 
 <style>
@@ -106,5 +113,10 @@
 	.project-list {
 		display: grid;
   		grid-template-columns: 1fr 1fr 1fr;
+	}
+
+	.contact-image {
+		width: auto;
+		height: 10px;
 	}
 </style>
