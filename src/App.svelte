@@ -3,12 +3,14 @@
 	import Home from './Home.svelte';
 	import About from './About.svelte';
 	import Poetry from './Poetry.svelte';
+	import Van from './Van.svelte';
 
 	let page;
 
 	router('/', () => page = Home);
 	router('/about', () => page = About);
 	router('/poetry', () => page = Poetry);
+	router('/van', () => page = Van);
 
 	router.start();
 </script>

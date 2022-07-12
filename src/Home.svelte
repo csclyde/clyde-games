@@ -11,15 +11,15 @@
 	<div class="project-list">
 		<Project 
 			name="Into the Necrovale" 
-			href="/necrovale"
+			href="https://clydegames.itch.io/necrovale"
 			img="/img/necrovale.png"
 			desc="An action RPG about fighting hordes of monsters with powerful combinations of items."
-			tools="Haxe, Heaps.io"
+			tools="Haxe, Heaps.io, pass: lemmeplay"
 		/>
 
 		<Project 
 			name="VectorLance" 
-			href="/vector-lance"
+			href="https://clydegames.itch.io/vectorlance"
 			img="/img/vl.png"
 			desc="An arcade-style game about popping bubbles in space."
 			tools="Haxe, Heaps.io"
@@ -51,7 +51,7 @@
 	
 		<Project 
 			name="ARC" 
-			href="/arc"
+			href="https://clydegames.itch.io/arc"
 			img="/img/arc.png"
 			desc="A game made in 48 hours, where you use magnets to climb a shaft."
 			tools="JavaScript, Phaser.io"
@@ -59,7 +59,7 @@
 
 		<Project 
 			name="A Neocortical Theory" 
-			href="/neo"
+			href="https://docs.google.com/document/d/e/2PACX-1vR36VpZ6VpXY63o3_MMqPnrSnRXhQtDu79TFigDkL18Ui0iDGFtXpibn8YuZKKFV_olGhcjQiptRera/pub"
 			img="/img/neo.png"
 			desc="A theory on how the neocortex can be understood algorithmically."
 			tools="Research, Thinking"
@@ -111,8 +111,10 @@
 	}
 
 	.project-list {
-		display: grid;
-  		grid-template-columns: 1fr 1fr 1fr;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: center;
 	}
 
 	.contact-image {
