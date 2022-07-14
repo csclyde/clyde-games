@@ -19,6 +19,7 @@ func get_feedback(c *gin.Context) {
 
 	if err != nil {
 		c.AbortWithError(http.StatusNotFound, err)
+		return
 	}
 
 	defer db.Close()
@@ -28,6 +29,7 @@ func get_feedback(c *gin.Context) {
 
 	if err != nil {
 		c.AbortWithError(http.StatusNotFound, err)
+		return
 	}
 
 	// convert the results into Feedback structs
@@ -39,6 +41,7 @@ func get_feedback(c *gin.Context) {
 
 		if err != nil {
 			c.AbortWithError(http.StatusNotFound, err)
+			return
 		}
 
 		feedback = append(feedback, fb)
@@ -47,6 +50,7 @@ func get_feedback(c *gin.Context) {
 	// check the result, and return it as JSON
 	if feedback == nil || len(feedback) == 0 {
 		c.AbortWithStatus(http.StatusNotFound)
+		return
 	} else {
 		c.IndentedJSON(http.StatusOK, feedback)
 	}
@@ -57,6 +61,7 @@ func add_feedback(c *gin.Context) {
 
 	if err := c.BindJSON(&feedback); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
+		return
 	} 
 
 	// open db connection
@@ -64,6 +69,7 @@ func add_feedback(c *gin.Context) {
 
 	if err != nil {
 		c.AbortWithError(http.StatusNotFound, err)
+		return
 	}
 
 	defer db.Close()
@@ -75,6 +81,7 @@ func add_feedback(c *gin.Context) {
 
 	if err != nil {
 		c.AbortWithError(http.StatusNotFound, err)
+		return
 
 	}
 
