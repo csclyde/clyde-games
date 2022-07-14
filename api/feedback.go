@@ -4,7 +4,6 @@ import "net/http"
 import "github.com/gin-gonic/gin"
 import "database/sql"
 import _ "github.com/go-sql-driver/mysql"
-import "fmt"
 
 type Feedback struct {
     Id int `json:"id"`
@@ -19,8 +18,7 @@ func get_feedback(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/analytics")
 
 	if err != nil {
-		fmt.Println("Err", err.Error())
-		return
+		c.AbortWithError(http.StatusNotFound, err)
 	}
 
 	defer db.Close()
@@ -29,8 +27,7 @@ func get_feedback(c *gin.Context) {
 	results, err := db.Query("SELECT * FROM feedback")
 
 	if err != nil {
-		fmt.Println("Err", err.Error())
-		return
+		c.AbortWithError(http.StatusNotFound, err)
 	}
 
 	// convert the results into Feedback structs
@@ -41,7 +38,7 @@ func get_feedback(c *gin.Context) {
 		err := results.Scan(&fb.Id, &fb.Message, &fb.Rating, &fb.Created, &fb.Env)
 
 		if err != nil {
-			panic(err.Error())
+			c.AbortWithError(http.StatusNotFound, err)
 		}
 
 		feedback = append(feedback, fb)
@@ -60,15 +57,13 @@ func add_feedback(c *gin.Context) {
 
 	if err := c.BindJSON(&feedback); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
-		return
 	} 
 
 	// open db connection
 	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/analytics")
 
 	if err != nil {
-		fmt.Println("Err", err.Error())
-		return
+		c.AbortWithError(http.StatusNotFound, err)
 	}
 
 	defer db.Close()
@@ -79,7 +74,8 @@ func add_feedback(c *gin.Context) {
 		feedback.Message, feedback.Rating)
 
 	if err != nil {
-		panic(err.Error())
+		c.AbortWithError(http.StatusNotFound, err)
+
 	}
 
 	defer insert.Close()
