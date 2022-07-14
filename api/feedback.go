@@ -25,7 +25,7 @@ func get_feedback(c *gin.Context) {
 	defer db.Close()
 
 	// query all the feedback
-	results, err := db.Query("SELECT * FROM feedback")
+	results, err := db.Query("SELECT * FROM feedback ORDER BY created DESC")
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
