@@ -18,7 +18,7 @@ func get_feedback(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/analytics")
 
 	if err != nil {
-		c.AbortWithError(http.StatusNotFound, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -28,7 +28,7 @@ func get_feedback(c *gin.Context) {
 	results, err := db.Query("SELECT * FROM feedback")
 
 	if err != nil {
-		c.AbortWithError(http.StatusNotFound, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -40,7 +40,7 @@ func get_feedback(c *gin.Context) {
 		err := results.Scan(&fb.Id, &fb.Message, &fb.Rating, &fb.Created, &fb.Env)
 
 		if err != nil {
-			c.AbortWithError(http.StatusNotFound, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -49,7 +49,8 @@ func get_feedback(c *gin.Context) {
 
 	// check the result, and return it as JSON
 	if feedback == nil || len(feedback) == 0 {
-		c.AbortWithStatus(http.StatusNotFound)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No feedback found"})
+
 		return
 	} else {
 		c.IndentedJSON(http.StatusOK, feedback)
@@ -60,7 +61,7 @@ func add_feedback(c *gin.Context) {
 	var feedback Feedback
 
 	if err := c.BindJSON(&feedback); err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	} 
 
@@ -68,7 +69,7 @@ func add_feedback(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/analytics")
 
 	if err != nil {
-		c.AbortWithError(http.StatusNotFound, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -80,7 +81,7 @@ func add_feedback(c *gin.Context) {
 		feedback.Message, feedback.Rating)
 
 	if err != nil {
-		c.AbortWithError(http.StatusNotFound, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 
 	}
