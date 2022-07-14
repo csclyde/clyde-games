@@ -1,12 +1,12 @@
 package main
 
-import (
-	"net/http"
-)
+// import "net/http"
+import "github.com/gin-gonic/gin"
 
 func main() {
-	http.HandleFunc("/api/ety/", ety);
-	http.HandleFunc("/api/feedback", feedback)
+	router := gin.Default()
+	router.GET("/api/feedback", get_feedback)
+	router.POST("/api/feedback", add_feedback)
 
-	http.ListenAndServe(":9990", nil);
+	router.Run(":9990")
 }
