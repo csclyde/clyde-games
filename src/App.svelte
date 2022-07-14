@@ -4,6 +4,7 @@
 	import About from './About.svelte';
 	import Poetry from './Poetry.svelte';
 	import Van from './Van.svelte';
+	import Feedback from './Feedback.svelte';
 
 	let page;
 
@@ -11,6 +12,7 @@
 	router('/about', () => page = About);
 	router('/poetry', () => page = Poetry);
 	router('/van', () => page = Van);
+	router('/feedback', () => page = Feedback);
 
 	router.start();
 </script>
