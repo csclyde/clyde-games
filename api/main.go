@@ -25,8 +25,8 @@ func CORSMiddleware() gin.HandlerFunc {
 func main() {
 	router := gin.Default()
 	router.Use(CORSMiddleware())
-	router.GET("/api/feedback", endpoints.GetFeedback)
-	router.POST("/api/feedback", endpoints.AddFeedback)
+	router.GET("/feedback", endpoints.GetFeedback)
+	router.POST("/feedback", endpoints.AddFeedback)
 
 	router.Run(":9990")
 }
