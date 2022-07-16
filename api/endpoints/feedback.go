@@ -3,10 +3,8 @@ package endpoints
 import (
 	"net/http"
 
-	"clyde.games/models"
+	"api.clyde.games/models"
 	"github.com/gin-gonic/gin"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 func GetFeedback(c *gin.Context) {

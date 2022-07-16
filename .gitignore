@@ -3,3 +3,4 @@ site/public/build/
 site/.env
 api/__pycache__
 api/lib
+api/api.clyde.games
