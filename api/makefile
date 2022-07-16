@@ -1,7 +1,7 @@
 build:
 	go build -o main
 
-deploy: main
+deploy:
 	cp main /var/www/api.clyde.games/
 
 restart:
