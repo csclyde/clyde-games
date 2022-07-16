@@ -2,6 +2,7 @@ package main
 
 // import "net/http"
 import "github.com/gin-gonic/gin"
+import "clyde.games/endpoints"
 
 func CORSMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
@@ -22,8 +23,8 @@ func CORSMiddleware() gin.HandlerFunc {
 func main() {
 	router := gin.Default()
 	router.Use(CORSMiddleware())
-	router.GET("/api/feedback", get_feedback)
-	router.POST("/api/feedback", add_feedback)
+	router.GET("/api/feedback", endpoints.GetFeedback)
+	router.POST("/api/feedback", endpoints.AddFeedback)
 
 	router.Run(":9990")
 }

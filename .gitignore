@@ -1,5 +1,5 @@
-node_modules/
-public/build/
-.env
+site/node_modules/
+site/public/build/
+site/.env
 api/__pycache__
 api/lib

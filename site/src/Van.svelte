@@ -83,6 +83,7 @@
 			<img src={step.img} alt="A step in the conversion">
 			<p>{ step.desc }</p>
 		</div>
+		<hr/>
 		{/each}
 	</div>
 </main>
@@ -109,7 +110,7 @@
 		flex-shrink: 0;
 	}
 
-	p {
+	.step-container p {
 		font-size: large;
 	}
 </style>
