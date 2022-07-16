@@ -1,5 +1,6 @@
 build:
 	go build -o main
+	systemctl stop goweb
 	cp main /var/www/api.clyde.games/
-	systemctl restart nginx goweb
-	echo "project built and deployed"
+	systemctl start goweb
+	systemctl restart nginx
