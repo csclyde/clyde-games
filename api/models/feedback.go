@@ -22,7 +22,7 @@ func SelectAllFeedback() ([]Feedback, error) {
 	db.AutoMigrate(&Feedback{})
 
 	var allFeedback []Feedback
-	result := db.Order("created desc").Find(&allFeedback)
+	result := db.Order("created_at desc").Find(&allFeedback)
 
 	if result.Error != nil {
 		return nil, result.Error
