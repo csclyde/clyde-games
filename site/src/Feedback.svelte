@@ -1,7 +1,7 @@
 <script>
 
 	async function getFeedback() {
-		const res = await fetch(`https://clyde.games/api/feedback`);
+		const res = await fetch(`https://api.clyde.games/feedback`);
 		const feedback = await res.json();
 
 		if (res.ok) {
