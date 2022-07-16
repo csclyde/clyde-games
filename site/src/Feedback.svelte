@@ -34,9 +34,9 @@
 		<div class="comment-list">
 		{#each feedback as comment}
 			<div class="comment">
-				<p class="rating" style="background-color:{ colors[comment.rating] }"></p>
-				<p class="message">{comment.message}</p>
-				<p class="created">{new Date(comment.created).toLocaleString()}</p>
+				<p class="rating" style="background-color:{ colors[comment.Rating] }"></p>
+				<p class="message">{comment.Message}</p>
+				<p class="created">{new Date(comment.CreatedAt).toLocaleString()}</p>
 			</div>
 		{/each}
 		</div>

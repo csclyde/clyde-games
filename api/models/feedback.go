@@ -7,12 +7,9 @@ import (
 
 type Feedback struct {
 	gorm.Model
-	Id        int
-	Message   string
-	Rating    int
-	Created   string
-	Env       string
-	TestField string
+	Message string
+	Rating  int
+	Env     string
 }
 
 func SelectAllFeedback() ([]Feedback, error) {
