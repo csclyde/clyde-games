@@ -7,9 +7,12 @@ import (
 
 type Feedback struct {
 	gorm.Model
-	Message string
-	Rating  int
-	Env     string
+	Message  string `gorm:"default:''"`
+	Rating   int    `gorm:"default:0"`
+	Env      string `gorm:"default:'dev'"`
+	Category string `gorm:"default:'general"`
+	Platform string `gorm:"default:'unknown'"`
+	FPS      int    `gorm:"default:0"`
 }
 
 func SelectAllFeedback() ([]Feedback, error) {
