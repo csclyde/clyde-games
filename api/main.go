@@ -27,6 +27,8 @@ func main() {
 	router.Use(CORSMiddleware())
 	router.GET("/feedback", endpoints.GetFeedback)
 	router.POST("/feedback", endpoints.AddFeedback)
+	router.GET("/event", endpoints.GetEvent)
+	router.POST("/event", endpoints.AddEvent)
 
 	router.Run(":9990")
 }

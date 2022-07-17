@@ -1,58 +1,55 @@
 package models
 
 import (
+	"gorm.io/datatypes"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
-type Feedback struct {
+type Event struct {
 	gorm.Model
-	PID      string `gorm:"type:tinytext"`
-	Project  string `gorm:"type:tinytext"`
-	Message  string `gorm:"type:text"`
-	Rating   uint8
-	Env      string `gorm:"type:tinytext"`
-	Category string `gorm:"type:tinytext"`
-	Platform string `gorm:"type:tinytext"`
-	FPS      uint16
+	PID     string `gorm:"type:tinytext"`
+	Project string `gorm:"type:tinytext"`
+	Type    string `gorm:"not null;type:tinytext"`
+	Save    datatypes.JSON
 }
 
-func SelectAllFeedback() ([]Feedback, error) {
+func SelectAllEvents() ([]Event, error) {
 	dbs := "root:root@tcp(127.0.0.1:3306)/analytics?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dbs), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&Feedback{})
+	err = db.AutoMigrate(&Event{})
 	if err != nil {
 		return nil, err
 	}
 
-	var allFeedback []Feedback
-	result := db.Order("created_at desc").Find(&allFeedback)
+	var allEvents []Event
+	result := db.Order("created_at desc").Find(&allEvents)
 
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
-	return allFeedback, nil
+	return allEvents, nil
 }
 
-func AddFeedback(fb Feedback) (*Feedback, error) {
+func AddEvent(event Event) (*Event, error) {
 	dbs := "root:root@tcp(127.0.0.1:3306)/analytics?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dbs), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
 
-	db.AutoMigrate(&Feedback{})
+	db.AutoMigrate(&Event{})
 
-	result := db.Create(&fb)
+	result := db.Create(&event)
 
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
-	return &fb, nil
+	return &event, nil
 }
