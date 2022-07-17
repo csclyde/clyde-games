@@ -14,3 +14,31 @@ body {
 a {
     color: black;
 }
+
+h1 {
+	color: black;
+	font-size: 6em;
+	font-weight: 800;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+h2 {
+	color: black;
+	font-size: 4em;
+	font-weight: 800;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+h3 {
+	color: black;
+	font-size: 2em;
+	font-weight: 600;
+	margin-top: 8px;
+	margin-bottom: 8px;
+}
+
+h1, h2, h3, h4, h5, small, p {
+	text-align: center;
+}

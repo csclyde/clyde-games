@@ -1,10 +1,10 @@
 <script>
 	import router from "page";
-	import Home from './Home.svelte';
-	import About from './About.svelte';
-	import Poetry from './Poetry.svelte';
-	import Van from './Van.svelte';
-	import Feedback from './Feedback.svelte';
+	import Home from './pages/Home.svelte';
+	import About from './pages/About.svelte';
+	import Poetry from './pages/Poetry.svelte';
+	import Van from './pages/Van.svelte';
+	import Feedback from './pages/Feedback.svelte';
 
 	let page;
 
@@ -19,5 +19,29 @@
 
 <svelte:component this={page} />
 
+<footer>
+	<small>Contact me at &nbsp;<img class="contact-image" src="img/em.png" alt="The place where I can be contacted"/></small>
+	<a href="/about">About me</a>
+	<small><i>Built with: Svelte</i></small>
+</footer>
+
 <style>
+	footer {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 24px;
+		margin: 24px;
+		gap: 8px;
+		border-top: 1px black solid;
+	}
+
+	footer small {
+		text-align: center;
+	}
+	
+	.contact-image {
+		width: auto;
+		height: 10px;
+	}
 </style>

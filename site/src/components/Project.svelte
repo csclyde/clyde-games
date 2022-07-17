@@ -6,11 +6,10 @@
 	export let tools;
 	
 	let target = href.includes('http') ? '_blank' : '_self';
-
 </script>
 
 <div>
-	<h1><a { href } { target }>{ name }</a></h1>
+	<h3><a { href } { target }>{ name }</a></h3>
 
 	{#if img != undefined}
 		<a { href } { target }><img src={img} alt="A picture of { name }"/></a>
@@ -27,13 +26,14 @@
 		margin: 16px;
 		padding: 16px;
 		/* min-width: 300px; */
+		display: flex;
+		flex-direction: column;
 	}
 
 	p {
 		font-weight: 500;
 		max-width: 330px;
-		margin-left: auto;
-		margin-right: auto;
+		flex-grow: 1;
 	}
 
 	img {

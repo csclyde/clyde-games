@@ -1,0 +1,58 @@
+[
+    {
+        "name": "Into the Necrovale",
+        "href": "https://clydegames.itch.io/necrovale",
+        "img": "/img/necrovale.png",
+        "desc": "An action RPG about fighting hordes of monsters with powerful combinations of items.",
+        "tools": "Haxe, Heaps.io, pass: lemmeplay"
+    },
+    {
+        "name": "VectorLance",
+        "href": "https://clydegames.itch.io/vectorlance",
+        "img": "/img/vl.png",
+        "desc": "An arcade-style game about popping bubbles in space.",
+        "tools": "Haxe, Heaps.io"
+    },
+    {
+        "name": "Van Conversion",
+        "href": "/van",
+        "img": "/img/van.png",
+        "desc": "A camper van conversion, to allow easy travel and exploration.",
+        "tools": "Baltic Birch, Polyiso Insulation"
+    },
+    {
+        "name": "Frauki's Adventure!",
+        "href": "https://store.steampowered.com/app/1570850/Fraukis_Adventure/",
+        "img": "/img/frauki.png",
+        "desc": "A 2D game about exploring and fighting difficult enemies.",
+        "tools": "JavaScript, Phaser.io, Electron"
+    },
+    {
+        "name": "The Stupefied Cretin",
+        "href": "https://stupefiedcretin.blogspot.com/",
+        "img": "/img/cretin.jpeg",
+        "desc": "A blog about modernity.",
+        "tools": "Blogger"
+    },
+    {
+        "name": "ARC",
+        "href": "https://clydegames.itch.io/arc",
+        "img": "/img/arc.png",
+        "desc": "A game made in 48 hours, where you use magnets to climb a shaft.",
+        "tools": "JavaScript, Phaser.io"
+    },
+    {
+        "name": "A Neocortical Theory",
+        "href": "https://docs.google.com/document/d/e/2PACX-1vR36VpZ6VpXY63o3_MMqPnrSnRXhQtDu79TFigDkL18Ui0iDGFtXpibn8YuZKKFV_olGhcjQiptRera/pub",
+        "img": "/img/neo.png",
+        "desc": "A theory on how the neocortex can be understood algorithmically.",
+        "tools": "Research, Thinking"
+    },
+    {
+        "name": "Poetry",
+        "href": "/poetry",
+        "img": "/img/lyre.png",
+        "desc": "Various poems I have written over the years.",
+        "tools": "Notebook"
+    }
+]
