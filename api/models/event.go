@@ -9,6 +9,7 @@ import (
 type Event struct {
 	gorm.Model
 	PID     string `gorm:"type:tinytext"`
+	Env     string `gorm:"type:tinytext"`
 	Project string `gorm:"type:tinytext"`
 	Type    string `gorm:"not null;type:tinytext"`
 	Save    datatypes.JSON

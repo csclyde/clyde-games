@@ -4,3 +4,4 @@ site/.env
 api/__pycache__
 api/lib
 api/main
+.vscode/*.log

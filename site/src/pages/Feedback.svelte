@@ -24,7 +24,7 @@
 </script>
 
 <main>
-	<h1>Player Feedback</h1>
+	<h2>Player Feedback</h2>
 	<hr/>
 
 	{#await promise}
@@ -33,9 +33,15 @@
 		<div class="comment-list">
 		{#each feedback as comment}
 			<div class="comment">
-				<p class="rating" style="background-color:{ colors[comment.Rating] }"></p>
-				<p class="message">{comment.Message}</p>
-				<p class="created">{new Date(comment.CreatedAt).toLocaleString()}</p>
+				<div class="comment-body">
+					<p class="rating" style="background-color:{ colors[comment.Rating] }"></p>
+					<p class="message">{comment.Message}</p>
+					<p class="created">{new Date(comment.CreatedAt).toLocaleString()}</p>
+				</div>
+				<div class="comment-footer">
+					<small>{comment.PID}:{comment.Platform}:{comment.Project}:{comment.Env}</small>
+					<small class="fps">FPS: {comment.FPS}</small>
+				</div>
 			</div>
 		{/each}
 		</div>
@@ -53,10 +59,21 @@
 
 	.comment {
 		display: flex;
-		flex-direction: row;
+		flex-direction: column;
 		border: 2px solid black;
-		border-radius: 6px;
 		padding: 8px;
+		border-radius: 6px;
+	}
+
+	.comment-body {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.comment-footer {
+		display: flex;
+		margin-top: 8px;
 	}
 
 	.comment p {
@@ -70,9 +87,23 @@
 		height: 20px;
 		text-align: center;
 		font-weight: 800;
+		flex-shrink: 0;
+	}
+
+	.created {
+		flex-shrink: 0;
 	}
 
 	.message {
 		flex-grow: 1;
+		text-align: start;
+	}
+
+	small {
+		font-size: xx-small;
+	}
+
+	.fps {
+		margin-left: auto;
 	}
 </style>
