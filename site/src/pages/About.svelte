@@ -3,7 +3,7 @@
 
 <main>
 	<h2>About Me</h2>
-	<p>I travel when I can. I work when I have to. I do the best I'm able to do.</p>
+	<p>I travel when I can. I work when I have to. I sometimes find joy in building things. I do the best I'm able to do.</p>
 
 	<section>
 		<img src="img/kc4.jpg" alt="Good lighting">

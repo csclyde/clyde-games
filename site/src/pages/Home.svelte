@@ -1,13 +1,14 @@
 <script>
 	import Project from '../components/Project.svelte';
 	import projects from '../data/projects.json';
+	import havamal from '../data/havamal.json';
 </script>
 
 <main>
 	<h1><u>CLYDE GAMES</u></h1>
 	<img class='portrait' src="/img/casey.jpeg" alt="Casey at Lake Tahoe">
 	<p>Below you will find a selection of games and other projects I have worked on.</p>
-	<small>Fire is best for mortals, and sunshine— and also good health if you have it, and living beyond reproach - The Hávamál</small>
+	<small>{havamal[Math.floor(Math.random()*havamal.length)]} - The Hávamál</small>
 
 	<section>
 		{#each projects as project}
@@ -20,6 +21,9 @@
 			/>
 		{/each}
 	</section>
+
+	<small>Thanks to Jackson Crawford for the Hávamál translations.</small>
+
 </main>
 
 <style>
