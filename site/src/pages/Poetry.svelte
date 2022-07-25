@@ -2,6 +2,25 @@
 </script>
 
 <main>
+	<h3>Death Poem</h3>
+	<p>
+Our lives were never our own.
+It just felt that way sometimes.
+We borrowed them from the world,
+And must soon return them.
+Look around and see for yourself,
+People are coming and going
+From this place all the time.
+So when it's my time to live,
+I'll give it what I can.
+And when it's my time to die,
+I won't complain too much.
+I saw when I was young
+That being alive was strange,
+And it's a lot easier to be gone
+Than to be here.
+	</p>
+
 	<h3>The Inverted Man</h3>
 	<p>
 The man who lived upside down,
