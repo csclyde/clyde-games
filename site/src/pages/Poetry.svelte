@@ -2,7 +2,7 @@
 </script>
 
 <main>
-	<h3>Death Poem</h3>
+	<h3>The Waiting Room</h3>
 	<p>
 Our lives were never our own.
 It just felt that way sometimes.
@@ -18,7 +18,7 @@ I won't complain too much.
 I saw when I was young
 That being alive was strange,
 And it's a lot easier to be gone
-Than to be here.
+Than it is to be here.
 	</p>
 
 	<h3>The Inverted Man</h3>

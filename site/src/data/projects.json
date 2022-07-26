@@ -1,5 +1,12 @@
 [
     {
+        "name": "Game Designer Guild",
+        "href": "https://gamedesignerguild.com",
+        "img": "/img/guild.jpg",
+        "desc": "A forum for giving and receiving useful, long-form feedback on game development projects.",
+        "tools": "Discourse"
+    },
+    {
         "name": "Into the Necrovale",
         "href": "https://clydegames.itch.io/necrovale",
         "img": "/img/necrovale.png",
