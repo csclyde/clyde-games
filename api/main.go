@@ -3,6 +3,7 @@ package main
 // import "net/http"
 import (
 	"api.clyde.games/endpoints"
+	"api.clyde.games/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -33,6 +34,17 @@ func main() {
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
 	router.POST("/words/unknown", endpoints.GetUnknownWords)
 	router.POST("/words/update", endpoints.UpdateWords)
+
+	var err error
+	models.AnalyticsDB, err = models.GetDB("analytics")
+	if err != nil {
+		panic(err)
+	}
+
+	models.EtymologyDB, err = models.GetDB("etymology")
+	if err != nil {
+		panic(err)
+	}
 
 	router.Run(":9990")
 }

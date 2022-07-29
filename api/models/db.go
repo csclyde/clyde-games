@@ -5,7 +5,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func getDB(name string) (*gorm.DB, error) {
+var AnalyticsDB *gorm.DB
+var EtymologyDB *gorm.DB
+
+func GetDB(name string) (*gorm.DB, error) {
 	dbs := "root:root@tcp(127.0.0.1:3306)/" + name + "?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dbs), &gorm.Config{})
 	if err != nil {

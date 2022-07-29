@@ -15,13 +15,8 @@ type Event struct {
 }
 
 func SelectAllEvents() ([]Event, error) {
-	db, err := getDB("analytics")
-	if err != nil {
-		return nil, err
-	}
-
 	var allEvents []Event
-	result := db.Order("created_at desc").Find(&allEvents)
+	result := AnalyticsDB.Order("created_at desc").Find(&allEvents)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -31,12 +26,7 @@ func SelectAllEvents() ([]Event, error) {
 }
 
 func AddEvent(event Event) (*Event, error) {
-	db, err := getDB("analytics")
-	if err != nil {
-		return nil, err
-	}
-
-	result := db.Create(&event)
+	result := AnalyticsDB.Create(&event)
 
 	if result.Error != nil {
 		return nil, result.Error

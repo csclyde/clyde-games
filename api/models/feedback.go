@@ -17,13 +17,8 @@ type Feedback struct {
 }
 
 func SelectAllFeedback() ([]Feedback, error) {
-	db, err := getDB("analytics")
-	if err != nil {
-		return nil, err
-	}
-
 	var allFeedback []Feedback
-	result := db.Order("created_at desc").Find(&allFeedback)
+	result := AnalyticsDB.Order("created_at desc").Find(&allFeedback)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -33,12 +28,7 @@ func SelectAllFeedback() ([]Feedback, error) {
 }
 
 func AddFeedback(fb Feedback) (*Feedback, error) {
-	db, err := getDB("analytics")
-	if err != nil {
-		return nil, err
-	}
-
-	result := db.Create(&fb)
+	result := AnalyticsDB.Create(&fb)
 
 	if result.Error != nil {
 		return nil, result.Error

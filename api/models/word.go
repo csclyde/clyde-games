@@ -20,13 +20,8 @@ type Word struct {
 }
 
 func SelectWords(from []string) ([]Word, error) {
-	db, err := getDB("etymology")
-	if err != nil {
-		return nil, err
-	}
-
 	var allWords []Word
-	result := db.Where("Text IN ?", from).Find(&allWords)
+	result := EtymologyDB.Where("Text IN ?", from).Find(&allWords)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -36,13 +31,8 @@ func SelectWords(from []string) ([]Word, error) {
 }
 
 func SelectUnknownWords() ([]Word, error) {
-	db, err := getDB("etymology")
-	if err != nil {
-		return nil, err
-	}
-
 	var unknownWords []Word
-	result := db.Where("Origin = ?", 0).Find(&unknownWords)
+	result := EtymologyDB.Where("Origin = ?", 0).Find(&unknownWords)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -52,12 +42,7 @@ func SelectUnknownWords() ([]Word, error) {
 }
 
 func AddWord(word Word) (*Word, error) {
-	db, err := getDB("etymology")
-	if err != nil {
-		return nil, err
-	}
-
-	result := db.Create(&word)
+	result := EtymologyDB.Create(&word)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -66,12 +51,7 @@ func AddWord(word Word) (*Word, error) {
 }
 
 func AddWords(words []Word) ([]Word, error) {
-	db, err := getDB("etymology")
-	if err != nil {
-		return nil, err
-	}
-
-	result := db.CreateInBatches(&words, 100)
+	result := EtymologyDB.CreateInBatches(&words, 100)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -80,13 +60,8 @@ func AddWords(words []Word) ([]Word, error) {
 }
 
 func UpdateWords(words []Word) ([]Word, error) {
-	db, err := getDB("etymology")
-	if err != nil {
-		return nil, err
-	}
-
 	for _, w := range words {
-		result := db.Save(&w)
+		result := EtymologyDB.Save(&w)
 		if result.Error != nil {
 			return nil, result.Error
 		}
