@@ -22,12 +22,29 @@
 		}
 	}
 
+	async function getWordStats() {
+		const res = await fetch(`https://api.clyde.games/words/stats`, {
+			method: 'POST',
+		});
+
+		const stats = await res.json();
+
+		if (res.ok) {
+			return stats;
+		} else {
+			throw new Error(stats);
+		}
+	}
+
 	let analyzedText = '';
+
+	let stats = getWordStats();
 </script>
 
 <main>
 	<h2>Analyze Word Origins</h2>
 	<hr/>
+	<small>{JSON.stringify(stats)}</small>
 
 	<textarea bind:value={analyzedText}></textarea>
 	<button on:click={analyzeWords}>Analyze</button>

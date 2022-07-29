@@ -19,6 +19,16 @@ type Word struct {
 	Origin int    `gorm:"default:0"`
 }
 
+type Stats struct {
+	Total    int64
+	Unknown  int
+	Germanic int
+	French   int
+	Latin    int
+	Greek    int
+	Other    int
+}
+
 func SelectWords(from []string) ([]Word, error) {
 	var allWords []Word
 	result := EtymologyDB.Where("Text IN ?", from).Find(&allWords)
@@ -41,15 +51,6 @@ func SelectUnknownWords() ([]Word, error) {
 	return unknownWords, nil
 }
 
-func AddWord(word Word) (*Word, error) {
-	result := EtymologyDB.Create(&word)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	return &word, nil
-}
-
 func AddWords(words []Word) ([]Word, error) {
 	result := EtymologyDB.CreateInBatches(&words, 100)
 	if result.Error != nil {
@@ -68,4 +69,37 @@ func UpdateWords(words []Word) ([]Word, error) {
 	}
 
 	return words, nil
+}
+
+func SelectStatistics() (*Stats, error) {
+	var stats Stats
+
+	var allWords []Word
+	result := EtymologyDB.Find(&allWords)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	stats.Total = result.RowsAffected
+
+	for _, w := range allWords {
+		switch w.Origin {
+		case 0:
+			stats.Unknown += 1
+		case 1:
+			stats.Germanic += 1
+		case 2:
+			stats.French += 1
+		case 3:
+			stats.Latin += 1
+		case 4:
+			stats.Greek += 1
+		case 5:
+			stats.Other += 1
+		default:
+			stats.Unknown += 1
+		}
+	}
+
+	return &stats, nil
 }

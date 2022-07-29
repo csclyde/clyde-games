@@ -23,6 +23,16 @@ func GetUnknownWords(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, unknowns)
 }
 
+func GetWordStats(c *gin.Context) {
+	stats, err := models.SelectStatistics()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, stats)
+}
+
 func UpdateWords(c *gin.Context) {
 	var words []models.Word
 
