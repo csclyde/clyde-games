@@ -2,7 +2,6 @@ package models
 
 import (
 	"gorm.io/datatypes"
-	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -16,13 +15,7 @@ type Event struct {
 }
 
 func SelectAllEvents() ([]Event, error) {
-	dbs := "root:root@tcp(127.0.0.1:3306)/analytics?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(mysql.Open(dbs), &gorm.Config{})
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.AutoMigrate(&Event{})
+	db, err := getDB("analytics")
 	if err != nil {
 		return nil, err
 	}
@@ -38,13 +31,10 @@ func SelectAllEvents() ([]Event, error) {
 }
 
 func AddEvent(event Event) (*Event, error) {
-	dbs := "root:root@tcp(127.0.0.1:3306)/analytics?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(mysql.Open(dbs), &gorm.Config{})
+	db, err := getDB("analytics")
 	if err != nil {
 		return nil, err
 	}
-
-	db.AutoMigrate(&Event{})
 
 	result := db.Create(&event)
 

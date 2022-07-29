@@ -1,7 +1,6 @@
 package models
 
 import (
-	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -18,13 +17,7 @@ type Feedback struct {
 }
 
 func SelectAllFeedback() ([]Feedback, error) {
-	dbs := "root:root@tcp(127.0.0.1:3306)/analytics?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(mysql.Open(dbs), &gorm.Config{})
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.AutoMigrate(&Feedback{})
+	db, err := getDB("analytics")
 	if err != nil {
 		return nil, err
 	}
@@ -40,13 +33,10 @@ func SelectAllFeedback() ([]Feedback, error) {
 }
 
 func AddFeedback(fb Feedback) (*Feedback, error) {
-	dbs := "root:root@tcp(127.0.0.1:3306)/analytics?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(mysql.Open(dbs), &gorm.Config{})
+	db, err := getDB("analytics")
 	if err != nil {
 		return nil, err
 	}
-
-	db.AutoMigrate(&Feedback{})
 
 	result := db.Create(&fb)
 

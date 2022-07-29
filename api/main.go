@@ -30,5 +30,7 @@ func main() {
 	router.GET("/event", endpoints.GetEvent)
 	router.POST("/event", endpoints.AddEvent)
 
+	router.POST("/words/analyze", endpoints.AnalyzeWords)
+
 	router.Run(":9990")
 }
