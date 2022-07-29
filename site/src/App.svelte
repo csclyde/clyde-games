@@ -5,6 +5,8 @@
 	import Poetry from './pages/Poetry.svelte';
 	import Van from './pages/Van.svelte';
 	import Feedback from './pages/Feedback.svelte';
+	import AnalyzeWords from "./pages/AnalyzeWords.svelte";
+	import UnknownWords from "./pages/UnknownWords.svelte";
 
 	let page;
 
@@ -13,6 +15,8 @@
 	router('/poetry', () => page = Poetry);
 	router('/van', () => page = Van);
 	router('/feedback', () => page = Feedback);
+	router('/analyze-words', () => page = AnalyzeWords);
+	router('/unknown-words', () => page = UnknownWords);
 
 	router.start();
 </script>
