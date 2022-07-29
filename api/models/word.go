@@ -79,16 +79,18 @@ func AddWords(words []Word) ([]Word, error) {
 	return words, nil
 }
 
-func UpdateWord(word Word) (*Word, error) {
+func UpdateWords(words []Word) ([]Word, error) {
 	db, err := getDB("etymology")
 	if err != nil {
 		return nil, err
 	}
 
-	result := db.Save(&word)
-	if result.Error != nil {
-		return nil, result.Error
+	for _, w := range words {
+		result := db.Save(&w)
+		if result.Error != nil {
+			return nil, result.Error
+		}
 	}
 
-	return &word, nil
+	return words, nil
 }

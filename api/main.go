@@ -31,6 +31,8 @@ func main() {
 	router.POST("/event", endpoints.AddEvent)
 
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
+	router.POST("/words/unknown", endpoints.GetUnknownWords)
+	router.POST("/words/update", endpoints.UpdateWords)
 
 	router.Run(":9990")
 }

@@ -13,6 +13,36 @@ type WordRequest struct {
 	Text string
 }
 
+func GetUnknownWords(c *gin.Context) {
+	unknowns, err := models.SelectUnknownWords()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, unknowns)
+}
+
+func UpdateWords(c *gin.Context) {
+	var words []models.Word
+
+	if err := c.BindJSON(&words); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// open db connection
+	updatedWords, err := models.UpdateWords(words)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+
+	}
+
+	c.IndentedJSON(http.StatusCreated, updatedWords)
+}
+
 func AnalyzeWords(c *gin.Context) {
 	// get the words from the request body
 	var request WordRequest
