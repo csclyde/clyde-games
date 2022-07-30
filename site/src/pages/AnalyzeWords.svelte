@@ -1,8 +1,10 @@
 <script>
 	async function analyzeWords() {
 		var body = {
-			text: analyzedText,
+			text: analysisText,
 		}
+
+		analysisText = '';
 
 		const res = await fetch(`https://api.clyde.games/words/analyze`, {
 			method: 'POST',
@@ -15,7 +17,6 @@
 		const words = await res.json();
 
 		if (res.ok) {
-			analyzedText = '';
 			return words;
 		} else {
 			throw new Error(words);
@@ -36,13 +37,23 @@
 		}
 	}
 
-	let analyzedText = '';
+	let analysisText = '';
+	let analyzePromise = null;
 
 	let statsPromise = getWordStats();
 
 	function pct(n) {
 		return (Math.floor(n * 1000) / 10)
 	}
+
+	let colors = [
+		'black',
+		'green',
+		'blue',
+		'orange',
+		'red',
+		'gray'
+	]
 </script>
 
 <main>
@@ -64,8 +75,31 @@
 		<p style="color: red">{error.message}</p>
 	{/await}
 
-	<textarea bind:value={analyzedText}></textarea>
-	<button on:click={analyzeWords}>Analyze</button>
+	<textarea bind:value={analysisText}></textarea>
+	<button on:click={() => analyzePromise = analyzeWords()}>Analyze</button>
+
+	{#if analyzePromise != null}
+	{#await analyzePromise}
+	<p>loading...</p>
+	{:then wordList}
+	<section>
+		<p style="color:{ colors[0] }">Unknown</p>
+		<p style="color:{ colors[1] }">Germanic</p>
+		<p style="color:{ colors[2] }">French</p>
+		<p style="color:{ colors[3] }">Latin</p>
+		<p style="color:{ colors[4] }">Greek</p>
+		<p style="color:{ colors[5] }">Other</p>
+	</section>
+	<div class="results">
+		{#each wordList as word}
+		<small style="color:{ colors[word.Origin] }">{word.Text}</small>
+		{/each}
+	</div>
+	{:catch error}
+	<p style="color: red">{error.message}</p>
+	{/await}
+	{/if}
+
 </main>
 
 <style>
@@ -77,12 +111,20 @@
 	}
 
 	textarea {
-		width: 50%;
+		width: 75%;
 		height: 300px;
 	}
 
 	section {
 		display: flex;
 		gap: 16px;
+		flex-wrap: wrap;
+	}
+
+	.results {
+		display: flex;
+		flex-wrap: wrap;
+		max-width: 75%;
+		gap: 4px;
 	}
 </style>
