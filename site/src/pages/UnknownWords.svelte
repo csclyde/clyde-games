@@ -41,7 +41,7 @@
 		<section>
 		{#each words as word}
 			<div class="word-item">
-				<a target="blank" href='https://etymonline.com/word/{word.Text}"'>{word.Text}</a>
+				<a target="blank" href='https://etymonline.com/word/{word.Text}'>{word.Text}</a>
 				<button on:click={() => updateWord(word, 1)}>Germanic</button>
 				<button on:click={() => updateWord(word, 2)}>French</button>
 				<button on:click={() => updateWord(word, 3)}>Latin</button>
