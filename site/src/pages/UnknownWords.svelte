@@ -47,6 +47,7 @@
 				<button on:click={() => updateWord(word, 3)}>Latin</button>
 				<button on:click={() => updateWord(word, 4)}>Greek</button>
 				<button on:click={() => updateWord(word, 5)}>Other</button>
+				<button on:click={() => updateWord(word, -1)}>Nonsense</button>
 			</div>
 		{/each}
 		</section>
