@@ -83,12 +83,12 @@
 	<p>loading...</p>
 	{:then analysis}
 	<section>
-		<p style="color:{ colors[0] }">Unknown: {pct(analysis.Statistics.Unknown / analysisText.Statistics.Total)}</p>
-		<p style="color:{ colors[1] }">Germanic: {pct(analysis.Statistics.Germanic / analysisText.Statistics.Total)}</p>
-		<p style="color:{ colors[2] }">French: {pct(analysis.Statistics.French / analysisText.Statistics.Total)}</p>
-		<p style="color:{ colors[3] }">Latin: {pct(analysis.Statistics.Latin / analysisText.Statistics.Total)}</p>
-		<p style="color:{ colors[4] }">Greek: {pct(analysis.Statistics.Greek / analysisText.Statistics.Total)}</p>
-		<p style="color:{ colors[5] }">Other: {pct(analysis.Statistics.Other / analysisText.Statistics.Total)}</p>
+		<p style="color:{ colors[0] }">Unknown: {pct(analysis.Statistics.Unknown / analysis.Statistics.Total)}%</p>
+		<p style="color:{ colors[1] }">Germanic: {pct(analysis.Statistics.Germanic / analysis.Statistics.Total)}%</p>
+		<p style="color:{ colors[2] }">French: {pct(analysis.Statistics.French / analysis.Statistics.Total)}%</p>
+		<p style="color:{ colors[3] }">Latin: {pct(analysis.Statistics.Latin / analysis.Statistics.Total)}%</p>
+		<p style="color:{ colors[4] }">Greek: {pct(analysis.Statistics.Greek / analysis.Statistics.Total)}%</p>
+		<p style="color:{ colors[5] }">Other: {pct(analysis.Statistics.Other / analysis.Statistics.Total)}%</p>
 	</section>
 	<div class="results">
 		{#each analysis.Words as word}
