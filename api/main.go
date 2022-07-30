@@ -34,7 +34,7 @@ func main() {
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
 	router.POST("/words/unknown", endpoints.GetUnknownWords)
 	router.POST("/words/update", endpoints.UpdateWords)
-	router.POST("/words/stats", endpoints.GetWordStats)
+	router.POST("/words/stats", endpoints.GetAllWordStats)
 
 	var err error
 	models.AnalyticsDB, err = models.GetDB("analytics")

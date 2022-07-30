@@ -13,6 +13,21 @@ type WordRequest struct {
 	Text string
 }
 
+type WordResponse struct {
+	Words      []models.Word
+	Statistics Stats
+}
+
+type Stats struct {
+	Total    int
+	Unknown  int
+	Germanic int
+	French   int
+	Latin    int
+	Greek    int
+	Other    int
+}
+
 func GetUnknownWords(c *gin.Context) {
 	unknowns, err := models.SelectUnknownWords()
 	if err != nil {
@@ -23,14 +38,41 @@ func GetUnknownWords(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, unknowns)
 }
 
-func GetWordStats(c *gin.Context) {
-	stats, err := models.SelectStatistics()
+func GetAllWordStats(c *gin.Context) {
+	words, err := models.SelectAllWords()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, stats)
+	c.IndentedJSON(http.StatusOK, GenerateStats(words))
+}
+
+func GenerateStats(words []models.Word) Stats {
+	var stats Stats
+
+	stats.Total = len(words)
+
+	for _, w := range words {
+		switch w.Origin {
+		case 0:
+			stats.Unknown += 1
+		case 1:
+			stats.Germanic += 1
+		case 2:
+			stats.French += 1
+		case 3:
+			stats.Latin += 1
+		case 4:
+			stats.Greek += 1
+		case 5:
+			stats.Other += 1
+		default:
+			stats.Unknown += 1
+		}
+	}
+
+	return stats
 }
 
 func UpdateWords(c *gin.Context) {
@@ -124,7 +166,11 @@ func AnalyzeWords(c *gin.Context) {
 		}
 	}
 
-	c.IndentedJSON(http.StatusCreated, analyzedText)
+	var resp WordResponse
+	resp.Words = analyzedText
+	resp.Statistics = GenerateStats(analyzedText)
+
+	c.IndentedJSON(http.StatusCreated, resp)
 }
 
 func stripSymbols(text string) (string, error) {

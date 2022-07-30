@@ -81,17 +81,17 @@
 	{#if analyzePromise != null}
 	{#await analyzePromise}
 	<p>loading...</p>
-	{:then wordList}
+	{:then analysis}
 	<section>
-		<p style="color:{ colors[0] }">Unknown</p>
-		<p style="color:{ colors[1] }">Germanic</p>
-		<p style="color:{ colors[2] }">French</p>
-		<p style="color:{ colors[3] }">Latin</p>
-		<p style="color:{ colors[4] }">Greek</p>
-		<p style="color:{ colors[5] }">Other</p>
+		<p style="color:{ colors[0] }">Unknown: {pct(analysis.Statistics.Unknown / analysisText.Statistics.Total)}</p>
+		<p style="color:{ colors[1] }">Germanic: {pct(analysis.Statistics.Germanic / analysisText.Statistics.Total)}</p>
+		<p style="color:{ colors[2] }">French: {pct(analysis.Statistics.French / analysisText.Statistics.Total)}</p>
+		<p style="color:{ colors[3] }">Latin: {pct(analysis.Statistics.Latin / analysisText.Statistics.Total)}</p>
+		<p style="color:{ colors[4] }">Greek: {pct(analysis.Statistics.Greek / analysisText.Statistics.Total)}</p>
+		<p style="color:{ colors[5] }">Other: {pct(analysis.Statistics.Other / analysisText.Statistics.Total)}</p>
 	</section>
 	<div class="results">
-		{#each wordList as word}
+		{#each analysis.Words as word}
 		<small style="color:{ colors[word.Origin] }">{word.Text}</small>
 		{/each}
 	</div>
