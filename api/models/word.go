@@ -62,7 +62,16 @@ func AddWords(words []Word) ([]Word, error) {
 
 func UpdateWords(words []Word) ([]Word, error) {
 	for _, w := range words {
-		result := EtymologyDB.Save(&w)
+		var existingWord Word
+		result := EtymologyDB.Where("Text = ?", w.Text).First(&existingWord)
+
+		if result.RowsAffected > 0 {
+			existingWord.Origin = w.Origin
+			result = EtymologyDB.Save(&existingWord)
+		} else {
+			result = EtymologyDB.Save(&w)
+		}
+
 		if result.Error != nil {
 			return nil, result.Error
 		}
