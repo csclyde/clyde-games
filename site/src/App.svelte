@@ -24,7 +24,7 @@
 <svelte:component this={page} />
 
 <footer>
-	<small>Contact me at &nbsp;<img class="contact-image" src="img/em.png" alt="The place where I can be contacted"/></small>
+	<small>Contact me at &nbsp;<img class="contact-image" src="/img/em.png" alt="The place where I can be contacted"/></small>
 	<a href="/about">About me</a>
 	<small><i>Built with: Svelte</i></small>
 </footer>

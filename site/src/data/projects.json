@@ -1,5 +1,12 @@
 [
     {
+        "name": "Word Origin Analysis",
+        "href": "/words/analyze",
+        "img": "/img/monk.jpeg",
+        "desc": "A tool to analyze and display the origin of English words.",
+        "tools": "Golang, Svelte"
+    },
+    {
         "name": "Game Designer Guild",
         "href": "https://gamedesignerguild.com",
         "img": "/img/guild.jpg",
