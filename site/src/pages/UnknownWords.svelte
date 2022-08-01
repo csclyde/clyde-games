@@ -16,9 +16,7 @@
 	async function updateWord(w, o) {
 		w.Origin = o;
 		var body = [w];
-		arbWord.Text = '';
-		arbWord.Origin = 0;
-
+		
 		const res = await fetch(`https://api.clyde.games/words/update`, {
 			method: 'POST',
 			body: JSON.stringify(body),
@@ -27,7 +25,10 @@
 			},
 		}).then(r => {
 			promise = getUnknownWords();
+			arbWord.Text = '';
+			arbWord.Origin = 0;
 		});
+
 	}
 
 	let promise = getUnknownWords();
