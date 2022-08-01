@@ -29,6 +29,10 @@
 	}
 
 	let promise = getUnknownWords();
+	let arbWord = {
+		Origin: 0,
+		Text: ''
+	};
 </script>
 
 <main>
@@ -39,6 +43,14 @@
 		<p>loading...</p>
 	{:then words}
 		<section>
+			<div class="word-item">
+				<input bind:value={arbWord.Text}/>
+				<button on:click={() => updateWord(arbWord, 1)}>Germanic</button>
+				<button on:click={() => updateWord(arbWord, 2)}>French</button>
+				<button on:click={() => updateWord(arbWord, 3)}>Latin</button>
+				<button on:click={() => updateWord(arbWord, 4)}>Greek</button>
+				<button on:click={() => updateWord(arbWord, 5)}>Other</button>
+			</div>
 		{#each words as word}
 			<div class="word-item">
 				<a target="blank" href='https://etymonline.com/word/{word.Text}'>{word.Text}</a>
