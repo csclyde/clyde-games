@@ -15,8 +15,8 @@
 	router('/poetry', () => page = Poetry);
 	router('/van', () => page = Van);
 	router('/feedback', () => page = Feedback);
-	router('/analyze-words', () => page = AnalyzeWords);
-	router('/unknown-words', () => page = UnknownWords);
+	router('/words/analyze', () => page = AnalyzeWords);
+	router('/words/unknown', () => page = UnknownWords);
 
 	router.start();
 </script>
