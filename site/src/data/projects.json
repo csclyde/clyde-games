@@ -9,7 +9,7 @@
     {
         "name": "Game Designer Guild",
         "href": "https://gamedesignerguild.com",
-        "img": "/img/guild.jpg",
+        "img": "/img/gdg.png",
         "desc": "A forum for giving and receiving useful, long-form feedback on game development projects.",
         "tools": "Discourse"
     },
