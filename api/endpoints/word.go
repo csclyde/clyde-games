@@ -111,7 +111,7 @@ func AnalyzeWords(c *gin.Context) {
 	}
 	processedString = strings.ToLower(processedString)
 	wordArray := strings.Split(processedString, " ")
-	uniqueWordArray := removeDuplicateWords((wordArray))
+	uniqueWordArray := removeDuplicateWords(wordArray)
 
 	// grab all those words from the DB
 	queriedWords, err := models.SelectWords(uniqueWordArray)
@@ -192,7 +192,9 @@ func removeDuplicateWords(words []string) []string {
 	for _, entry := range words {
 		if _, value := keys[entry]; !value {
 			keys[entry] = true
-			list = append(list, entry)
+			if entry != "" {
+				list = append(list, entry)
+			}
 		}
 	}
 	return list
