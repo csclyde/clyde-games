@@ -92,7 +92,7 @@
 	</section>
 	<div class="results">
 		{#each analysis.Words as word}
-		<small style="color:{ colors[word.Origin] }">{word.Text}</small>
+		<a target="_blank" href='https://www.etymonline.com/word/{word.Text}' style="color:{ colors[word.Origin] }">{word.Text}</a>
 		{/each}
 	</div>
 	{:catch error}
