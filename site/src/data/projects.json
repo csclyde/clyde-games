@@ -42,13 +42,6 @@
         "tools": "JavaScript, Phaser.io, Electron"
     },
     {
-        "name": "The Stupefied Cretin",
-        "href": "https://stupefiedcretin.blogspot.com/",
-        "img": "/img/cretin.jpeg",
-        "desc": "A blog about modernity.",
-        "tools": "Blogger"
-    },
-    {
         "name": "ARC",
         "href": "https://clydegames.itch.io/arc",
         "img": "/img/arc.png",
