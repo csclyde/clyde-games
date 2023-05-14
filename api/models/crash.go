@@ -10,7 +10,6 @@ type Crash struct {
 	Project  string `gorm:"type:tinytext"`
 	Message  string `gorm:"type:text"`
 	Stack    string `gorm:"type:text"`
-	Rating   uint8
 	Env      string `gorm:"type:tinytext"`
 	Category string `gorm:"type:tinytext"`
 	Platform string `gorm:"type:tinytext"`

@@ -7,10 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetCrash(c *gin.Context) {
+func GetFeedback(c *gin.Context) {
 
-	// retrieve all crash from the db
-	crash, err := models.SelectAllCrash()
+	// retrieve all feedback from the db
+	feedback, err := models.SelectAllFeedback()
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -18,25 +18,25 @@ func GetCrash(c *gin.Context) {
 	}
 
 	// check the result, and return it as JSON
-	if len(crash) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No crash found"})
+	if len(feedback) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No feedback found"})
 
 		return
 	} else {
-		c.IndentedJSON(http.StatusOK, crash)
+		c.IndentedJSON(http.StatusOK, feedback)
 	}
 }
 
-func AddCrash(c *gin.Context) {
-	var crash models.Crash
+func AddFeedback(c *gin.Context) {
+	var feedback models.Feedback
 
-	if err := c.BindJSON(&crash); err != nil {
+	if err := c.BindJSON(&feedback); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// open db connection
-	updatedCrash, err := models.AddCrash(crash)
+	updatedFeedback, err := models.AddFeedback(feedback)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -44,5 +44,5 @@ func AddCrash(c *gin.Context) {
 
 	}
 
-	c.IndentedJSON(http.StatusCreated, updatedCrash)
+	c.IndentedJSON(http.StatusCreated, updatedFeedback)
 }
