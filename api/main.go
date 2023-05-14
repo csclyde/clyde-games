@@ -30,6 +30,8 @@ func main() {
 	router.POST("/feedback", endpoints.AddFeedback)
 	router.GET("/event", endpoints.GetEvent)
 	router.POST("/event", endpoints.AddEvent)
+	router.GET("/crash", endpoints.GetCrash)
+	router.POST("/crash", endpoints.AddCrash)
 
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
 	router.POST("/words/unknown", endpoints.GetUnknownWords)

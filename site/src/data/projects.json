@@ -14,13 +14,6 @@
         "tools": "Golang, Svelte"
     },
     {
-        "name": "Game Designer Guild",
-        "href": "https://gamedesignerguild.com",
-        "img": "/img/gdg.png",
-        "desc": "A forum for giving and receiving useful, long-form feedback on game development projects.",
-        "tools": "Discourse"
-    },
-    {
         "name": "VectorLance",
         "href": "https://clydegames.itch.io/vectorlance",
         "img": "/img/vl.png",
