@@ -10,7 +10,7 @@ import (
 func GetCrash(c *gin.Context) {
 
 	// retrieve all crash from the db
-	crash, err := models.SelectAllFeedback()
+	crash, err := models.SelectAllCrash()
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
