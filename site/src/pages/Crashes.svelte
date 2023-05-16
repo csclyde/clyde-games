@@ -1,4 +1,6 @@
 <script>
+    import Poetry from "./Poetry.svelte";
+
 	async function getCrashes() {
 		const res = await fetch(`https://api.clyde.games/crash`);
 		const crashes = await res.json();
@@ -11,6 +13,24 @@
 	}
 
 	let promise = getCrashes();
+
+	function getStack(crash) {
+		var stack = crash.Stack.split('FilePos');
+
+		if(stack.length > 0 && stack[0] == '[') {
+			stack.shift();
+		}
+
+		for(const i in stack) {
+			stack[i] = stack[i].replaceAll('[', '');
+			stack[i] = stack[i].replaceAll(']', '');
+			stack[i] = stack[i].replaceAll('(', ' ');
+			stack[i] = stack[i].replaceAll(')', ' ');
+			stack[i] = stack[i].replaceAll(',', '::');
+		}
+
+		return stack;
+	}
 
 	let colors = [
 		'black',
@@ -34,9 +54,13 @@
 		{#each crashes as crash}
 			<div class="comment">
 				<div class="comment-body">
-					<p class="message">{crash.Message}</p>
-					<p class="message">{crash.Stack}</p>
 					<p class="created">{new Date(crash.CreatedAt).toLocaleString()}</p>
+					<div class="stack">
+						<p class="message"><b>{crash.Message}</b></p>
+						{#each getStack(crash) as stackMessage}
+							<p class="message">{stackMessage}</p>
+						{/each}
+					</div>
 				</div>
 				<div class="comment-footer">
 					<small>{crash.PID}:{crash.Platform}:{crash.Project}:{crash.Env}</small>
@@ -68,6 +92,11 @@
 		display: flex;
 		flex-direction: row;
 		align-items: center;
+	}
+
+	.stack {
+		display: flex;
+		flex-direction: column;
 	}
 
 	.comment-footer {
