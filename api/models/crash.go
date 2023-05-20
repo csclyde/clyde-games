@@ -1,8 +1,6 @@
 package models
 
 import (
-	"time"
-
 	"gorm.io/gorm"
 )
 
@@ -15,7 +13,7 @@ type Crash struct {
 	Env      string `gorm:"type:tinytext"`
 	Category string `gorm:"type:tinytext"`
 	Platform string `gorm:"type:tinytext"`
-	Build    time.Time
+	Build    string `gorm:"type:tinytext"`
 	Commit   string `gorm:"type:tinytext"`
 	Hash     string `gorm:"type:tinytext"`
 	Count    uint
