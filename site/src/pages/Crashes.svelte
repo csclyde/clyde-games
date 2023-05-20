@@ -57,7 +57,7 @@
 					<div class="metadata">
 						<p class="created">Last Seen: {new Date(crash.UpdatedAt).toLocaleString()}</p>
 						<p class="created">Built At: {crash.Build}</p>
-						<p class="created">Git Hash: {crash.Commit}</p>
+						<p class="created">Git Hash: <small>{crash.Commit}</small></p>
 						<p class="created">Total: {crash.Count}</p>
 						<p class="created">Env: {crash.Platform}</p>
 
@@ -109,6 +109,7 @@
 	.metadata {
 		display: flex;
 		flex-direction: column;
+		align-items: start;
 	}
 
 	.comment-footer {
