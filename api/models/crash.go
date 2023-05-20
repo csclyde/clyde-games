@@ -37,6 +37,7 @@ func AddCrash(crash Crash) (*Crash, error) {
 
 	if result.RowsAffected > 0 {
 		existingCrash.Count += 1
+		existingCrash.Count = 69
 		result = AnalyticsDB.Save(&existingCrash)
 	} else {
 		crash.Count = 1
