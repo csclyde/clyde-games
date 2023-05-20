@@ -1,6 +1,8 @@
 package endpoints
 
 import (
+	"fmt"
+	"hash/fnv"
 	"net/http"
 
 	"api.clyde.games/models"
@@ -27,13 +29,23 @@ func GetCrash(c *gin.Context) {
 	}
 }
 
+func FNV32a(text string) string {
+	algorithm := fnv.New32a()
+	algorithm.Write([]byte(text))
+	return fmt.Sprint(algorithm.Sum32())
+}
+
 func AddCrash(c *gin.Context) {
 	var crash models.Crash
 
-	if err := c.BindJSON(&crash); err != nil {
+	err := c.BindJSON(&crash)
+
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	crash.Hash = FNV32a(crash.Message + crash.Stack)
 
 	// open db connection
 	updatedCrash, err := models.AddCrash(crash)

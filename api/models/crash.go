@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -13,6 +15,10 @@ type Crash struct {
 	Env      string `gorm:"type:tinytext"`
 	Category string `gorm:"type:tinytext"`
 	Platform string `gorm:"type:tinytext"`
+	Build    time.Time
+	Commit   string `gorm:"type:tinytext"`
+	Hash     string `gorm:"type:tinytext"`
+	Count    uint
 }
 
 func SelectAllCrash() ([]Crash, error) {
@@ -27,7 +33,17 @@ func SelectAllCrash() ([]Crash, error) {
 }
 
 func AddCrash(crash Crash) (*Crash, error) {
-	result := AnalyticsDB.Create(&crash)
+
+	var existingCrash Crash
+	result := AnalyticsDB.Where("Hash = ?", crash.Hash).First(&existingCrash)
+
+	if result.RowsAffected > 0 {
+		existingCrash.Count = existingCrash.Count + 1
+		result = AnalyticsDB.Save(&existingCrash)
+	} else {
+		crash.Count = 1
+		result = AnalyticsDB.Save(&crash)
+	}
 
 	if result.Error != nil {
 		return nil, result.Error
