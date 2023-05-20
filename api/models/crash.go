@@ -16,7 +16,7 @@ type Crash struct {
 	Build    string `gorm:"type:tinytext"`
 	Commit   string `gorm:"type:tinytext"`
 	Hash     string `gorm:"type:tinytext"`
-	Count    uint
+	Count    uint   `gorm:"type:int"`
 }
 
 func SelectAllCrash() ([]Crash, error) {
@@ -37,7 +37,6 @@ func AddCrash(crash Crash) (*Crash, error) {
 
 	if result.RowsAffected > 0 {
 		existingCrash.Count += 1
-		existingCrash.Count = 69
 		result = AnalyticsDB.Save(&existingCrash)
 	} else {
 		crash.Count = 1

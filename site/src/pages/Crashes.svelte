@@ -54,7 +54,14 @@
 		{#each crashes as crash}
 			<div class="comment">
 				<div class="comment-body">
-					<p class="created">{new Date(crash.CreatedAt).toLocaleString()}</p>
+					<div class="metadata">
+						<p class="created">Last Seen: {new Date(crash.UpdatedAt).toLocaleString()}</p>
+						<p class="created">Built At: {crash.Build}</p>
+						<p class="created">Git Hash: {crash.Commit}</p>
+						<p class="created">Total: {crash.Count}</p>
+						<p class="created">Env: {crash.Platform}</p>
+
+					</div>
 					<div class="stack">
 						<p class="message"><b>{crash.Message}</b></p>
 						{#each getStack(crash) as stackMessage}
@@ -63,7 +70,7 @@
 					</div>
 				</div>
 				<div class="comment-footer">
-					<small>{crash.PID}:{crash.Platform}:{crash.Project}:{crash.Env}</small>
+					<small>{crash.PID}:{crash.Project}:{crash.Env}</small>
 				</div>
 			</div>
 		{/each}
@@ -99,6 +106,11 @@
 		flex-direction: column;
 	}
 
+	.metadata {
+		display: flex;
+		flex-direction: column;
+	}
+
 	.comment-footer {
 		display: flex;
 		margin-top: 8px;
@@ -110,6 +122,7 @@
 
 	.created {
 		flex-shrink: 0;
+		font-size: small;
 	}
 
 	.message {
