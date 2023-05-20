@@ -36,7 +36,7 @@ func AddCrash(crash Crash) (*Crash, error) {
 	result := AnalyticsDB.Where("Hash = ?", crash.Hash).First(&existingCrash)
 
 	if result.RowsAffected > 0 {
-		existingCrash.Count = existingCrash.Count + 1
+		existingCrash.Count += 1
 		result = AnalyticsDB.Save(&existingCrash)
 	} else {
 		crash.Count = 1
