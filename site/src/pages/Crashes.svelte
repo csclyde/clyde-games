@@ -69,7 +69,7 @@
 						<p class="created">DB Hash: <small>{crash.Hash}</small></p>
 						<p class="created">Total: {crash.Count}</p>
 						<p class="created">Env: {crash.Platform}</p>
-						<button type="button" on:click={resolveCrash(crash.Hash)}>
+						<button type="button" on:click={() => resolveCrash(crash.Hash)}>
 							Resolve
 						</button>
 
