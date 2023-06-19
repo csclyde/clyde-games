@@ -31,7 +31,7 @@ func main() {
 	router.GET("/event", endpoints.GetEvent)
 	router.POST("/event", endpoints.AddEvent)
 	router.GET("/crash", endpoints.GetCrash)
-	router.GET("/crash/resolve", endpoints.ResolveCrash)
+	router.GET("/resolvecrash", endpoints.ResolveCrash)
 	router.POST("/crash", endpoints.AddCrash)
 
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
