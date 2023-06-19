@@ -58,6 +58,7 @@
 						<p class="created">Last Seen: {new Date(crash.UpdatedAt).toLocaleString()}</p>
 						<p class="created">Built At: {crash.Build}</p>
 						<p class="created">Git Hash: <small>{crash.Commit}</small></p>
+						<p class="created">DB Hash: <small>{crash.Hash}</small></p>
 						<p class="created">Total: {crash.Count}</p>
 						<p class="created">Env: {crash.Platform}</p>
 

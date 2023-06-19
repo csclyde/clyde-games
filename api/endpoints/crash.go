@@ -58,3 +58,9 @@ func AddCrash(c *gin.Context) {
 
 	c.IndentedJSON(http.StatusCreated, updatedCrash)
 }
+
+func ResolveCrash(c *gin.Context) {
+
+	models.ResolveCrash(c.Query("hash"))
+
+}
