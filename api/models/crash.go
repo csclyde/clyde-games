@@ -22,7 +22,7 @@ type Crash struct {
 
 func SelectAllCrash() ([]Crash, error) {
 	var allCrash []Crash
-	result := AnalyticsDB.Where("Resolved = false").Order("created_at desc").Find(&allCrash)
+	result := AnalyticsDB.Where("resolved = false").Order("created_at desc").Find(&allCrash)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -34,7 +34,7 @@ func SelectAllCrash() ([]Crash, error) {
 func AddCrash(crash Crash) (*Crash, error) {
 
 	var existingCrash Crash
-	result := AnalyticsDB.Where("Hash = ?", crash.Hash).First(&existingCrash)
+	result := AnalyticsDB.Where("hash = ?", crash.Hash).First(&existingCrash)
 
 	if result.RowsAffected > 0 {
 		existingCrash.Count += 1
@@ -54,7 +54,7 @@ func AddCrash(crash Crash) (*Crash, error) {
 
 func ResolveCrash(hash string) (*Crash, error) {
 	var existingCrash Crash
-	result := AnalyticsDB.Where("Hash = ?", hash).First(&existingCrash)
+	result := AnalyticsDB.Where("hash = ?", hash).First(&existingCrash)
 
 	if result.RowsAffected > 0 {
 		existingCrash.Resolved = true
