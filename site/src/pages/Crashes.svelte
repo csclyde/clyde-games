@@ -32,6 +32,14 @@
 		return stack;
 	}
 
+	async function resolveCrash(hash) {
+		const res = await fetch(`https://api.clyde.games/resolvecrash?hash=` + hash, {
+			method: 'GET'
+		})
+		
+		getCrashes();
+	}
+
 	let colors = [
 		'black',
 		'red',
@@ -61,6 +69,9 @@
 						<p class="created">DB Hash: <small>{crash.Hash}</small></p>
 						<p class="created">Total: {crash.Count}</p>
 						<p class="created">Env: {crash.Platform}</p>
+						<button type="button" on:click={resolveCrash(crash.Hash)}>
+							Resolve
+						</button>
 
 					</div>
 					<div class="stack">

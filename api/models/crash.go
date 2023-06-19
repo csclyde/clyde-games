@@ -42,6 +42,7 @@ func AddCrash(crash Crash) (*Crash, error) {
 		result = AnalyticsDB.Save(&existingCrash)
 	} else {
 		crash.Count = 1
+		crash.Resolved = false
 		result = AnalyticsDB.Save(&crash)
 	}
 
