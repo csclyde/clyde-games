@@ -1,5 +1,4 @@
 <script>
-    import Poetry from "./Poetry.svelte";
 
 	async function getCrashes() {
 		const res = await fetch(`https://api.clyde.games/crash`);
@@ -37,7 +36,7 @@
 			method: 'GET'
 		})
 		
-		getCrashes();
+		promise = getCrashes();
 	}
 
 	let colors = [
