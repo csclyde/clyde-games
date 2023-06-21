@@ -14,7 +14,7 @@ type Feedback struct {
 	Category string `gorm:"type:tinytext"`
 	Platform string `gorm:"type:tinytext"`
 	FPS      uint16
-	Resolved bool `gorm:"type:boolean"`
+	Resolved bool `gorm:"type:boolean default:false"`
 }
 
 func SelectAllFeedback() ([]Feedback, error) {

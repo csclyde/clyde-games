@@ -17,7 +17,7 @@ type Crash struct {
 	Commit   string `gorm:"type:tinytext"`
 	Hash     string `gorm:"type:tinytext"`
 	Count    uint   `gorm:"type:int"`
-	Resolved bool   `gorm:"type:boolean"`
+	Resolved bool   `gorm:"type:boolean default:false"`
 }
 
 func SelectAllCrash() ([]Crash, error) {
