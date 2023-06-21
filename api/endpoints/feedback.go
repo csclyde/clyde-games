@@ -46,3 +46,9 @@ func AddFeedback(c *gin.Context) {
 
 	c.IndentedJSON(http.StatusCreated, updatedFeedback)
 }
+
+func ResolveFeedback(c *gin.Context) {
+
+	models.ResolveFeedback(c.Query("id"))
+
+}

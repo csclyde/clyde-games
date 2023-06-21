@@ -14,11 +14,12 @@ type Feedback struct {
 	Category string `gorm:"type:tinytext"`
 	Platform string `gorm:"type:tinytext"`
 	FPS      uint16
+	Resolved bool `gorm:"type:boolean"`
 }
 
 func SelectAllFeedback() ([]Feedback, error) {
 	var allFeedback []Feedback
-	result := AnalyticsDB.Order("created_at desc").Find(&allFeedback)
+	result := AnalyticsDB.Where("resolved != true").Order("created_at desc").Find(&allFeedback)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -35,4 +36,22 @@ func AddFeedback(fb Feedback) (*Feedback, error) {
 	}
 
 	return &fb, nil
+}
+
+func ResolveFeedback(id string) (*Feedback, error) {
+	var existingFeedback Feedback
+	result := AnalyticsDB.Where("id = ?", id).First(&existingFeedback)
+
+	if result.RowsAffected > 0 {
+		existingFeedback.Resolved = true
+		result = AnalyticsDB.Save(&existingFeedback)
+	} else {
+		return nil, nil
+	}
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &existingFeedback, nil
 }

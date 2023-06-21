@@ -22,7 +22,7 @@ type Crash struct {
 
 func SelectAllCrash() ([]Crash, error) {
 	var allCrash []Crash
-	result := AnalyticsDB.Where("resolved = false").Order("created_at desc").Find(&allCrash)
+	result := AnalyticsDB.Where("resolved != true").Order("created_at desc").Find(&allCrash)
 
 	if result.Error != nil {
 		return nil, result.Error

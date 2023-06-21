@@ -12,6 +12,14 @@
 
 	let promise = getFeedback();
 
+	async function resolveFeedback(id) {
+		const res = await fetch(`https://api.clyde.games/resolvefeedback?id=` + id, {
+			method: 'GET'
+		})
+		
+		promise = getFeedback();
+	}
+
 	let colors = [
 		'black',
 		'red',
@@ -41,6 +49,8 @@
 				<div class="comment-footer">
 					<small>{comment.PID}:{comment.Platform}:{comment.Project}:{comment.Env}</small>
 					<small class="fps">FPS: {comment.FPS}</small>
+					<button type="button" on:click={() => resolveFeedback(feedback.id)}>
+						Resolve
 				</div>
 			</div>
 		{/each}
