@@ -49,7 +49,7 @@
 				<div class="comment-footer">
 					<small>{comment.PID}:{comment.Platform}:{comment.Project}:{comment.Env}</small>
 					<small class="fps">FPS: {comment.FPS}</small>
-					<button type="button" on:click={() => resolveFeedback(feedback.ID)}>
+					<button type="button" on:click={() => resolveFeedback(comment.ID)}>
 						Resolve
 				</div>
 			</div>
