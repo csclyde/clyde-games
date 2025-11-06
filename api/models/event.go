@@ -6,15 +6,16 @@ import (
 
 type Event struct {
 	gorm.Model
-	PID     string `gorm:"type:varchar(32)"`
-	SID     string `gorm:"type:varchar(32)"`
-	Env     string `gorm:"type:varchar(32)"`
-	Project string `gorm:"type:varchar(32)"`
-	Type    string `gorm:"not null;type:varchar(32)"`
-	Level   string `gorm:"type:varchar(32)"`
-	Spell   string `gorm:"type:varchar(32)"`
-	Ward    string `gorm:"type:varchar(32)"`
-	Ult     string `gorm:"type:varchar(32)"`
+	PID       string `gorm:"type:varchar(32)"`
+	SID       string `gorm:"type:varchar(32)"`
+	Env       string `gorm:"type:varchar(32)"`
+	Project   string `gorm:"type:varchar(32)"`
+	Type      string `gorm:"not null;type:varchar(32)"`
+	Level     string `gorm:"type:varchar(32)"`
+	Cursemark int    `gorm:"type:tinyint"`
+	Spell     string `gorm:"type:varchar(32)"`
+	Ward      string `gorm:"type:varchar(32)"`
+	Ult       string `gorm:"type:varchar(32)"`
 }
 
 func SelectAllEvents() ([]Event, error) {
