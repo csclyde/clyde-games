@@ -1,17 +1,16 @@
 package models
 
 import (
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type Event struct {
 	gorm.Model
 	PID     string `gorm:"type:tinytext"`
+	SID     string `gorm:"type:tinytext"`
 	Env     string `gorm:"type:tinytext"`
 	Project string `gorm:"type:tinytext"`
-	Type    string `gorm:"not null;type:tinytext"`
-	Save    datatypes.JSON
+	Type    string `gorm:"not null;type:varchar(64)"`
 }
 
 func SelectAllEvents() ([]Event, error) {
