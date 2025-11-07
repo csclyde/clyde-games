@@ -15,7 +15,7 @@ func GetDB(name string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&Crash{}, &Event{}, &Feedback{}, &Word{})
+	err = db.AutoMigrate(&Crash{}, &Event{}, &EventItem{}, &Feedback{}, &Word{})
 	if err != nil {
 		return nil, err
 	}
