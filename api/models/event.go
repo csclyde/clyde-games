@@ -39,39 +39,11 @@ func SelectAllEvents() ([]Event, error) {
 	return allEvents, nil
 }
 
-// func AddEvent(event Event) (*Event, error) {
-// 	result := AnalyticsDB.Create(&event)
-
-// 	if result.Error != nil {
-// 		return nil, result.Error
-// 	}
-
-// 	return &event, nil
-// }
-
 func AddEvent(event Event) (*Event, error) {
-	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
-		// Create the event itself
-		if err := tx.Create(&event).Error; err != nil {
-			return err
-		}
+	result := AnalyticsDB.Create(&event)
 
-		// If there are items, link them to the event and insert
-		if len(event.Items) > 0 {
-			for i := range event.Items {
-				event.Items[i].EventID = event.ID
-			}
-
-			if err := tx.CreateInBatches(event.Items, len(event.Items)).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
 	return &event, nil
