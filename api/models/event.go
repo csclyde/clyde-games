@@ -39,12 +39,12 @@ func SelectAllEvents() ([]Event, error) {
 	return allEvents, nil
 }
 
-func AddEvent(event Event) (*Event, error) {
+func AddEvent(event *Event) (*Event, error) {
 	result := AnalyticsDB.Create(&event)
 
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
-	return &event, nil
+	return event, nil
 }
