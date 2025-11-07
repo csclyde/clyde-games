@@ -14,9 +14,6 @@ type Event struct {
 	Type      string      `gorm:"not null;type:varchar(32)"`
 	Level     string      `gorm:"type:varchar(32)"`
 	Cursemark int         `gorm:"type:tinyint"`
-	Spell     string      `gorm:"type:varchar(32)"`
-	Ward      string      `gorm:"type:varchar(32)"`
-	Ult       string      `gorm:"type:varchar(32)"`
 	Items     []EventItem `gorm:"foreignKey:EventID"`
 }
 
