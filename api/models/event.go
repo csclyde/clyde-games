@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -9,7 +11,7 @@ type Event struct {
 	PID       string      `gorm:"type:varchar(32)"`
 	SID       string      `gorm:"type:varchar(32)"`
 	Env       string      `gorm:"type:varchar(32)"`
-	Build     string      `gorm:"type:varchar(32)"`
+	Build     time.Time   `gorm:"type:datetime"`
 	Project   string      `gorm:"type:varchar(32)"`
 	Type      string      `gorm:"not null;type:varchar(32)"`
 	Level     string      `gorm:"type:varchar(32)"`
