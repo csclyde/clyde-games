@@ -53,8 +53,7 @@
 
 	function getFirstStackLine(crash) {
 		const stack = getStack(crash);
-		const firstLine = stack.length > 0 && stack[0].trim() ? stack[0].trim() : 'Unknown location';
-		return firstLine.split('::')[0].trim();
+		return stack.length > 0 && stack[0].trim() ? stack[0].trim() : 'Unknown location';
 	}
 
 	function getAccessViolationSummary(crashes) {
@@ -295,6 +294,9 @@
 
 	.access-row p {
 		margin: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.empty-state {
