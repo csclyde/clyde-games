@@ -29,6 +29,16 @@ func GetCrash(c *gin.Context) {
 	}
 }
 
+func GetAccessViolationCrashes(c *gin.Context) {
+	crashes, err := models.SelectRecentAccessViolationCrashes()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, crashes)
+}
+
 func FNV32a(text string) string {
 	algorithm := fnv.New32a()
 	algorithm.Write([]byte(text))
@@ -60,7 +70,22 @@ func AddCrash(c *gin.Context) {
 }
 
 func ResolveCrash(c *gin.Context) {
+	if c.Query("all") == "true" {
+		if err := models.ResolveAllCrashes(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-	models.ResolveCrash(c.Query("hash"))
+		c.JSON(http.StatusOK, gin.H{"resolved": true})
+		return
+	}
+
+	crash, err := models.ResolveCrash(c.Query("hash"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, crash)
 
 }

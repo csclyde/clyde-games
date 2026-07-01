@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -29,6 +31,22 @@ func SelectAllCrash() ([]Crash, error) {
 	}
 
 	return allCrash, nil
+}
+
+func SelectRecentAccessViolationCrashes() ([]Crash, error) {
+	var crashes []Crash
+	oneMonthAgo := time.Now().AddDate(0, -1, 0)
+	result := AnalyticsDB.
+		Where("message LIKE ?", "%Access Violation%").
+		Where("updated_at >= ?", oneMonthAgo).
+		Order("updated_at desc").
+		Find(&crashes)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return crashes, nil
 }
 
 func AddCrash(crash Crash) (*Crash, error) {
@@ -69,4 +87,9 @@ func ResolveCrash(hash string) (*Crash, error) {
 	}
 
 	return &existingCrash, nil
+}
+
+func ResolveAllCrashes() error {
+	result := AnalyticsDB.Model(&Crash{}).Where("resolved != true").Update("resolved", true)
+	return result.Error
 }
