@@ -6,6 +6,7 @@
 	import Van from './pages/Van.svelte';
 	import Feedback from './pages/Feedback.svelte';
     import Crashes from "./pages/Crashes.svelte";
+	import Savegames from "./pages/Savegames.svelte";
 	import AnalyzeWords from "./pages/AnalyzeWords.svelte";
 	import UnknownWords from "./pages/UnknownWords.svelte";
 
@@ -17,6 +18,7 @@
 	router('/van', () => page = Van);
 	router('/feedback', () => page = Feedback);
 	router('/crashes', () => page = Crashes);
+	router('/savegames', () => page = Savegames);
 	router('/words/analyze', () => page = AnalyzeWords);
 	router('/words/unknown', () => page = UnknownWords);
 

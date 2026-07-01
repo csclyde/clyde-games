@@ -15,10 +15,27 @@ func GetDB(name string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&Crash{}, &Event{}, &EventItem{}, &Feedback{}, &Word{})
-	if err != nil {
-		return nil, err
+	return db, nil
+}
+
+func MigrateAnalyticsDB() error {
+	if err := AnalyticsDB.AutoMigrate(&Crash{}, &Event{}, &EventItem{}, &Feedback{}, &Savegame{}); err != nil {
+		return err
 	}
 
-	return db, nil
+	return CreateSavegameRetentionEvent()
+}
+
+func MigrateEtymologyDB() error {
+	return EtymologyDB.AutoMigrate(&Word{})
+}
+
+func CreateSavegameRetentionEvent() error {
+	return AnalyticsDB.Exec(`
+		CREATE EVENT IF NOT EXISTS delete_old_savegames
+		ON SCHEDULE EVERY 1 DAY
+		DO
+			DELETE FROM savegames
+			WHERE created_at < NOW() - INTERVAL 1 MONTH
+	`).Error
 }

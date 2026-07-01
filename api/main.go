@@ -12,7 +12,7 @@ func CORSMiddleware() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -34,6 +34,10 @@ func main() {
 	router.GET("/crash", endpoints.GetCrash)
 	router.GET("/resolvecrash", endpoints.ResolveCrash)
 	router.POST("/crash", endpoints.AddCrash)
+	router.GET("/savegame", endpoints.GetSavegames)
+	router.POST("/savegame", endpoints.AddSavegame)
+	router.GET("/savegame/download", endpoints.DownloadSavegame)
+	router.DELETE("/savegame", endpoints.DeleteSavegame)
 
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
 	router.POST("/words/unknown", endpoints.GetUnknownWords)
@@ -45,9 +49,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if err = models.MigrateAnalyticsDB(); err != nil {
+		panic(err)
+	}
 
 	models.EtymologyDB, err = models.GetDB("etymology")
 	if err != nil {
+		panic(err)
+	}
+	if err = models.MigrateEtymologyDB(); err != nil {
 		panic(err)
 	}
 
