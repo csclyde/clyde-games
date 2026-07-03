@@ -29,6 +29,10 @@
 		'green'
 	]
 
+	function metadataValue(value) {
+		return value || 'unknown';
+	}
+
 </script>
 
 <main>
@@ -42,15 +46,24 @@
 		{#each feedback as comment}
 			<div class="comment">
 				<div class="comment-body">
-					<p class="rating" style="background-color:{ colors[comment.Rating] }"></p>
-					<p class="message">{comment.Message}</p>
-					<p class="created">{new Date(comment.CreatedAt).toLocaleString()}</p>
+					<div class="metadata">
+						<p class="created">Created: {new Date(comment.CreatedAt).toLocaleString()}</p>
+						<p class="created">Built At: {metadataValue(comment.Build)}</p>
+						<p class="created">Git Hash: <small>{metadataValue(comment.Commit)}</small></p>
+						<p class="created">Env: {metadataValue(comment.Platform)}</p>
+						<button type="button" on:click={() => resolveFeedback(comment.ID)}>
+							Resolve
+						</button>
+					</div>
+					<div class="feedback-content">
+						<div class="message-header">
+							<p class="rating" style="background-color:{ colors[comment.Rating] }"></p>
+							<p class="message">{comment.Message}</p>
+						</div>
+					</div>
 				</div>
 				<div class="comment-footer">
 					<small>{comment.PID}:{comment.Platform}:{comment.Project}:{comment.Env}</small>
-					<small class="fps">FPS: {comment.FPS}</small>
-					<button type="button" on:click={() => resolveFeedback(comment.ID)}>
-						Resolve
 				</div>
 			</div>
 		{/each}
@@ -79,6 +92,23 @@
 		display: flex;
 		flex-direction: row;
 		align-items: center;
+		gap: 12px;
+	}
+
+	.metadata {
+		display: flex;
+		flex-direction: column;
+		align-items: start;
+		flex-shrink: 0;
+	}
+
+	.feedback-content {
+		flex-grow: 1;
+	}
+
+	.message-header {
+		display: flex;
+		align-items: center;
 	}
 
 	.comment-footer {
@@ -102,6 +132,7 @@
 
 	.created {
 		flex-shrink: 0;
+		font-size: small;
 	}
 
 	.message {
@@ -113,7 +144,4 @@
 		font-size: xx-small;
 	}
 
-	.fps {
-		margin-left: auto;
-	}
 </style>

@@ -13,8 +13,9 @@ type Feedback struct {
 	Env      string `gorm:"type:tinytext"`
 	Category string `gorm:"type:tinytext"`
 	Platform string `gorm:"type:tinytext"`
-	FPS      uint16
-	Resolved bool `gorm:"type:boolean;default:false"`
+	Build    string `gorm:"type:tinytext"`
+	Commit   string `gorm:"type:tinytext"`
+	Resolved bool   `gorm:"type:boolean;default:false"`
 }
 
 func SelectAllFeedback() ([]Feedback, error) {
