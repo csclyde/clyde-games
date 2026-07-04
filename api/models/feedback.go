@@ -39,6 +39,17 @@ func AddFeedback(fb Feedback) (*Feedback, error) {
 	return &fb, nil
 }
 
+func SelectFeedback(id string) (*Feedback, error) {
+	var feedback Feedback
+	result := AnalyticsDB.Where("id = ?", id).First(&feedback)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &feedback, nil
+}
+
 func ResolveFeedback(id string) (*Feedback, error) {
 	var existingFeedback Feedback
 	result := AnalyticsDB.Where("id = ?", id).First(&existingFeedback)

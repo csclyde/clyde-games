@@ -11,6 +11,7 @@
 	}
 
 	let promise = getFeedback();
+	let ticketStatus = {};
 
 	async function resolveFeedback(id) {
 		const res = await fetch(`https://api.clyde.games/resolvefeedback?id=` + id, {
@@ -18,6 +19,25 @@
 		})
 		
 		promise = getFeedback();
+	}
+
+	async function makeTicket(comment) {
+		ticketStatus = { ...ticketStatus, [comment.ID]: 'Making ticket...' };
+
+		const res = await fetch(`https://api.clyde.games/feedback/ticket?id=` + comment.ID, {
+			method: 'POST'
+		});
+		const result = await res.json();
+
+		if (res.ok) {
+			const cardName = result.card && result.card.name ? result.card.name : 'ticket';
+			ticketStatus = { ...ticketStatus, [comment.ID]: `Created ${cardName}` };
+		} else {
+			ticketStatus = {
+				...ticketStatus,
+				[comment.ID]: result.error || 'Unable to make ticket'
+			};
+		}
 	}
 
 	let colors = [
@@ -51,9 +71,17 @@
 						<p class="created">Built At: {metadataValue(comment.Build)}</p>
 						<p class="created">Git Hash: <small>{metadataValue(comment.Commit)}</small></p>
 						<p class="created">Env: {metadataValue(comment.Platform)}</p>
-						<button type="button" on:click={() => resolveFeedback(comment.ID)}>
-							Resolve
-						</button>
+						<div class="actions">
+							<button type="button" on:click={() => makeTicket(comment)}>
+								Make Ticket
+							</button>
+							<button type="button" on:click={() => resolveFeedback(comment.ID)}>
+								Resolve
+							</button>
+						</div>
+						{#if ticketStatus[comment.ID]}
+							<small class="ticket-status">{ticketStatus[comment.ID]}</small>
+						{/if}
 					</div>
 					<div class="feedback-content">
 						<div class="message-header">
@@ -102,6 +130,11 @@
 		flex-shrink: 0;
 	}
 
+	.actions {
+		display: flex;
+		gap: 4px;
+	}
+
 	.feedback-content {
 		flex-grow: 1;
 	}
@@ -142,6 +175,11 @@
 
 	small {
 		font-size: xx-small;
+	}
+
+	.ticket-status {
+		max-width: 220px;
+		text-align: start;
 	}
 
 </style>

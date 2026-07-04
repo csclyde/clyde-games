@@ -28,6 +28,7 @@ func main() {
 	router.Use(CORSMiddleware())
 	router.GET("/feedback", endpoints.GetFeedback)
 	router.POST("/feedback", endpoints.AddFeedback)
+	router.POST("/feedback/ticket", endpoints.MakeFeedbackTicket)
 	router.GET("/resolvefeedback", endpoints.ResolveFeedback)
 	router.GET("/event", endpoints.GetEvent)
 	router.POST("/event", endpoints.AddEvent)
