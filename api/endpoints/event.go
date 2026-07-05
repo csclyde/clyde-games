@@ -27,6 +27,17 @@ func GetEvent(c *gin.Context) {
 	}
 }
 
+func GetEventBuilds(c *gin.Context) {
+	builds, err := models.SelectEventBuilds()
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, builds)
+}
+
 func AddEvent(c *gin.Context) {
 	var event models.Event
 
@@ -44,4 +55,20 @@ func AddEvent(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusCreated, updatedEvent)
+}
+
+func DeleteEventsByBuild(c *gin.Context) {
+	build := c.Query("build")
+	if build == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "build is required"})
+		return
+	}
+
+	deleted, err := models.DeleteEventsByBuild(build)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"deleted": deleted})
 }

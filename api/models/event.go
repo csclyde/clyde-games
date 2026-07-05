@@ -25,6 +25,11 @@ type EventItem struct {
 	Parent  string `gorm:"type:char(16);"`
 }
 
+type EventBuild struct {
+	Build string
+	Count int64
+}
+
 func SelectAllEvents() ([]Event, error) {
 	var allEvents []Event
 	result := AnalyticsDB.Order("created_at desc").Find(&allEvents)
@@ -34,6 +39,22 @@ func SelectAllEvents() ([]Event, error) {
 	}
 
 	return allEvents, nil
+}
+
+func SelectEventBuilds() ([]EventBuild, error) {
+	var builds []EventBuild
+	result := AnalyticsDB.Model(&Event{}).
+		Select("build, count(*) as count").
+		Where("build <> ''").
+		Group("build").
+		Order("build desc").
+		Find(&builds)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return builds, nil
 }
 
 // func AddEvent(event Event) (*Event, error) {
@@ -72,4 +93,33 @@ func AddEvent(event Event) (*Event, error) {
 	}
 
 	return &event, nil
+}
+
+func DeleteEventsByBuild(build string) (int64, error) {
+	var deleted int64
+
+	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		var eventIDs []uint
+		if err := tx.Model(&Event{}).Where("build = ?", build).Pluck("id", &eventIDs).Error; err != nil {
+			return err
+		}
+
+		if len(eventIDs) == 0 {
+			return nil
+		}
+
+		if err := tx.Where("event_id IN ?", eventIDs).Delete(&EventItem{}).Error; err != nil {
+			return err
+		}
+
+		result := tx.Where("id IN ?", eventIDs).Delete(&Event{})
+		if result.Error != nil {
+			return result.Error
+		}
+
+		deleted = result.RowsAffected
+		return nil
+	})
+
+	return deleted, err
 }
