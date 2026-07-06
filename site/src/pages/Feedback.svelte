@@ -6,19 +6,61 @@
 		if (res.ok) {
 			return feedback;
 		} else {
-			throw new Error(feedback);
+			if (feedback.error == 'No feedback found') {
+				return [];
+			}
+
+			throw new Error(feedback.error || feedback);
 		}
 	}
 
-	let promise = getFeedback();
+	let feedback = [];
+	let loadingFeedback = true;
+	let feedbackError = '';
 	let ticketStatus = {};
+	let resolvingFeedback = {};
+
+	async function loadFeedback() {
+		loadingFeedback = true;
+		feedbackError = '';
+
+		try {
+			feedback = await getFeedback();
+		} catch (error) {
+			feedbackError = error.message;
+		} finally {
+			loadingFeedback = false;
+		}
+	}
+
+	loadFeedback();
+
+	async function refreshFeedback() {
+		try {
+			feedback = await getFeedback();
+			feedbackError = '';
+		} catch (error) {
+			feedbackError = error.message;
+		}
+	}
 
 	async function resolveFeedback(id) {
-		const res = await fetch(`https://api.clyde.games/resolvefeedback?id=` + id, {
-			method: 'GET'
-		})
-		
-		promise = getFeedback();
+		resolvingFeedback = { ...resolvingFeedback, [id]: true };
+
+		try {
+			const res = await fetch(`https://api.clyde.games/resolvefeedback?id=` + id, {
+				method: 'GET'
+			});
+
+			if (res.ok) {
+				feedback = feedback.filter(comment => comment.ID !== id);
+				await refreshFeedback();
+			}
+		} finally {
+			const nextResolvingFeedback = { ...resolvingFeedback };
+			delete nextResolvingFeedback[id];
+			resolvingFeedback = nextResolvingFeedback;
+		}
 	}
 
 	async function makeTicket(comment) {
@@ -59,12 +101,14 @@
 	<h2>Player Feedback</h2>
 	<hr/>
 
-	{#await promise}
+	{#if loadingFeedback}
 		<p>loading...</p>
-	{:then feedback}
+	{:else if feedbackError}
+		<p style="color: red">{feedbackError}</p>
+	{:else}
 		<div class="comment-list">
 		{#each feedback as comment}
-			<div class="comment">
+			<div class:resolving={resolvingFeedback[comment.ID]} class="comment">
 				<div class="comment-body">
 					<div class="metadata">
 						<p class="created">Created At: {new Date(comment.CreatedAt).toLocaleString()}</p>
@@ -78,11 +122,11 @@
 					</div>
 					<div class="action-column">
 						<div class="actions">
-							<button type="button" on:click={() => makeTicket(comment)}>
+							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => makeTicket(comment)}>
 								Make Ticket
 							</button>
-							<button type="button" on:click={() => resolveFeedback(comment.ID)}>
-								Resolve
+							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => resolveFeedback(comment.ID)}>
+								{resolvingFeedback[comment.ID] ? 'Resolving...' : 'Resolve'}
 							</button>
 						</div>
 						{#if ticketStatus[comment.ID]}
@@ -96,9 +140,7 @@
 			</div>
 		{/each}
 		</div>
-	{:catch error}
-		<p style="color: red">{error.message}</p>
-	{/await}
+	{/if}
 </main>
 
 <style>
@@ -114,6 +156,11 @@
 		border: 2px solid black;
 		padding: 8px;
 		border-radius: 6px;
+	}
+
+	.comment.resolving {
+		opacity: 0.45;
+		pointer-events: none;
 	}
 
 	.comment-body {

@@ -26,8 +26,59 @@
 		}
 	}
 
-	let crashPromise = getCrashes();
-	let accessViolationPromise = getAccessViolations();
+	let crashes = [];
+	let accessViolations = [];
+	let loadingCrashes = true;
+	let loadingAccessViolations = true;
+	let crashError = '';
+	let accessViolationError = '';
+	let resolvingCrashes = {};
+	let resolvingAllCrashes = false;
+
+	async function loadCrashes() {
+		loadingCrashes = true;
+		crashError = '';
+
+		try {
+			crashes = await getCrashes();
+		} catch (error) {
+			crashError = error.message;
+		} finally {
+			loadingCrashes = false;
+		}
+	}
+
+	async function loadAccessViolations() {
+		loadingAccessViolations = true;
+		accessViolationError = '';
+
+		try {
+			accessViolations = await getAccessViolations();
+		} catch (error) {
+			accessViolationError = error.message;
+		} finally {
+			loadingAccessViolations = false;
+		}
+	}
+
+	loadCrashes();
+	loadAccessViolations();
+
+	async function refreshCrashLists() {
+		try {
+			crashes = await getCrashes();
+			crashError = '';
+		} catch (error) {
+			crashError = error.message;
+		}
+
+		try {
+			accessViolations = await getAccessViolations();
+			accessViolationError = '';
+		} catch (error) {
+			accessViolationError = error.message;
+		}
+	}
 
 	function getStack(crash) {
 		var stack = crash.Stack.split('FilePos');
@@ -84,21 +135,39 @@
 	}
 
 	async function resolveCrash(hash) {
-		const res = await fetch(`https://api.clyde.games/resolvecrash?hash=` + hash, {
-			method: 'GET'
-		})
-		
-		crashPromise = getCrashes();
-		accessViolationPromise = getAccessViolations();
+		resolvingCrashes = { ...resolvingCrashes, [hash]: true };
+
+		try {
+			const res = await fetch(`https://api.clyde.games/resolvecrash?hash=` + hash, {
+				method: 'GET'
+			});
+
+			if (res.ok) {
+				crashes = crashes.filter(crash => crash.Hash !== hash);
+				await refreshCrashLists();
+			}
+		} finally {
+			const nextResolvingCrashes = { ...resolvingCrashes };
+			delete nextResolvingCrashes[hash];
+			resolvingCrashes = nextResolvingCrashes;
+		}
 	}
 
 	async function resolveAllCrashes() {
-		const res = await fetch(`https://api.clyde.games/resolvecrash?all=true`, {
-			method: 'GET'
-		})
-		
-		crashPromise = getCrashes();
-		accessViolationPromise = getAccessViolations();
+		resolvingAllCrashes = true;
+
+		try {
+			const res = await fetch(`https://api.clyde.games/resolvecrash?all=true`, {
+				method: 'GET'
+			});
+
+			if (res.ok) {
+				crashes = [];
+				await refreshCrashLists();
+			}
+		} finally {
+			resolvingAllCrashes = false;
+		}
 	}
 
 	let colors = [
@@ -115,19 +184,25 @@
 <main>
 	<h2>Crash Reports</h2>
 	<div class="controls">
-		<button type="button" on:click={resolveAllCrashes}>
-			Close All
+		<button type="button" disabled={resolvingAllCrashes} on:click={resolveAllCrashes}>
+			{resolvingAllCrashes ? 'Closing...' : 'Close All'}
 		</button>
 	</div>
 	<hr/>
 
 	<section class="access-violations">
-		{#await accessViolationPromise}
+		{#if loadingAccessViolations}
 			<div class="section-header">
 				<h3>Access Violations</h3>
 				<p>loading...</p>
 			</div>
-		{:then accessViolations}
+		{:else if accessViolationError}
+			<div class="section-header">
+				<h3>Access Violations</h3>
+				<p>error</p>
+			</div>
+			<p class="empty-state">{accessViolationError}</p>
+		{:else}
 			<div class="section-header">
 				<h3>Access Violations</h3>
 				<p>{getAccessViolationTotal(accessViolations)} last month</p>
@@ -144,21 +219,17 @@
 			{:else}
 				<p class="empty-state">No Access Violations in the last month.</p>
 			{/if}
-		{:catch error}
-			<div class="section-header">
-				<h3>Access Violations</h3>
-				<p>error</p>
-			</div>
-			<p class="empty-state">{error.message}</p>
-		{/await}
+		{/if}
 	</section>
 
-	{#await crashPromise}
+	{#if loadingCrashes}
 		<p>loading...</p>
-	{:then crashes}
+	{:else if crashError}
+		<p style="color: red">{crashError}</p>
+	{:else}
 		<div class="comment-list">
 		{#each getRegularCrashes(crashes) as crash}
-			<div class="comment">
+			<div class:resolving={resolvingCrashes[crash.Hash] || resolvingAllCrashes} class="comment">
 				<div class="comment-body">
 					<div class="metadata">
 						<p class="created">Last Seen: {new Date(crash.UpdatedAt).toLocaleString()}</p>
@@ -167,8 +238,8 @@
 						<p class="created">DB Hash: <small>{crash.Hash}</small></p>
 						<p class="created">Total: {crash.Count}</p>
 						<p class="created">Env: {crash.Platform}</p>
-						<button type="button" on:click={() => resolveCrash(crash.Hash)}>
-							Resolve
+						<button type="button" disabled={resolvingCrashes[crash.Hash] || resolvingAllCrashes} on:click={() => resolveCrash(crash.Hash)}>
+							{resolvingCrashes[crash.Hash] ? 'Resolving...' : 'Resolve'}
 						</button>
 
 					</div>
@@ -185,9 +256,7 @@
 			</div>
 		{/each}
 		</div>
-	{:catch error}
-		<p style="color: red">{error.message}</p>
-	{/await}
+	{/if}
 </main>
 
 <style>
@@ -203,6 +272,11 @@
 		border: 2px solid black;
 		padding: 8px;
 		border-radius: 6px;
+	}
+
+	.comment.resolving {
+		opacity: 0.45;
+		pointer-events: none;
 	}
 
 	.comment-body {
