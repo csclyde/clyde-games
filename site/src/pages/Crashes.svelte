@@ -320,9 +320,10 @@
 
 	.comment {
 		background: #fff;
-		border: 1px solid #cfcfcf;
+		border: 1px solid #bdbdbd;
 		border-left: 4px solid #111;
 		border-radius: 4px;
+		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
 		padding: 14px 16px 10px;
@@ -402,6 +403,7 @@
 		background: #fff;
 		border: 1px solid #a8a8a8;
 		border-radius: 4px;
+		box-sizing: border-box;
 		color: #111;
 		cursor: pointer;
 		font: inherit;
@@ -435,9 +437,10 @@
 	}
 
 	.access-violations {
-		border: 1px solid #cfcfcf;
+		border: 1px solid #bdbdbd;
 		border-left: 4px solid #111;
 		border-radius: 4px;
+		box-sizing: border-box;
 		margin-bottom: 12px;
 		padding: 14px 16px;
 	}
@@ -506,7 +509,7 @@
 
 	@media (max-width: 820px) {
 		main {
-			padding: 8px;
+			padding: 8px 4px 24px;
 		}
 
 		.page-header {
@@ -518,6 +521,20 @@
 			font-size: 2rem;
 		}
 
+		.comment-list {
+			gap: 12px;
+		}
+
+		.comment,
+		.access-violations {
+			border: 1px solid #a8a8a8;
+			border-top: 4px solid #111;
+			border-left-width: 1px;
+			border-radius: 6px;
+			padding: 12px;
+			width: 100%;
+		}
+
 		.comment-body {
 			display: grid;
 			gap: 12px;
@@ -526,7 +543,42 @@
 		.metadata {
 			display: grid;
 			grid-template-columns: 1fr 1fr;
+			gap: 8px 12px;
 			width: 100%;
+		}
+
+		.metadata button {
+			width: 100%;
+		}
+
+		.stack {
+			width: 100%;
+		}
+
+		.access-row {
+			grid-template-columns: 44px 1fr;
+		}
+
+		.access-row p {
+			overflow-wrap: anywhere;
+			white-space: normal;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.metadata {
+			grid-template-columns: 1fr;
+		}
+
+		.section-header {
+			align-items: flex-start;
+			flex-direction: column;
+			gap: 4px;
+		}
+
+		.section-header p {
+			margin-left: 0;
+			text-align: left;
 		}
 	}
 </style>

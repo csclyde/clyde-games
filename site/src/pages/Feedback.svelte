@@ -347,9 +347,10 @@
 
 	.comment {
 		background: #fff;
-		border: 1px solid #cfcfcf;
+		border: 1px solid #bdbdbd;
 		border-left: 4px solid #111;
 		border-radius: 4px;
+		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
 		padding: 14px 16px 10px;
@@ -397,6 +398,7 @@
 
 	.actions {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 6px;
 		justify-content: flex-end;
 	}
@@ -473,6 +475,7 @@
 		background: #fff;
 		border: 1px solid #a8a8a8;
 		border-radius: 4px;
+		box-sizing: border-box;
 		color: #111;
 		cursor: pointer;
 		font: inherit;
@@ -518,11 +521,24 @@
 
 	@media (max-width: 820px) {
 		main {
-			padding: 8px;
+			padding: 8px 4px 24px;
 		}
 
 		.page-header h2 {
 			font-size: 2rem;
+		}
+
+		.comment-list {
+			gap: 12px;
+		}
+
+		.comment {
+			border: 1px solid #a8a8a8;
+			border-top: 4px solid #111;
+			border-left-width: 1px;
+			border-radius: 6px;
+			padding: 12px;
+			width: 100%;
 		}
 
 		.comment-body {
@@ -533,16 +549,42 @@
 		.metadata {
 			display: grid;
 			grid-template-columns: 1fr 1fr;
+			gap: 8px 12px;
+			width: 100%;
+		}
+
+		.message-header {
+			gap: 10px;
+		}
+
+		.feedback-content,
+		.message-stack {
 			width: 100%;
 		}
 
 		.action-column {
 			align-items: flex-start;
 			margin-left: 0;
+			width: 100%;
+		}
+
+		.actions {
+			justify-content: flex-start;
+			width: 100%;
+		}
+
+		.actions button {
+			flex: 1 1 96px;
 		}
 
 		.ticket-status {
 			text-align: left;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.metadata {
+			grid-template-columns: 1fr;
 		}
 	}
 

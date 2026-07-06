@@ -99,20 +99,12 @@ func DeleteEventsByBuild(build string) (int64, error) {
 	var deleted int64
 
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
-		var eventIDs []uint
-		if err := tx.Model(&Event{}).Where("build = ?", build).Pluck("id", &eventIDs).Error; err != nil {
+		eventIDs := tx.Unscoped().Model(&Event{}).Select("id").Where("build = ?", build)
+		if err := tx.Where("event_id IN (?)", eventIDs).Delete(&EventItem{}).Error; err != nil {
 			return err
 		}
 
-		if len(eventIDs) == 0 {
-			return nil
-		}
-
-		if err := tx.Where("event_id IN ?", eventIDs).Delete(&EventItem{}).Error; err != nil {
-			return err
-		}
-
-		result := tx.Where("id IN ?", eventIDs).Delete(&Event{})
+		result := tx.Unscoped().Where("build = ?", build).Delete(&Event{})
 		if result.Error != nil {
 			return result.Error
 		}
