@@ -19,6 +19,8 @@
 	let feedbackError = '';
 	let ticketStatus = {};
 	let resolvingFeedback = {};
+	let translatingFeedback = {};
+	let translations = {};
 
 	async function loadFeedback() {
 		loadingFeedback = true;
@@ -82,6 +84,153 @@
 		}
 	}
 
+	function getTranslationApi() {
+		if (typeof Translator !== 'undefined') {
+			return Translator;
+		}
+
+		return null;
+	}
+
+	async function detectLanguage(text) {
+		if (typeof LanguageDetector === 'undefined') {
+			throw new Error('Chrome language detection is not available in this browser.');
+		}
+
+		const detector = await LanguageDetector.create();
+		const results = await detector.detect(text);
+
+		if (results && results.length > 0 && results[0].detectedLanguage) {
+			return results[0].detectedLanguage;
+		}
+
+		throw new Error('Could not detect the source language.');
+	}
+
+	function getTranslatedText(result) {
+		if (typeof result === 'string') {
+			return result.trim();
+		}
+
+		if (!result) {
+			return '';
+		}
+
+		const possibleText = result.translation || result.translatedText || result.text;
+
+		if (typeof possibleText === 'string') {
+			return possibleText.trim();
+		}
+
+		return '';
+	}
+
+	function getTranslatableMessage(message) {
+		const metadataMatch = message.match(/\s+\((Level:.*,\s*Cursemark:.*)\)\s*$/);
+
+		if (!metadataMatch) {
+			return {
+				text: message,
+				suffix: ''
+			};
+		}
+
+		return {
+			text: message.slice(0, metadataMatch.index).trim(),
+			suffix: message.slice(metadataMatch.index)
+		};
+	}
+
+	async function translateFeedback(comment) {
+		translatingFeedback = { ...translatingFeedback, [comment.ID]: true };
+		translations = {
+			...translations,
+			[comment.ID]: {
+				text: translations[comment.ID] && translations[comment.ID].text,
+				error: '',
+				status: 'Translating...'
+			}
+		};
+
+		try {
+			const TranslationApi = getTranslationApi();
+
+			if (!TranslationApi) {
+				throw new Error('Chrome translation is not available in this browser.');
+			}
+
+			const messageParts = getTranslatableMessage(comment.Message);
+			const sourceLanguage = await detectLanguage(messageParts.text);
+
+			if (sourceLanguage === 'en') {
+				translations = {
+					...translations,
+					[comment.ID]: {
+						text: '',
+						error: '',
+						status: 'Already English'
+					}
+				};
+				return;
+			}
+
+			const options = {
+				sourceLanguage,
+				targetLanguage: 'en'
+			};
+
+			if (TranslationApi.availability) {
+				const availability = await TranslationApi.availability(options);
+
+				if (availability === 'unavailable') {
+					throw new Error('English translation is not available for this language.');
+				}
+			}
+
+			const translator = await TranslationApi.create(options);
+			const translatedText = getTranslatedText(await translator.translate(messageParts.text));
+
+			if (!translatedText) {
+				throw new Error('Chrome translation finished without returning translated text.');
+			}
+
+			const translatedMessage = translatedText + messageParts.suffix;
+
+			feedback = feedback.map(item => {
+				if (item.ID !== comment.ID) {
+					return item;
+				}
+
+				return {
+					...item,
+					Message: translatedMessage
+				};
+			});
+
+			translations = {
+				...translations,
+				[comment.ID]: {
+					text: '',
+					error: '',
+					status: sourceLanguage === 'en' ? 'Already English' : 'Translated to English'
+				}
+			};
+		} catch (error) {
+			translations = {
+				...translations,
+				[comment.ID]: {
+					text: translations[comment.ID] && translations[comment.ID].text,
+					error: error.message,
+					status: ''
+				}
+			};
+		} finally {
+			const nextTranslatingFeedback = { ...translatingFeedback };
+			delete nextTranslatingFeedback[comment.ID];
+			translatingFeedback = nextTranslatingFeedback;
+		}
+	}
+
 	let colors = [
 		'black',
 		'red',
@@ -123,11 +272,22 @@
 					<div class="feedback-content">
 						<div class="message-header">
 							<span class="rating" style="background-color:{ colors[comment.Rating] }"></span>
-							<p class="message">{comment.Message}</p>
+							<div class="message-stack">
+								<p class="message">{comment.Message}</p>
+								{#if translations[comment.ID] && translations[comment.ID].status}
+									<small class="translation-status">{translations[comment.ID].status}</small>
+								{/if}
+								{#if translations[comment.ID] && translations[comment.ID].error}
+									<small class="translation-error">{translations[comment.ID].error}</small>
+								{/if}
+							</div>
 						</div>
 					</div>
 					<div class="action-column">
 						<div class="actions">
+							<button type="button" disabled={translatingFeedback[comment.ID] || resolvingFeedback[comment.ID]} on:click={() => translateFeedback(comment)}>
+								{translatingFeedback[comment.ID] ? 'Translating...' : 'Translate'}
+							</button>
 							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => makeTicket(comment)}>
 								Make Ticket
 							</button>
@@ -261,6 +421,13 @@
 		gap: 12px;
 	}
 
+	.message-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+
 	.comment-footer {
 		color: #666;
 		display: flex;
@@ -288,6 +455,18 @@
 		line-height: 1.4;
 		overflow-wrap: anywhere;
 		text-align: left;
+	}
+
+	.translation-status {
+		color: #777;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.translation-error {
+		color: #a40000;
+		max-width: 520px;
 	}
 
 	button {

@@ -34,6 +34,7 @@
 	let accessViolationError = '';
 	let resolvingCrashes = {};
 	let resolvingAllCrashes = false;
+	let expandedCrashes = {};
 
 	async function loadCrashes() {
 		loadingCrashes = true;
@@ -132,6 +133,24 @@
 
 	function getRegularCrashes(crashes) {
 		return crashes.filter(crash => !isAccessViolation(crash));
+	}
+
+	function getVisibleStack(crash) {
+		const stack = getStack(crash);
+
+		if (expandedCrashes[crash.Hash]) {
+			return stack;
+		}
+
+		return stack.slice(0, 6);
+	}
+
+	function shouldShowExpand(crash) {
+		return !expandedCrashes[crash.Hash] && getStack(crash).length > 6;
+	}
+
+	function expandCrash(hash) {
+		expandedCrashes = { ...expandedCrashes, [hash]: true };
 	}
 
 	async function resolveCrash(hash) {
@@ -240,9 +259,14 @@
 					</div>
 					<div class="stack">
 						<p class="message"><b>{crash.Message}</b></p>
-						{#each getStack(crash) as stackMessage}
+						{#each getVisibleStack(crash) as stackMessage}
 							<p class="message">{stackMessage}</p>
 						{/each}
+						{#if shouldShowExpand(crash)}
+							<button class="expand-button" type="button" on:click={() => expandCrash(crash.Hash)}>
+								Expand...
+							</button>
+						{/if}
 					</div>
 				</div>
 				<div class="comment-footer">
@@ -395,6 +419,11 @@
 	button:disabled {
 		color: #777;
 		cursor: default;
+	}
+
+	.expand-button {
+		align-self: flex-start;
+		margin-top: 8px;
 	}
 
 	small,
