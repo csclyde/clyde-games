@@ -67,10 +67,16 @@
 			<div class="comment">
 				<div class="comment-body">
 					<div class="metadata">
-						<p class="created">Created: {new Date(comment.CreatedAt).toLocaleString()}</p>
+						<p class="created">Created At: {new Date(comment.CreatedAt).toLocaleString()}</p>
 						<p class="created">Built At: {metadataValue(comment.Build)}</p>
-						<p class="created">Git Hash: <small>{metadataValue(comment.Commit)}</small></p>
-						<p class="created">Env: {metadataValue(comment.Platform)}</p>
+					</div>
+					<div class="feedback-content">
+						<div class="message-header">
+							<p class="rating" style="background-color:{ colors[comment.Rating] }"></p>
+							<p class="message">{comment.Message}</p>
+						</div>
+					</div>
+					<div class="action-column">
 						<div class="actions">
 							<button type="button" on:click={() => makeTicket(comment)}>
 								Make Ticket
@@ -83,15 +89,9 @@
 							<small class="ticket-status">{ticketStatus[comment.ID]}</small>
 						{/if}
 					</div>
-					<div class="feedback-content">
-						<div class="message-header">
-							<p class="rating" style="background-color:{ colors[comment.Rating] }"></p>
-							<p class="message">{comment.Message}</p>
-						</div>
-					</div>
 				</div>
 				<div class="comment-footer">
-					<small>{comment.PID}:{comment.Platform}:{comment.Project}:{comment.Env}</small>
+					<small>{comment.PID}:{comment.Platform}:{comment.Project}:{comment.Env}:{metadataValue(comment.Commit)}</small>
 				</div>
 			</div>
 		{/each}
@@ -132,6 +132,15 @@
 
 	.actions {
 		display: flex;
+		gap: 4px;
+		justify-content: flex-end;
+	}
+
+	.action-column {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		flex-shrink: 0;
 		gap: 4px;
 	}
 
