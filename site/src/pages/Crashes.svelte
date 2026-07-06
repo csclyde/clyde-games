@@ -153,6 +153,38 @@
 		expandedCrashes = { ...expandedCrashes, [hash]: true };
 	}
 
+	function formatDate(value) {
+		const date = new Date(value);
+
+		if (isNaN(date.getTime())) {
+			return value || '-';
+		}
+
+		return date.toLocaleString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+	}
+
+	function metadataValue(value) {
+		return value || 'unknown';
+	}
+
+	function formatBuildDate(value) {
+		if (!value) {
+			return metadataValue(value);
+		}
+
+		return formatDate(value);
+	}
+
+	function crashContext(crash) {
+		return [crash.Project, crash.Env, crash.Platform, crash.Category].filter(Boolean).join(' / ');
+	}
+
 	async function resolveCrash(hash) {
 		resolvingCrashes = { ...resolvingCrashes, [hash]: true };
 
@@ -245,32 +277,45 @@
 		{#each getRegularCrashes(crashes) as crash}
 			<div class:resolving={resolvingCrashes[crash.Hash] || resolvingAllCrashes} class="comment">
 				<div class="comment-body">
-					<div class="metadata">
-						<p class="created"><span>Last Seen</span>{new Date(crash.UpdatedAt).toLocaleString()}</p>
-						<p class="created"><span>Build</span>{crash.Build}</p>
-						<p class="created"><span>Git Hash</span><small>{crash.Commit}</small></p>
-						<p class="created"><span>DB Hash</span><small>{crash.Hash}</small></p>
-						<p class="created"><span>Total</span>{crash.Count}</p>
-						<p class="created"><span>Platform</span>{crash.Platform}</p>
-						<button type="button" disabled={resolvingCrashes[crash.Hash] || resolvingAllCrashes} on:click={() => resolveCrash(crash.Hash)}>
-							{resolvingCrashes[crash.Hash] ? 'Resolving...' : 'Resolve'}
-						</button>
-
+					<div class="comment-main">
+						<div class="stack">
+							<p class="message"><b>{crash.Message}</b></p>
+							{#each getVisibleStack(crash) as stackMessage}
+								<p class="message">{stackMessage}</p>
+							{/each}
+							{#if shouldShowExpand(crash)}
+								<button class="expand-button" type="button" on:click={() => expandCrash(crash.Hash)}>
+									Expand...
+								</button>
+							{/if}
+						</div>
+						<div class="meta-list">
+							{#if crashContext(crash)}
+								<span>{crashContext(crash)}</span>
+							{/if}
+							{#if crash.PID}
+								<span>{crash.PID}</span>
+							{/if}
+							{#if crash.Commit}
+								<span>{crash.Commit}</span>
+							{/if}
+							{#if crash.Hash}
+								<span>{crash.Hash}</span>
+							{/if}
+						</div>
 					</div>
-					<div class="stack">
-						<p class="message"><b>{crash.Message}</b></p>
-						{#each getVisibleStack(crash) as stackMessage}
-							<p class="message">{stackMessage}</p>
-						{/each}
-						{#if shouldShowExpand(crash)}
-							<button class="expand-button" type="button" on:click={() => expandCrash(crash.Hash)}>
-								Expand...
+					<div class="comment-side">
+						<div class="stats">
+							<p><span>Last Seen</span>{formatDate(crash.UpdatedAt)}</p>
+							<p><span>Build</span>{formatBuildDate(crash.Build)}</p>
+							<p><span>Total</span>{crash.Count}</p>
+						</div>
+						<div class="actions">
+							<button type="button" disabled={resolvingCrashes[crash.Hash] || resolvingAllCrashes} on:click={() => resolveCrash(crash.Hash)}>
+								{resolvingCrashes[crash.Hash] ? 'Resolving...' : 'Resolve'}
 							</button>
-						{/if}
+						</div>
 					</div>
-				</div>
-				<div class="comment-footer">
-					<small>{crash.PID}:{crash.Project}:{crash.Env}</small>
 				</div>
 			</div>
 		{/each}
@@ -324,9 +369,7 @@
 		border-left: 4px solid #111;
 		border-radius: 4px;
 		box-sizing: border-box;
-		display: flex;
-		flex-direction: column;
-		padding: 14px 16px 10px;
+		padding: 14px 16px;
 		transition: opacity 120ms ease, background-color 120ms ease;
 	}
 
@@ -336,10 +379,24 @@
 	}
 
 	.comment-body {
-		align-items: flex-start;
-		display: flex;
-		flex-direction: row;
+		align-items: stretch;
+		display: grid;
 		gap: 18px;
+		grid-template-columns: minmax(0, 1fr) minmax(320px, auto);
+	}
+
+	.comment-main {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+	}
+
+	.comment-side {
+		align-items: flex-end;
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
 	}
 
 	.stack {
@@ -348,28 +405,19 @@
 		min-width: 0;
 	}
 
-	.metadata {
-		color: #333;
-		display: flex;
-		flex-direction: column;
-		align-items: start;
-		flex-shrink: 0;
-		gap: 6px;
-		width: 260px;
-	}
-
-	.comment-footer {
-		color: #666;
-		display: flex;
-		margin-top: 12px;
-		min-width: 0;
-	}
-
 	.comment p {
 		margin: 0;
 	}
 
-	.created {
+	.stats {
+		display: grid;
+		gap: 12px;
+		grid-template-columns: repeat(3, minmax(90px, max-content));
+		justify-content: end;
+	}
+
+	.stats p {
+		color: #333;
 		display: grid;
 		font-size: 0.82rem;
 		gap: 2px;
@@ -377,12 +425,31 @@
 		text-align: left;
 	}
 
-	.created span {
+	.stats span {
 		color: #777;
 		font-size: 0.68rem;
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
+	}
+
+	.meta-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.meta-list span {
+		background: #f4f4f4;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		color: #555;
+		font-size: 0.68rem;
+		line-height: 1.25;
+		max-width: 100%;
+		overflow-wrap: anywhere;
+		padding: 3px 6px;
+		text-align: left;
 	}
 
 	.message {
@@ -413,6 +480,13 @@
 		padding: 7px 10px;
 	}
 
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		justify-content: flex-end;
+	}
+
 	button:hover:not(:disabled) {
 		background: #f2f2f2;
 		border-color: #666;
@@ -426,14 +500,6 @@
 	.expand-button {
 		align-self: flex-start;
 		margin-top: 8px;
-	}
-
-	small,
-	.comment-footer small {
-		font-size: 0.68rem;
-		line-height: 1.3;
-		overflow-wrap: anywhere;
-		text-align: left;
 	}
 
 	.access-violations {
@@ -536,19 +602,27 @@
 		}
 
 		.comment-body {
-			display: grid;
-			gap: 12px;
+			grid-template-columns: 1fr;
 		}
 
-		.metadata {
-			display: grid;
-			grid-template-columns: 1fr 1fr;
-			gap: 8px 12px;
+		.comment-side {
+			align-items: flex-start;
 			width: 100%;
 		}
 
-		.metadata button {
+		.stats {
+			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+			justify-content: stretch;
 			width: 100%;
+		}
+
+		.actions {
+			justify-content: flex-start;
+			width: 100%;
+		}
+
+		.actions button {
+			flex: 1 1 96px;
 		}
 
 		.stack {
@@ -566,7 +640,7 @@
 	}
 
 	@media (max-width: 480px) {
-		.metadata {
+		.stats {
 			grid-template-columns: 1fr;
 		}
 

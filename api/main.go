@@ -39,9 +39,11 @@ func main() {
 	router.GET("/resolvecrash", endpoints.ResolveCrash)
 	router.POST("/crash", endpoints.AddCrash)
 	router.GET("/savegame", endpoints.GetSavegames)
+	router.GET("/savegame/builds", endpoints.GetSavegameBuilds)
 	router.POST("/savegame", endpoints.AddSavegame)
 	router.GET("/savegame/download", endpoints.DownloadSavegame)
 	router.DELETE("/savegame", endpoints.DeleteSavegame)
+	router.DELETE("/savegame/build", endpoints.DeleteSavegamesByBuild)
 
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
 	router.POST("/words/unknown", endpoints.GetUnknownWords)

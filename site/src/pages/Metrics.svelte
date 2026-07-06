@@ -24,23 +24,49 @@
 		}
 	}
 
+	async function getSavegameBuilds() {
+		const res = await fetch(`https://api.clyde.games/savegame/builds`);
+		const builds = await parseResponse(res);
+
+		if (res.ok) {
+			return builds;
+		} else {
+			throw new Error(builds.error || builds);
+		}
+	}
+
 	let builds = [];
+	let savegameBuilds = [];
 	let loadingBuilds = true;
+	let loadingSavegameBuilds = true;
 	let buildError = '';
-	let deletingBuild = null;
+	let savegameBuildError = '';
+	let deletingEventBuild = null;
+	let deletingSavegameBuild = null;
 	let deleteError = '';
 
 	async function loadBuilds() {
 		loadingBuilds = true;
+		loadingSavegameBuilds = true;
 		buildError = '';
+		savegameBuildError = '';
 
-		try {
-			builds = await getBuilds();
-		} catch (error) {
-			buildError = error.message;
-		} finally {
-			loadingBuilds = false;
+		const [eventBuilds, savegameBuildItems] = await Promise.allSettled([getBuilds(), getSavegameBuilds()]);
+
+		if (eventBuilds.status === 'fulfilled') {
+			builds = eventBuilds.value;
+		} else {
+			buildError = eventBuilds.reason.message || String(eventBuilds.reason);
 		}
+
+		if (savegameBuildItems.status === 'fulfilled') {
+			savegameBuilds = savegameBuildItems.value;
+		} else {
+			savegameBuildError = savegameBuildItems.reason.message || String(savegameBuildItems.reason);
+		}
+
+		loadingBuilds = false;
+		loadingSavegameBuilds = false;
 	}
 
 	loadBuilds();
@@ -51,6 +77,15 @@
 			buildError = '';
 		} catch (error) {
 			buildError = error.message;
+		}
+	}
+
+	async function refreshSavegameBuilds() {
+		try {
+			savegameBuilds = await getSavegameBuilds();
+			savegameBuildError = '';
+		} catch (error) {
+			savegameBuildError = error.message;
 		}
 	}
 
@@ -70,12 +105,12 @@
 		});
 	}
 
-	async function deleteBuild(build) {
+	async function deleteEventBuild(build) {
 		if (!confirm(`Delete all metrics events for build ${build}?`)) {
 			return;
 		}
 
-		deletingBuild = build;
+		deletingEventBuild = build;
 		deleteError = '';
 
 		try {
@@ -94,7 +129,35 @@
 		} catch (error) {
 			deleteError = error.message;
 		} finally {
-			deletingBuild = null;
+			deletingEventBuild = null;
+		}
+	}
+
+	async function deleteSavegameBuildItems(build) {
+		if (!confirm(`Delete all save games for build ${build}?`)) {
+			return;
+		}
+
+		deletingSavegameBuild = build;
+		deleteError = '';
+
+		try {
+			const res = await fetch(`https://api.clyde.games/savegame/build?build=${encodeURIComponent(build)}`, {
+				method: 'DELETE'
+			});
+
+			if (!res.ok) {
+				const error = await parseResponse(res);
+				deleteError = error.error || error;
+				return;
+			}
+
+			savegameBuilds = savegameBuilds.filter(item => item.Build !== build);
+			await refreshSavegameBuilds();
+		} catch (error) {
+			deleteError = error.message;
+		} finally {
+			deletingSavegameBuild = null;
 		}
 	}
 </script>
@@ -103,15 +166,18 @@
 	<header class="page-header">
 		<div>
 			<h2>Metrics</h2>
-			<p>{builds.length} build{builds.length === 1 ? '' : 's'}</p>
+			<p>{builds.length} event build{builds.length === 1 ? '' : 's'} / {savegameBuilds.length} save build{savegameBuilds.length === 1 ? '' : 's'}</p>
 		</div>
 	</header>
 
-	<section class="builds">
-		{#if deleteError}
-			<p class="error">{deleteError}</p>
-		{/if}
+	{#if deleteError}
+		<p class="error">{deleteError}</p>
+	{/if}
 
+	<section class="builds">
+		<div class="section-header">
+			<h3>Event Builds</h3>
+		</div>
 		{#if loadingBuilds}
 			<p class="state-message">loading...</p>
 		{:else if buildError}
@@ -120,21 +186,53 @@
 			{#if builds.length > 0}
 				<div class="build-list">
 					{#each builds as build}
-						<div class:deleting={deletingBuild === build.Build} class="build-row">
+						<div class:deleting={deletingEventBuild === build.Build} class="build-row">
 							<p class="build-date">{formatBuildDate(build.Build)}</p>
 							<p class="build-count">{build.Count} events</p>
 							<button
 								type="button"
-								disabled={deletingBuild === build.Build}
-								on:click={() => deleteBuild(build.Build)}
+								disabled={deletingEventBuild === build.Build}
+								on:click={() => deleteEventBuild(build.Build)}
 							>
-								{deletingBuild === build.Build ? 'Deleting...' : 'Delete All'}
+								{deletingEventBuild === build.Build ? 'Deleting...' : 'Delete All'}
 							</button>
 						</div>
 					{/each}
 				</div>
 			{:else}
 				<p class="empty-state">No builds found.</p>
+			{/if}
+		{/if}
+	</section>
+
+	<section class="builds">
+		<div class="section-header">
+			<h3>Save Game Builds</h3>
+		</div>
+
+		{#if loadingSavegameBuilds}
+			<p class="state-message">loading...</p>
+		{:else if savegameBuildError}
+			<p class="state-message error">{savegameBuildError}</p>
+		{:else}
+			{#if savegameBuilds.length > 0}
+				<div class="build-list">
+					{#each savegameBuilds as build}
+						<div class:deleting={deletingSavegameBuild === build.Build} class="build-row">
+							<p class="build-date">{formatBuildDate(build.Build)}</p>
+							<p class="build-count">{build.Count} save game{build.Count === 1 ? '' : 's'}</p>
+							<button
+								type="button"
+								disabled={deletingSavegameBuild === build.Build}
+								on:click={() => deleteSavegameBuildItems(build.Build)}
+							>
+								{deletingSavegameBuild === build.Build ? 'Deleting...' : 'Delete All'}
+							</button>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<p class="empty-state">No save game builds found.</p>
 			{/if}
 		{/if}
 	</section>
@@ -174,7 +272,20 @@
 		border: 1px solid #cfcfcf;
 		border-left: 4px solid #111;
 		border-radius: 4px;
+		margin-top: 14px;
 		padding: 4px 16px;
+	}
+
+	.section-header {
+		border-bottom: 1px solid #ddd;
+		padding: 12px 0;
+	}
+
+	.section-header h3 {
+		font-size: 1rem;
+		line-height: 1;
+		margin: 0;
+		text-align: left;
 	}
 
 	.build-list {
@@ -193,7 +304,7 @@
 		transition: opacity 120ms ease;
 	}
 
-	.build-row:first-child {
+	.section-header + .build-list .build-row:first-child {
 		border-top: 0;
 	}
 

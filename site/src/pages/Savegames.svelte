@@ -54,12 +54,49 @@
 	}
 
 	function downloadSavegame(id) {
+		const savegame = savegames.find(item => item.ID === id);
 		const link = document.createElement('a');
 		link.href = `https://api.clyde.games/savegame/download?id=${id}`;
-		link.download = 'test.sav';
+		link.download = savegame?.Filename || 'test.sav';
 		document.body.appendChild(link);
 		link.click();
 		link.remove();
+	}
+
+	function formatDate(value) {
+		const date = new Date(value);
+
+		if (isNaN(date.getTime())) {
+			return value || '-';
+		}
+
+		return date.toLocaleString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+	}
+
+	function formatBuildDate(build) {
+		return formatDate(build);
+	}
+
+	function formatSize(size) {
+		if (!size) {
+			return '0 KB';
+		}
+
+		return `${Math.ceil(size / 1024)} KB`;
+	}
+
+	function savegameContext(savegame) {
+		return [savegame.Project, savegame.Env, savegame.Platform, savegame.Category].filter(Boolean).join(' / ');
+	}
+
+	function playerContext(savegame) {
+		return [savegame.PID, savegame.SID].filter(Boolean).join(' / ');
 	}
 
 	async function deleteSavegame(id) {
@@ -106,25 +143,42 @@
 		{#each savegames as savegame}
 			<div class:deleting={deletingSavegames[savegame.ID]} class="savegame">
 				<div class="savegame-body">
-					<p class="name">{savegame.Filename || 'test.sav'}</p>
-					<p class="created"><span>Created</span>{new Date(savegame.CreatedAt).toLocaleString()}</p>
-					<p class="size"><span>Size</span>{Math.ceil(savegame.Size / 1024)} KB</p>
-				</div>
-				<div class="savegame-footer">
-					<small>{savegame.PID}:{savegame.Platform}:{savegame.Project}:{savegame.Env}</small>
-					<div class="actions">
-						<button type="button" disabled={deletingSavegames[savegame.ID]} on:click={() => downloadSavegame(savegame.ID)}>
-							Download
-						</button>
-						<button type="button" disabled={deletingSavegames[savegame.ID]} on:click={() => deleteSavegame(savegame.ID)}>
-							{deletingSavegames[savegame.ID] ? 'Deleting...' : 'Delete'}
-						</button>
+					<div class="savegame-main">
+						<p class="name">{savegame.Filename || 'test.sav'}</p>
+						{#if savegame.Reason}
+							<p class="reason">{savegame.Reason}</p>
+						{/if}
+						<div class="meta-list">
+							{#if savegameContext(savegame)}
+								<span>{savegameContext(savegame)}</span>
+							{/if}
+							{#if playerContext(savegame)}
+								<span>{playerContext(savegame)}</span>
+							{/if}
+							{#if savegame.Commit}
+								<span>{savegame.Commit}</span>
+							{/if}
+							{#if savegame.Hash}
+								<span>{savegame.Hash}</span>
+							{/if}
+						</div>
+					</div>
+					<div class="savegame-side">
+						<div class="stats">
+							<p><span>Created</span>{formatDate(savegame.CreatedAt)}</p>
+							<p><span>Build</span>{formatBuildDate(savegame.Build)}</p>
+							<p><span>Size</span>{formatSize(savegame.Size)}</p>
+						</div>
+						<div class="actions">
+							<button type="button" disabled={deletingSavegames[savegame.ID]} on:click={() => downloadSavegame(savegame.ID)}>
+								Download
+							</button>
+							<button type="button" disabled={deletingSavegames[savegame.ID]} on:click={() => deleteSavegame(savegame.ID)}>
+								{deletingSavegames[savegame.ID] ? 'Deleting...' : 'Delete'}
+							</button>
+						</div>
 					</div>
 				</div>
-				{#if savegame.Reason}
-					<p class="reason">{savegame.Reason}</p>
-				{/if}
-				<small class="hash">{savegame.Hash}</small>
 			</div>
 		{/each}
 		</div>
@@ -172,9 +226,7 @@
 		border: 1px solid #cfcfcf;
 		border-left: 4px solid #111;
 		border-radius: 4px;
-		display: flex;
-		flex-direction: column;
-		padding: 14px 16px 10px;
+		padding: 14px 16px;
 		transition: opacity 120ms ease, background-color 120ms ease;
 	}
 
@@ -184,23 +236,28 @@
 	}
 
 	.savegame-body {
-		align-items: flex-start;
-		display: flex;
-		flex-direction: row;
+		align-items: stretch;
+		display: grid;
 		gap: 18px;
+		grid-template-columns: minmax(0, 1fr) minmax(320px, auto);
 	}
 
-	.savegame-footer {
+	.savegame-main {
 		display: flex;
-		align-items: center;
-		color: #666;
-		margin-top: 12px;
+		flex-direction: column;
+		gap: 10px;
 		min-width: 0;
+	}
+
+	.savegame-side {
+		align-items: flex-end;
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
 	}
 
 	.name {
 		color: #111;
-		flex-grow: 1;
 		font-size: 1rem;
 		font-weight: 800;
 		line-height: 1.35;
@@ -209,20 +266,23 @@
 		text-align: left;
 	}
 
-	.created,
-	.size {
+	.stats {
+		display: grid;
+		gap: 12px;
+		grid-template-columns: repeat(3, minmax(90px, max-content));
+		justify-content: end;
+	}
+
+	.stats p {
 		color: #333;
 		display: grid;
-		flex-shrink: 0;
 		font-size: 0.82rem;
 		gap: 2px;
 		line-height: 1.25;
 		text-align: left;
-		width: 180px;
 	}
 
-	.created span,
-	.size span {
+	.stats span {
 		color: #777;
 		font-size: 0.68rem;
 		font-weight: 800;
@@ -234,14 +294,31 @@
 		color: #333;
 		font-size: 0.9rem;
 		line-height: 1.35;
-		margin: 12px 0 4px;
+		text-align: left;
+	}
+
+	.meta-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.meta-list span {
+		background: #f4f4f4;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		color: #555;
+		font-size: 0.68rem;
+		line-height: 1.25;
+		max-width: 100%;
+		overflow-wrap: anywhere;
+		padding: 3px 6px;
 		text-align: left;
 	}
 
 	.actions {
 		display: flex;
 		gap: 6px;
-		margin-left: auto;
 	}
 
 	p {
@@ -271,19 +348,6 @@
 		cursor: default;
 	}
 
-	small {
-		font-size: 0.68rem;
-		line-height: 1.3;
-		overflow-wrap: anywhere;
-		text-align: left;
-	}
-
-	.hash {
-		color: #666;
-		margin-top: 8px;
-		text-align: left;
-	}
-
 	.state-message {
 		color: #666;
 		margin: 32px 0;
@@ -304,19 +368,17 @@
 		}
 
 		.savegame-body {
-			display: grid;
-			gap: 10px;
+			grid-template-columns: 1fr;
 		}
 
-		.created,
-		.size {
-			width: auto;
-		}
-
-		.savegame-footer {
+		.savegame-side {
 			align-items: flex-start;
-			flex-direction: column;
-			gap: 10px;
+		}
+
+		.stats {
+			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+			justify-content: stretch;
+			width: 100%;
 		}
 
 		.actions {

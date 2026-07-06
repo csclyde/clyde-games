@@ -244,6 +244,34 @@
 		return value || 'unknown';
 	}
 
+	function formatDate(value) {
+		const date = new Date(value);
+
+		if (isNaN(date.getTime())) {
+			return value || '-';
+		}
+
+		return date.toLocaleString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+	}
+
+	function formatBuildDate(value) {
+		if (!value) {
+			return metadataValue(value);
+		}
+
+		return formatDate(value);
+	}
+
+	function feedbackContext(comment) {
+		return [comment.Project, comment.Env, comment.Platform, comment.Category].filter(Boolean).join(' / ');
+	}
+
 </script>
 
 <main>
@@ -265,11 +293,7 @@
 		{#each feedback as comment}
 			<div class:resolving={resolvingFeedback[comment.ID]} class="comment">
 				<div class="comment-body">
-					<div class="metadata">
-						<p class="created"><span>Created</span>{new Date(comment.CreatedAt).toLocaleString()}</p>
-						<p class="created"><span>Build</span>{metadataValue(comment.Build)}</p>
-					</div>
-					<div class="feedback-content">
+					<div class="comment-main">
 						<div class="message-header">
 							<span class="rating" style="background-color:{ colors[comment.Rating] }"></span>
 							<div class="message-stack">
@@ -282,8 +306,23 @@
 								{/if}
 							</div>
 						</div>
+						<div class="meta-list">
+							{#if feedbackContext(comment)}
+								<span>{feedbackContext(comment)}</span>
+							{/if}
+							{#if comment.PID}
+								<span>{comment.PID}</span>
+							{/if}
+							{#if comment.Commit}
+								<span>{comment.Commit}</span>
+							{/if}
+						</div>
 					</div>
-					<div class="action-column">
+					<div class="comment-side">
+						<div class="stats">
+							<p><span>Created</span>{formatDate(comment.CreatedAt)}</p>
+							<p><span>Build</span>{formatBuildDate(comment.Build)}</p>
+						</div>
 						<div class="actions">
 							<button type="button" disabled={translatingFeedback[comment.ID] || resolvingFeedback[comment.ID]} on:click={() => translateFeedback(comment)}>
 								{translatingFeedback[comment.ID] ? 'Translating...' : 'Translate'}
@@ -299,9 +338,6 @@
 							<small class="ticket-status">{ticketStatus[comment.ID]}</small>
 						{/if}
 					</div>
-				</div>
-				<div class="comment-footer">
-					<small>{comment.PID}:{comment.Platform}:{comment.Project}:{comment.Env}:{metadataValue(comment.Commit)}</small>
 				</div>
 			</div>
 		{/each}
@@ -351,9 +387,7 @@
 		border-left: 4px solid #111;
 		border-radius: 4px;
 		box-sizing: border-box;
-		display: flex;
-		flex-direction: column;
-		padding: 14px 16px 10px;
+		padding: 14px 16px;
 		transition: opacity 120ms ease, background-color 120ms ease;
 	}
 
@@ -363,23 +397,35 @@
 	}
 
 	.comment-body {
-		align-items: flex-start;
-		display: flex;
-		flex-direction: row;
+		align-items: stretch;
+		display: grid;
 		gap: 18px;
+		grid-template-columns: minmax(0, 1fr) minmax(320px, auto);
 	}
 
-	.metadata {
-		color: #333;
+	.comment-main {
 		display: flex;
 		flex-direction: column;
-		align-items: start;
-		flex-shrink: 0;
-		gap: 5px;
-		width: 240px;
+		gap: 10px;
+		min-width: 0;
 	}
 
-	.created {
+	.comment-side {
+		align-items: flex-end;
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+
+	.stats {
+		display: grid;
+		gap: 12px;
+		grid-template-columns: repeat(2, minmax(90px, max-content));
+		justify-content: end;
+	}
+
+	.stats p {
+		color: #333;
 		display: grid;
 		font-size: 0.82rem;
 		gap: 2px;
@@ -388,7 +434,7 @@
 		text-align: left;
 	}
 
-	.created span {
+	.stats span {
 		color: #777;
 		font-size: 0.68rem;
 		font-weight: 800;
@@ -401,20 +447,6 @@
 		flex-wrap: wrap;
 		gap: 6px;
 		justify-content: flex-end;
-	}
-
-	.action-column {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		flex-shrink: 0;
-		gap: 6px;
-		margin-left: auto;
-	}
-
-	.feedback-content {
-		flex-grow: 1;
-		min-width: 0;
 	}
 
 	.message-header {
@@ -430,11 +462,23 @@
 		min-width: 0;
 	}
 
-	.comment-footer {
-		color: #666;
+	.meta-list {
 		display: flex;
-		margin-top: 12px;
-		min-width: 0;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.meta-list span {
+		background: #f4f4f4;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		color: #555;
+		font-size: 0.68rem;
+		line-height: 1.25;
+		max-width: 100%;
+		overflow-wrap: anywhere;
+		padding: 3px 6px;
+		text-align: left;
 	}
 
 	.comment p {
@@ -495,8 +539,7 @@
 		cursor: default;
 	}
 
-	small,
-	.comment-footer small {
+	small {
 		font-size: 0.68rem;
 		line-height: 1.3;
 		overflow-wrap: anywhere;
@@ -542,29 +585,25 @@
 		}
 
 		.comment-body {
-			display: grid;
-			gap: 12px;
-		}
-
-		.metadata {
-			display: grid;
-			grid-template-columns: 1fr 1fr;
-			gap: 8px 12px;
-			width: 100%;
+			grid-template-columns: 1fr;
 		}
 
 		.message-header {
 			gap: 10px;
 		}
 
-		.feedback-content,
 		.message-stack {
 			width: 100%;
 		}
 
-		.action-column {
+		.comment-side {
 			align-items: flex-start;
-			margin-left: 0;
+			width: 100%;
+		}
+
+		.stats {
+			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+			justify-content: stretch;
 			width: 100%;
 		}
 
@@ -583,7 +622,7 @@
 	}
 
 	@media (max-width: 480px) {
-		.metadata {
+		.stats {
 			grid-template-columns: 1fr;
 		}
 	}

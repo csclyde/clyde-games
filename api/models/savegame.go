@@ -20,6 +20,11 @@ type Savegame struct {
 	Data        []byte `gorm:"type:mediumblob;not null"`
 }
 
+type SavegameBuild struct {
+	Build string
+	Count int64
+}
+
 func AddSavegame(savegame Savegame) (*Savegame, error) {
 	result := AnalyticsDB.Create(&savegame)
 	if result.Error != nil {
@@ -39,6 +44,22 @@ func SelectAllSavegames() ([]Savegame, error) {
 	return savegames, nil
 }
 
+func SelectSavegameBuilds() ([]SavegameBuild, error) {
+	var builds []SavegameBuild
+	result := AnalyticsDB.Model(&Savegame{}).
+		Select("build, count(*) as count").
+		Where("build <> ''").
+		Group("build").
+		Order("build desc").
+		Find(&builds)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return builds, nil
+}
+
 func SelectSavegame(id string) (*Savegame, error) {
 	var savegame Savegame
 	result := AnalyticsDB.Where("id = ?", id).First(&savegame)
@@ -51,4 +72,13 @@ func SelectSavegame(id string) (*Savegame, error) {
 
 func DeleteSavegame(id string) error {
 	return AnalyticsDB.Delete(&Savegame{}, id).Error
+}
+
+func DeleteSavegamesByBuild(build string) (int64, error) {
+	result := AnalyticsDB.Unscoped().Where("build = ?", build).Delete(&Savegame{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
 }

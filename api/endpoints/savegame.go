@@ -71,6 +71,16 @@ func GetSavegames(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, responses)
 }
 
+func GetSavegameBuilds(c *gin.Context) {
+	builds, err := models.SelectSavegameBuilds()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, builds)
+}
+
 func DownloadSavegame(c *gin.Context) {
 	savegame, err := models.SelectSavegame(c.Query("id"))
 	if err != nil {
@@ -94,6 +104,22 @@ func DeleteSavegame(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"deleted": true})
+}
+
+func DeleteSavegamesByBuild(c *gin.Context) {
+	build := c.Query("build")
+	if build == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "build is required"})
+		return
+	}
+
+	deleted, err := models.DeleteSavegamesByBuild(build)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"deleted": deleted})
 }
 
 func readSavegame(c *gin.Context) (models.Savegame, error) {
