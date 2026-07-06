@@ -98,25 +98,31 @@
 </script>
 
 <main>
-	<h2>Player Feedback</h2>
-	<hr/>
+	<header class="page-header">
+		<div>
+			<h2>Player Feedback</h2>
+			<p>{feedback.length} open item{feedback.length === 1 ? '' : 's'}</p>
+		</div>
+	</header>
 
 	{#if loadingFeedback}
-		<p>loading...</p>
+		<p class="state-message">loading...</p>
 	{:else if feedbackError}
-		<p style="color: red">{feedbackError}</p>
+		<p class="state-message error">{feedbackError}</p>
+	{:else if feedback.length === 0}
+		<p class="state-message">No open feedback.</p>
 	{:else}
 		<div class="comment-list">
 		{#each feedback as comment}
 			<div class:resolving={resolvingFeedback[comment.ID]} class="comment">
 				<div class="comment-body">
 					<div class="metadata">
-						<p class="created">Created At: {new Date(comment.CreatedAt).toLocaleString()}</p>
-						<p class="created">Built At: {metadataValue(comment.Build)}</p>
+						<p class="created"><span>Created</span>{new Date(comment.CreatedAt).toLocaleString()}</p>
+						<p class="created"><span>Build</span>{metadataValue(comment.Build)}</p>
 					</div>
 					<div class="feedback-content">
 						<div class="message-header">
-							<p class="rating" style="background-color:{ colors[comment.Rating] }"></p>
+							<span class="rating" style="background-color:{ colors[comment.Rating] }"></span>
 							<p class="message">{comment.Message}</p>
 						</div>
 					</div>
@@ -144,18 +150,50 @@
 </main>
 
 <style>
+	main {
+		color: #171717;
+		max-width: 1400px;
+		margin: 0 auto;
+		padding: 12px 16px 32px;
+	}
+
+	.page-header {
+		border-bottom: 1px solid #d8d8d8;
+		margin-bottom: 14px;
+		padding-bottom: 12px;
+	}
+
+	.page-header h2 {
+		font-size: 2.5rem;
+		line-height: 1;
+		text-align: left;
+	}
+
+	.page-header p {
+		color: #666;
+		font-size: 0.85rem;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		margin: 6px 0 0;
+		text-align: left;
+		text-transform: uppercase;
+	}
+
 	.comment-list {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 10px;
 	}
 
 	.comment {
+		background: #fff;
+		border: 1px solid #cfcfcf;
+		border-left: 4px solid #111;
+		border-radius: 4px;
 		display: flex;
 		flex-direction: column;
-		border: 2px solid black;
-		padding: 8px;
-		border-radius: 6px;
+		padding: 14px 16px 10px;
+		transition: opacity 120ms ease, background-color 120ms ease;
 	}
 
 	.comment.resolving {
@@ -164,22 +202,42 @@
 	}
 
 	.comment-body {
+		align-items: flex-start;
 		display: flex;
 		flex-direction: row;
-		align-items: center;
-		gap: 12px;
+		gap: 18px;
 	}
 
 	.metadata {
+		color: #333;
 		display: flex;
 		flex-direction: column;
 		align-items: start;
 		flex-shrink: 0;
+		gap: 5px;
+		width: 240px;
+	}
+
+	.created {
+		display: grid;
+		font-size: 0.82rem;
+		gap: 2px;
+		line-height: 1.25;
+		margin: 0;
+		text-align: left;
+	}
+
+	.created span {
+		color: #777;
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 	}
 
 	.actions {
 		display: flex;
-		gap: 4px;
+		gap: 6px;
 		justify-content: flex-end;
 	}
 
@@ -188,54 +246,125 @@
 		flex-direction: column;
 		align-items: flex-end;
 		flex-shrink: 0;
-		gap: 4px;
+		gap: 6px;
+		margin-left: auto;
 	}
 
 	.feedback-content {
 		flex-grow: 1;
+		min-width: 0;
 	}
 
 	.message-header {
+		align-items: flex-start;
 		display: flex;
-		align-items: center;
+		gap: 12px;
 	}
 
 	.comment-footer {
+		color: #666;
 		display: flex;
-		margin-top: 8px;
+		margin-top: 12px;
+		min-width: 0;
 	}
 
 	.comment p {
-		margin: 4px;
+		margin: 0;
 	}
 
 	.rating {
-		/* background-color: red; */
 		border-radius: 50%;
-		width: 20px;
-		height: 20px;
-		text-align: center;
-		font-weight: 800;
+		box-shadow: 0 0 0 2px #fff, 0 0 0 3px #d8d8d8;
 		flex-shrink: 0;
-	}
-
-	.created {
-		flex-shrink: 0;
-		font-size: small;
+		height: 14px;
+		margin-top: 5px;
+		width: 14px;
 	}
 
 	.message {
+		color: #111;
 		flex-grow: 1;
-		text-align: start;
+		font-size: 1rem;
+		line-height: 1.4;
+		overflow-wrap: anywhere;
+		text-align: left;
 	}
 
-	small {
-		font-size: xx-small;
+	button {
+		background: #fff;
+		border: 1px solid #a8a8a8;
+		border-radius: 4px;
+		color: #111;
+		cursor: pointer;
+		font: inherit;
+		font-size: 0.82rem;
+		font-weight: 700;
+		line-height: 1;
+		padding: 7px 10px;
+	}
+
+	button:hover:not(:disabled) {
+		background: #f2f2f2;
+		border-color: #666;
+	}
+
+	button:disabled {
+		color: #777;
+		cursor: default;
+	}
+
+	small,
+	.comment-footer small {
+		font-size: 0.68rem;
+		line-height: 1.3;
+		overflow-wrap: anywhere;
+		text-align: left;
 	}
 
 	.ticket-status {
+		color: #555;
 		max-width: 220px;
-		text-align: start;
+		text-align: right;
+	}
+
+	.state-message {
+		color: #666;
+		margin: 32px 0;
+		text-align: left;
+	}
+
+	.error {
+		color: #a40000;
+	}
+
+	@media (max-width: 820px) {
+		main {
+			padding: 8px;
+		}
+
+		.page-header h2 {
+			font-size: 2rem;
+		}
+
+		.comment-body {
+			display: grid;
+			gap: 12px;
+		}
+
+		.metadata {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			width: 100%;
+		}
+
+		.action-column {
+			align-items: flex-start;
+			margin-left: 0;
+		}
+
+		.ticket-status {
+			text-align: left;
+		}
 	}
 
 </style>

@@ -170,25 +170,18 @@
 		}
 	}
 
-	let colors = [
-		'black',
-		'red',
-		'orange',
-		'gray',
-		'blue',
-		'green'
-	]
-
 </script>
 
 <main>
-	<h2>Crash Reports</h2>
-	<div class="controls">
-		<button type="button" disabled={resolvingAllCrashes} on:click={resolveAllCrashes}>
+	<header class="page-header">
+		<div>
+			<h2>Crash Reports</h2>
+			<p>{getRegularCrashes(crashes).length} open item{getRegularCrashes(crashes).length === 1 ? '' : 's'}</p>
+		</div>
+		<button type="button" disabled={resolvingAllCrashes || getRegularCrashes(crashes).length === 0} on:click={resolveAllCrashes}>
 			{resolvingAllCrashes ? 'Closing...' : 'Close All'}
 		</button>
-	</div>
-	<hr/>
+	</header>
 
 	<section class="access-violations">
 		{#if loadingAccessViolations}
@@ -223,21 +216,23 @@
 	</section>
 
 	{#if loadingCrashes}
-		<p>loading...</p>
+		<p class="state-message">loading...</p>
 	{:else if crashError}
-		<p style="color: red">{crashError}</p>
+		<p class="state-message error">{crashError}</p>
+	{:else if getRegularCrashes(crashes).length === 0}
+		<p class="state-message">No open crashes.</p>
 	{:else}
 		<div class="comment-list">
 		{#each getRegularCrashes(crashes) as crash}
 			<div class:resolving={resolvingCrashes[crash.Hash] || resolvingAllCrashes} class="comment">
 				<div class="comment-body">
 					<div class="metadata">
-						<p class="created">Last Seen: {new Date(crash.UpdatedAt).toLocaleString()}</p>
-						<p class="created">Built At: {crash.Build}</p>
-						<p class="created">Git Hash: <small>{crash.Commit}</small></p>
-						<p class="created">DB Hash: <small>{crash.Hash}</small></p>
-						<p class="created">Total: {crash.Count}</p>
-						<p class="created">Env: {crash.Platform}</p>
+						<p class="created"><span>Last Seen</span>{new Date(crash.UpdatedAt).toLocaleString()}</p>
+						<p class="created"><span>Build</span>{crash.Build}</p>
+						<p class="created"><span>Git Hash</span><small>{crash.Commit}</small></p>
+						<p class="created"><span>DB Hash</span><small>{crash.Hash}</small></p>
+						<p class="created"><span>Total</span>{crash.Count}</p>
+						<p class="created"><span>Platform</span>{crash.Platform}</p>
 						<button type="button" disabled={resolvingCrashes[crash.Hash] || resolvingAllCrashes} on:click={() => resolveCrash(crash.Hash)}>
 							{resolvingCrashes[crash.Hash] ? 'Resolving...' : 'Resolve'}
 						</button>
@@ -260,18 +255,54 @@
 </main>
 
 <style>
+	main {
+		color: #171717;
+		max-width: 1400px;
+		margin: 0 auto;
+		padding: 12px 16px 32px;
+	}
+
+	.page-header {
+		align-items: flex-end;
+		border-bottom: 1px solid #d8d8d8;
+		display: flex;
+		gap: 16px;
+		justify-content: space-between;
+		margin-bottom: 14px;
+		padding-bottom: 12px;
+	}
+
+	.page-header h2 {
+		font-size: 2.5rem;
+		line-height: 1;
+		text-align: left;
+	}
+
+	.page-header p {
+		color: #666;
+		font-size: 0.85rem;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		margin: 6px 0 0;
+		text-align: left;
+		text-transform: uppercase;
+	}
+
 	.comment-list {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 10px;
 	}
 
 	.comment {
+		background: #fff;
+		border: 1px solid #cfcfcf;
+		border-left: 4px solid #111;
+		border-radius: 4px;
 		display: flex;
 		flex-direction: column;
-		border: 2px solid black;
-		padding: 8px;
-		border-radius: 6px;
+		padding: 14px 16px 10px;
+		transition: opacity 120ms ease, background-color 120ms ease;
 	}
 
 	.comment.resolving {
@@ -280,57 +311,106 @@
 	}
 
 	.comment-body {
+		align-items: flex-start;
 		display: flex;
 		flex-direction: row;
-		align-items: center;
+		gap: 18px;
 	}
 
 	.stack {
 		display: flex;
 		flex-direction: column;
+		min-width: 0;
 	}
 
 	.metadata {
+		color: #333;
 		display: flex;
 		flex-direction: column;
 		align-items: start;
+		flex-shrink: 0;
+		gap: 6px;
+		width: 260px;
 	}
 
 	.comment-footer {
+		color: #666;
 		display: flex;
-		margin-top: 8px;
+		margin-top: 12px;
+		min-width: 0;
 	}
 
 	.comment p {
-		margin: 4px;
+		margin: 0;
 	}
 
 	.created {
-		flex-shrink: 0;
-		font-size: small;
+		display: grid;
+		font-size: 0.82rem;
+		gap: 2px;
+		line-height: 1.25;
+		text-align: left;
+	}
+
+	.created span {
+		color: #777;
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 	}
 
 	.message {
+		color: #111;
 		flex-grow: 1;
-		text-align: start;
+		font-size: 0.9rem;
+		line-height: 1.35;
+		overflow-wrap: anywhere;
+		text-align: left;
 	}
 
-	small {
-		font-size: xx-small;
-	}
-
-	.controls {
-		display: flex;
-		align-items: center;
-		justify-content: flex-end;
+	.message:first-child {
+		font-size: 1rem;
 		margin-bottom: 8px;
 	}
 
+	button {
+		background: #fff;
+		border: 1px solid #a8a8a8;
+		border-radius: 4px;
+		color: #111;
+		cursor: pointer;
+		font: inherit;
+		font-size: 0.82rem;
+		font-weight: 700;
+		line-height: 1;
+		padding: 7px 10px;
+	}
+
+	button:hover:not(:disabled) {
+		background: #f2f2f2;
+		border-color: #666;
+	}
+
+	button:disabled {
+		color: #777;
+		cursor: default;
+	}
+
+	small,
+	.comment-footer small {
+		font-size: 0.68rem;
+		line-height: 1.3;
+		overflow-wrap: anywhere;
+		text-align: left;
+	}
+
 	.access-violations {
-		border: 2px solid black;
-		border-radius: 6px;
+		border: 1px solid #cfcfcf;
+		border-left: 4px solid #111;
+		border-radius: 4px;
 		margin-bottom: 12px;
-		padding: 8px;
+		padding: 14px 16px;
 	}
 
 	.section-header {
@@ -339,12 +419,19 @@
 	}
 
 	.section-header h3 {
+		font-size: 1rem;
 		margin: 0;
+		text-align: left;
 	}
 
 	.section-header p {
+		color: #666;
+		font-size: 0.85rem;
+		letter-spacing: 0.02em;
 		margin: 0 0 0 auto;
 		font-weight: 800;
+		text-align: right;
+		text-transform: uppercase;
 	}
 
 	.access-list {
@@ -362,8 +449,8 @@
 		align-items: center;
 		gap: 8px;
 		border-top: 1px solid #ddd;
-		padding: 6px 0;
-		text-align: start;
+		padding: 7px 0;
+		text-align: left;
 	}
 
 	.access-row p {
@@ -375,6 +462,42 @@
 
 	.empty-state {
 		margin: 8px 0 0;
-		text-align: start;
+		text-align: left;
+	}
+
+	.state-message {
+		color: #666;
+		margin: 32px 0;
+		text-align: left;
+	}
+
+	.error {
+		color: #a40000;
+	}
+
+	@media (max-width: 820px) {
+		main {
+			padding: 8px;
+		}
+
+		.page-header {
+			align-items: flex-start;
+			flex-direction: column;
+		}
+
+		.page-header h2 {
+			font-size: 2rem;
+		}
+
+		.comment-body {
+			display: grid;
+			gap: 12px;
+		}
+
+		.metadata {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			width: 100%;
+		}
 	}
 </style>
