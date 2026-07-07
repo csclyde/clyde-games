@@ -1,4 +1,7 @@
 <script>
+	export let selectedProject = 'Cursemark';
+	export let reportProjects = () => {};
+
 	async function parseResponse(res) {
 		const text = await res.text();
 
@@ -99,6 +102,10 @@
 		return [savegame.PID, savegame.SID].filter(Boolean).join(' / ');
 	}
 
+	function matchesProject(item) {
+		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
+	}
+
 	async function deleteSavegame(id) {
 		deletingSavegames = { ...deletingSavegames, [id]: true };
 
@@ -122,13 +129,16 @@
 			deletingSavegames = nextDeletingSavegames;
 		}
 	}
+
+	$: visibleSavegames = savegames.filter(matchesProject);
+	$: reportProjects('savegames', savegames.map(savegame => savegame.Project));
 </script>
 
 <main>
 	<header class="page-header">
 		<div>
 			<h2>Save Games</h2>
-			<p>{savegames.length} file{savegames.length === 1 ? '' : 's'}</p>
+			<p>{visibleSavegames.length} file{visibleSavegames.length === 1 ? '' : 's'}</p>
 		</div>
 	</header>
 
@@ -136,11 +146,11 @@
 		<p class="state-message">loading...</p>
 	{:else if savegameError}
 		<p class="state-message error">{savegameError}</p>
-	{:else if savegames.length === 0}
+	{:else if visibleSavegames.length === 0}
 		<p class="state-message">No save games found.</p>
 	{:else}
 		<div class="savegame-list">
-		{#each savegames as savegame}
+		{#each visibleSavegames as savegame}
 			<div class:deleting={deletingSavegames[savegame.ID]} class="savegame">
 				<div class="savegame-body">
 					<div class="savegame-main">

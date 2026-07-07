@@ -1,4 +1,6 @@
 <script>
+	export let selectedProject = 'Cursemark';
+	export let reportProjects = () => {};
 
 	async function getCrashes() {
 		const res = await fetch(`https://api.clyde.games/crash`);
@@ -213,6 +215,10 @@
 		return [crash.Project, crash.Env, crash.Platform, crash.Category].filter(Boolean).join(' / ');
 	}
 
+	function matchesProject(item) {
+		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
+	}
+
 	async function resolveCrash(hash) {
 		resolvingCrashes = { ...resolvingCrashes, [hash]: true };
 
@@ -236,28 +242,34 @@
 		resolvingAllCrashes = true;
 
 		try {
-			const res = await fetch(`https://api.clyde.games/resolvecrash?all=true`, {
+			const crashesToResolve = visibleRegularCrashes;
+			await Promise.all(crashesToResolve.map(crash => fetch(`https://api.clyde.games/resolvecrash?hash=` + crash.Hash, {
 				method: 'GET'
-			});
+			})));
 
-			if (res.ok) {
-				crashes = [];
-				await refreshCrashLists();
-			}
+			crashes = crashes.filter(crash => !crashesToResolve.some(item => item.Hash === crash.Hash));
+			await refreshCrashLists();
 		} finally {
 			resolvingAllCrashes = false;
 		}
 	}
 
+	$: visibleCrashes = crashes.filter(matchesProject);
+	$: visibleAccessViolations = accessViolations.filter(matchesProject);
+	$: visibleRegularCrashes = getRegularCrashes(visibleCrashes);
+	$: reportProjects('crashes', [
+		...crashes.map(crash => crash.Project),
+		...accessViolations.map(crash => crash.Project)
+	]);
 </script>
 
 <main>
 	<header class="page-header">
 		<div>
 			<h2>Crash Reports</h2>
-			<p>{getRegularCrashes(crashes).length} open item{getRegularCrashes(crashes).length === 1 ? '' : 's'}</p>
+			<p>{visibleRegularCrashes.length} open item{visibleRegularCrashes.length === 1 ? '' : 's'}</p>
 		</div>
-		<button type="button" disabled={resolvingAllCrashes || getRegularCrashes(crashes).length === 0} on:click={resolveAllCrashes}>
+		<button type="button" disabled={resolvingAllCrashes || visibleRegularCrashes.length === 0} on:click={resolveAllCrashes}>
 			{resolvingAllCrashes ? 'Closing...' : 'Close All'}
 		</button>
 	</header>
@@ -277,11 +289,11 @@
 		{:else}
 			<div class="section-header">
 				<h3>Access Violations</h3>
-				<p>{getAccessViolationTotal(accessViolations)} incident{getAccessViolationTotal(accessViolations) === 1 ? '' : 's'} / {getAccessViolationPlayerTotal(accessViolations)} player{getAccessViolationPlayerTotal(accessViolations) === 1 ? '' : 's'} last month</p>
+				<p>{getAccessViolationTotal(visibleAccessViolations)} incident{getAccessViolationTotal(visibleAccessViolations) === 1 ? '' : 's'} / {getAccessViolationPlayerTotal(visibleAccessViolations)} player{getAccessViolationPlayerTotal(visibleAccessViolations) === 1 ? '' : 's'} last month</p>
 			</div>
-			{#if getAccessViolationTotal(accessViolations) > 0}
+			{#if getAccessViolationTotal(visibleAccessViolations) > 0}
 				<div class="access-list">
-					{#each getAccessViolationSummary(accessViolations) as group}
+					{#each getAccessViolationSummary(visibleAccessViolations) as group}
 						<div class="access-row">
 							<strong>{group.count}</strong>
 							<p>{group.firstLine}</p>
@@ -298,11 +310,11 @@
 		<p class="state-message">loading...</p>
 	{:else if crashError}
 		<p class="state-message error">{crashError}</p>
-	{:else if getRegularCrashes(crashes).length === 0}
+	{:else if visibleRegularCrashes.length === 0}
 		<p class="state-message">No open crashes.</p>
 	{:else}
 		<div class="comment-list">
-		{#each getRegularCrashes(crashes) as crash (getCrashKey(crash))}
+		{#each visibleRegularCrashes as crash (getCrashKey(crash))}
 			<div class:resolving={resolvingCrashes[crash.Hash] || resolvingAllCrashes} class="comment">
 				<div class="comment-body">
 					<div class="comment-main">

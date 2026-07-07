@@ -26,8 +26,9 @@ type EventItem struct {
 }
 
 type EventBuild struct {
-	Build string
-	Count int64
+	Build   string
+	Project string
+	Count   int64
 }
 
 func SelectAllEvents() ([]Event, error) {
@@ -44,10 +45,10 @@ func SelectAllEvents() ([]Event, error) {
 func SelectEventBuilds() ([]EventBuild, error) {
 	var builds []EventBuild
 	result := AnalyticsDB.Model(&Event{}).
-		Select("build, count(*) as count").
+		Select("build, project, count(*) as count").
 		Where("build <> ''").
-		Group("build").
-		Order("build desc").
+		Group("build, project").
+		Order("build desc, project asc").
 		Find(&builds)
 
 	if result.Error != nil {
@@ -95,16 +96,23 @@ func AddEvent(event Event) (*Event, error) {
 	return &event, nil
 }
 
-func DeleteEventsByBuild(build string) (int64, error) {
+func DeleteEventsByBuild(build string, project string) (int64, error) {
 	var deleted int64
 
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
-		eventIDs := tx.Unscoped().Model(&Event{}).Select("id").Where("build = ?", build)
+		eventQuery := tx.Unscoped().Model(&Event{}).Select("id").Where("build = ?", build)
+		deleteQuery := tx.Unscoped().Where("build = ?", build)
+		if project != "" {
+			eventQuery = eventQuery.Where("project = ?", project)
+			deleteQuery = deleteQuery.Where("project = ?", project)
+		}
+
+		eventIDs := eventQuery
 		if err := tx.Where("event_id IN (?)", eventIDs).Delete(&EventItem{}).Error; err != nil {
 			return err
 		}
 
-		result := tx.Unscoped().Where("build = ?", build).Delete(&Event{})
+		result := deleteQuery.Delete(&Event{})
 		if result.Error != nil {
 			return result.Error
 		}

@@ -21,8 +21,9 @@ type Savegame struct {
 }
 
 type SavegameBuild struct {
-	Build string
-	Count int64
+	Build   string
+	Project string
+	Count   int64
 }
 
 func AddSavegame(savegame Savegame) (*Savegame, error) {
@@ -47,10 +48,10 @@ func SelectAllSavegames() ([]Savegame, error) {
 func SelectSavegameBuilds() ([]SavegameBuild, error) {
 	var builds []SavegameBuild
 	result := AnalyticsDB.Model(&Savegame{}).
-		Select("build, count(*) as count").
+		Select("build, project, count(*) as count").
 		Where("build <> ''").
-		Group("build").
-		Order("build desc").
+		Group("build, project").
+		Order("build desc, project asc").
 		Find(&builds)
 
 	if result.Error != nil {
@@ -74,8 +75,13 @@ func DeleteSavegame(id string) error {
 	return AnalyticsDB.Delete(&Savegame{}, id).Error
 }
 
-func DeleteSavegamesByBuild(build string) (int64, error) {
-	result := AnalyticsDB.Unscoped().Where("build = ?", build).Delete(&Savegame{})
+func DeleteSavegamesByBuild(build string, project string) (int64, error) {
+	query := AnalyticsDB.Unscoped().Where("build = ?", build)
+	if project != "" {
+		query = query.Where("project = ?", project)
+	}
+
+	result := query.Delete(&Savegame{})
 	if result.Error != nil {
 		return 0, result.Error
 	}

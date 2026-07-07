@@ -1,4 +1,7 @@
 <script>
+	export let selectedProject = 'Cursemark';
+	export let reportProjects = () => {};
+
 	async function getFeedback() {
 		const res = await fetch(`https://api.clyde.games/feedback`);
 		const feedback = await res.json();
@@ -272,13 +275,19 @@
 		return [comment.Project, comment.Env, comment.Platform, comment.Category].filter(Boolean).join(' / ');
 	}
 
+	function matchesProject(item) {
+		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
+	}
+
+	$: visibleFeedback = feedback.filter(matchesProject);
+	$: reportProjects('feedback', feedback.map(comment => comment.Project));
 </script>
 
 <main>
 	<header class="page-header">
 		<div>
 			<h2>Player Feedback</h2>
-			<p>{feedback.length} open item{feedback.length === 1 ? '' : 's'}</p>
+			<p>{visibleFeedback.length} open item{visibleFeedback.length === 1 ? '' : 's'}</p>
 		</div>
 	</header>
 
@@ -286,11 +295,11 @@
 		<p class="state-message">loading...</p>
 	{:else if feedbackError}
 		<p class="state-message error">{feedbackError}</p>
-	{:else if feedback.length === 0}
+	{:else if visibleFeedback.length === 0}
 		<p class="state-message">No open feedback.</p>
 	{:else}
 		<div class="comment-list">
-		{#each feedback as comment}
+		{#each visibleFeedback as comment}
 			<div class:resolving={resolvingFeedback[comment.ID]} class="comment">
 				<div class="comment-body">
 					<div class="comment-main">

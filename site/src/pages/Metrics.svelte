@@ -1,4 +1,7 @@
 <script>
+	export let selectedProject = 'Cursemark';
+	export let reportProjects = () => {};
+
 	async function parseResponse(res) {
 		const text = await res.text();
 
@@ -105,16 +108,27 @@
 		});
 	}
 
+	function matchesProject(item) {
+		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
+	}
+
+	function buildContext(build) {
+		return build.Project || 'unknown';
+	}
+
 	async function deleteEventBuild(build) {
-		if (!confirm(`Delete all metrics events for build ${build}?`)) {
+		const project = selectedProject === 'all' ? '' : build.Project;
+		const projectLabel = project ? ` for ${project}` : '';
+		if (!confirm(`Delete all metrics events for build ${build.Build}${projectLabel}?`)) {
 			return;
 		}
 
-		deletingEventBuild = build;
+		deletingEventBuild = buildKey(build);
 		deleteError = '';
 
 		try {
-			const res = await fetch(`https://api.clyde.games/event/build?build=${encodeURIComponent(build)}`, {
+			const projectParam = project ? `&project=${encodeURIComponent(project)}` : '';
+			const res = await fetch(`https://api.clyde.games/event/build?build=${encodeURIComponent(build.Build)}${projectParam}`, {
 				method: 'DELETE'
 			});
 
@@ -124,7 +138,7 @@
 				return;
 			}
 
-			builds = builds.filter(item => item.Build !== build);
+			builds = builds.filter(item => item.Build !== build.Build || (project && item.Project !== project));
 			await refreshBuilds();
 		} catch (error) {
 			deleteError = error.message;
@@ -134,15 +148,18 @@
 	}
 
 	async function deleteSavegameBuildItems(build) {
-		if (!confirm(`Delete all save games for build ${build}?`)) {
+		const project = selectedProject === 'all' ? '' : build.Project;
+		const projectLabel = project ? ` for ${project}` : '';
+		if (!confirm(`Delete all save games for build ${build.Build}${projectLabel}?`)) {
 			return;
 		}
 
-		deletingSavegameBuild = build;
+		deletingSavegameBuild = buildKey(build);
 		deleteError = '';
 
 		try {
-			const res = await fetch(`https://api.clyde.games/savegame/build?build=${encodeURIComponent(build)}`, {
+			const projectParam = project ? `&project=${encodeURIComponent(project)}` : '';
+			const res = await fetch(`https://api.clyde.games/savegame/build?build=${encodeURIComponent(build.Build)}${projectParam}`, {
 				method: 'DELETE'
 			});
 
@@ -152,7 +169,7 @@
 				return;
 			}
 
-			savegameBuilds = savegameBuilds.filter(item => item.Build !== build);
+			savegameBuilds = savegameBuilds.filter(item => item.Build !== build.Build || (project && item.Project !== project));
 			await refreshSavegameBuilds();
 		} catch (error) {
 			deleteError = error.message;
@@ -160,13 +177,24 @@
 			deletingSavegameBuild = null;
 		}
 	}
+
+	function buildKey(build) {
+		return `${build.Project || ''}:${build.Build}`;
+	}
+
+	$: visibleBuilds = builds.filter(matchesProject);
+	$: visibleSavegameBuilds = savegameBuilds.filter(matchesProject);
+	$: reportProjects('metrics', [
+		...builds.map(build => build.Project),
+		...savegameBuilds.map(build => build.Project)
+	]);
 </script>
 
 <main>
 	<header class="page-header">
 		<div>
 			<h2>Metrics</h2>
-			<p>{builds.length} event build{builds.length === 1 ? '' : 's'} / {savegameBuilds.length} save build{savegameBuilds.length === 1 ? '' : 's'}</p>
+			<p>{visibleBuilds.length} event build{visibleBuilds.length === 1 ? '' : 's'} / {visibleSavegameBuilds.length} save build{visibleSavegameBuilds.length === 1 ? '' : 's'}</p>
 		</div>
 	</header>
 
@@ -183,18 +211,19 @@
 		{:else if buildError}
 			<p class="state-message error">{buildError}</p>
 		{:else}
-			{#if builds.length > 0}
+			{#if visibleBuilds.length > 0}
 				<div class="build-list">
-					{#each builds as build}
-						<div class:deleting={deletingEventBuild === build.Build} class="build-row">
+					{#each visibleBuilds as build (buildKey(build))}
+						<div class:deleting={deletingEventBuild === buildKey(build)} class="build-row">
 							<p class="build-date">{formatBuildDate(build.Build)}</p>
+							<p class="build-project">{buildContext(build)}</p>
 							<p class="build-count">{build.Count} events</p>
 							<button
 								type="button"
-								disabled={deletingEventBuild === build.Build}
-								on:click={() => deleteEventBuild(build.Build)}
+								disabled={deletingEventBuild === buildKey(build)}
+								on:click={() => deleteEventBuild(build)}
 							>
-								{deletingEventBuild === build.Build ? 'Deleting...' : 'Delete All'}
+								{deletingEventBuild === buildKey(build) ? 'Deleting...' : 'Delete All'}
 							</button>
 						</div>
 					{/each}
@@ -215,18 +244,19 @@
 		{:else if savegameBuildError}
 			<p class="state-message error">{savegameBuildError}</p>
 		{:else}
-			{#if savegameBuilds.length > 0}
+			{#if visibleSavegameBuilds.length > 0}
 				<div class="build-list">
-					{#each savegameBuilds as build}
-						<div class:deleting={deletingSavegameBuild === build.Build} class="build-row">
+					{#each visibleSavegameBuilds as build (buildKey(build))}
+						<div class:deleting={deletingSavegameBuild === buildKey(build)} class="build-row">
 							<p class="build-date">{formatBuildDate(build.Build)}</p>
+							<p class="build-project">{buildContext(build)}</p>
 							<p class="build-count">{build.Count} save game{build.Count === 1 ? '' : 's'}</p>
 							<button
 								type="button"
-								disabled={deletingSavegameBuild === build.Build}
-								on:click={() => deleteSavegameBuildItems(build.Build)}
+								disabled={deletingSavegameBuild === buildKey(build)}
+								on:click={() => deleteSavegameBuildItems(build)}
 							>
-								{deletingSavegameBuild === build.Build ? 'Deleting...' : 'Delete All'}
+								{deletingSavegameBuild === buildKey(build) ? 'Deleting...' : 'Delete All'}
 							</button>
 						</div>
 					{/each}
@@ -295,7 +325,7 @@
 
 	.build-row {
 		display: grid;
-		grid-template-columns: minmax(150px, max-content) minmax(120px, 1fr) auto;
+		grid-template-columns: minmax(150px, max-content) minmax(100px, max-content) minmax(120px, 1fr) auto;
 		align-items: center;
 		column-gap: 16px;
 		border-top: 1px solid #ddd;
@@ -314,9 +344,17 @@
 	}
 
 	.build-date,
+	.build-project,
 	.build-count {
 		margin: 0;
 		text-align: left;
+	}
+
+	.build-project {
+		color: #555;
+		font-size: 0.82rem;
+		font-weight: 800;
+		overflow-wrap: anywhere;
 	}
 
 	.build-date {
@@ -387,13 +425,19 @@
 			row-gap: 4px;
 		}
 
+		.build-project {
+			grid-column: 1;
+			grid-row: 2;
+		}
+
 		.build-count {
 			grid-column: 1;
+			grid-row: 3;
 		}
 
 		button {
 			grid-column: 2;
-			grid-row: 1 / span 2;
+			grid-row: 1 / span 3;
 		}
 	}
 </style>

@@ -113,7 +113,7 @@ func DeleteSavegamesByBuild(c *gin.Context) {
 		return
 	}
 
-	deleted, err := models.DeleteSavegamesByBuild(build)
+	deleted, err := models.DeleteSavegamesByBuild(build, c.Query("project"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

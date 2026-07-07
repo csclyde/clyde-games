@@ -64,7 +64,7 @@ func DeleteEventsByBuild(c *gin.Context) {
 		return
 	}
 
-	deleted, err := models.DeleteEventsByBuild(build)
+	deleted, err := models.DeleteEventsByBuild(build, c.Query("project"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
