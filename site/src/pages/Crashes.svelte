@@ -110,7 +110,7 @@
 	function getAccessViolationSummary(crashes) {
 		const groups = {};
 
-		for(const crash of crashes) {
+		for(const crash of getRecentAccessViolations(crashes)) {
 			const firstLine = getFirstStackLine(crash);
 			if(!groups[firstLine]) {
 				groups[firstLine] = {
@@ -119,15 +119,37 @@
 				};
 			}
 
-			groups[firstLine].count += crash.Count || 1;
+			groups[firstLine].count += 1;
 		}
 
 		return Object.values(groups).sort((a, b) => b.count - a.count);
 	}
 
 	function getAccessViolationTotal(crashes) {
-		return crashes
-			.reduce((total, crash) => total + (crash.Count || 1), 0);
+		return getRecentAccessViolations(crashes).length;
+	}
+
+	function getAccessViolationPlayerTotal(crashes) {
+		const players = new Set();
+
+		for(const crash of getRecentAccessViolations(crashes)) {
+			if(crash.PID) {
+				players.add(crash.PID);
+			}
+		}
+
+		return players.size;
+	}
+
+	function getRecentAccessViolations(crashes) {
+		const oneMonthAgo = new Date();
+		oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+		return crashes.filter(crash => {
+			const lastSeen = new Date(crash.UpdatedAt);
+
+			return !isNaN(lastSeen.getTime()) && lastSeen >= oneMonthAgo;
+		});
 	}
 
 	function getRegularCrashes(crashes) {
@@ -255,7 +277,7 @@
 		{:else}
 			<div class="section-header">
 				<h3>Access Violations</h3>
-				<p>{getAccessViolationTotal(accessViolations)} last month</p>
+				<p>{getAccessViolationTotal(accessViolations)} incident{getAccessViolationTotal(accessViolations) === 1 ? '' : 's'} / {getAccessViolationPlayerTotal(accessViolations)} player{getAccessViolationPlayerTotal(accessViolations) === 1 ? '' : 's'} last month</p>
 			</div>
 			{#if getAccessViolationTotal(accessViolations) > 0}
 				<div class="access-list">
