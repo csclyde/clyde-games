@@ -4,30 +4,35 @@
 	import About from './pages/About.svelte';
 	import Poetry from './pages/Poetry.svelte';
 	import Van from './pages/Van.svelte';
-	import Feedback from './pages/Feedback.svelte';
-    import Crashes from "./pages/Crashes.svelte";
-	import Savegames from "./pages/Savegames.svelte";
-	import Metrics from "./pages/Metrics.svelte";
+	import Admin from './pages/Admin.svelte';
 	import AnalyzeWords from "./pages/AnalyzeWords.svelte";
 	import UnknownWords from "./pages/UnknownWords.svelte";
 
 	let page;
+	let pageProps = {};
 
-	router('/', () => page = Home);
-	router('/about', () => page = About);
-	router('/poetry', () => page = Poetry);
-	router('/van', () => page = Van);
-	router('/feedback', () => page = Feedback);
-	router('/crashes', () => page = Crashes);
-	router('/savegames', () => page = Savegames);
-	router('/metrics', () => page = Metrics);
-	router('/words/analyze', () => page = AnalyzeWords);
-	router('/words/unknown', () => page = UnknownWords);
+	function setPage(component, props = {}) {
+		page = component;
+		pageProps = props;
+	}
+
+	router('/', () => setPage(Home));
+	router('/about', () => setPage(About));
+	router('/poetry', () => setPage(Poetry));
+	router('/van', () => setPage(Van));
+	router('/admin', () => setPage(Admin, { tab: 'admin' }));
+	router('/feedback', () => setPage(Admin, { tab: 'feedback' }));
+	router('/crashes', () => setPage(Admin, { tab: 'crashes' }));
+	router('/savegames', () => setPage(Admin, { tab: 'savegames' }));
+	router('/save-games', () => setPage(Admin, { tab: 'savegames' }));
+	router('/metrics', () => setPage(Admin, { tab: 'admin' }));
+	router('/words/analyze', () => setPage(AnalyzeWords));
+	router('/words/unknown', () => setPage(UnknownWords));
 
 	router.start();
 </script>
 
-<svelte:component this={page} />
+<svelte:component this={page} {...pageProps} />
 
 <footer>
 	<small>Contact me at &nbsp;<img class="contact-image" src="/img/em.png" alt="The place where I can be contacted"/></small>

@@ -34,7 +34,6 @@
 	let accessViolationError = '';
 	let resolvingCrashes = {};
 	let resolvingAllCrashes = false;
-	let expandedCrashes = {};
 
 	async function loadCrashes() {
 		loadingCrashes = true;
@@ -135,10 +134,14 @@
 		return crashes.filter(crash => !isAccessViolation(crash));
 	}
 
+	function getCrashKey(crash) {
+		return crash.ID || crash.Hash || `${crash.Message || ''}:${crash.Stack || ''}`;
+	}
+
 	function getVisibleStack(crash) {
 		const stack = getStack(crash);
 
-		if (expandedCrashes[crash.Hash]) {
+		if (crash.expanded) {
 			return stack;
 		}
 
@@ -146,11 +149,14 @@
 	}
 
 	function shouldShowExpand(crash) {
-		return !expandedCrashes[crash.Hash] && getStack(crash).length > 6;
+		return !crash.expanded && getStack(crash).length > 6;
 	}
 
-	function expandCrash(hash) {
-		expandedCrashes = { ...expandedCrashes, [hash]: true };
+	function expandCrash(crash) {
+		const crashKey = getCrashKey(crash);
+		crashes = crashes.map(item => getCrashKey(item) === crashKey
+			? { ...item, expanded: true }
+			: item);
 	}
 
 	function formatDate(value) {
@@ -274,7 +280,7 @@
 		<p class="state-message">No open crashes.</p>
 	{:else}
 		<div class="comment-list">
-		{#each getRegularCrashes(crashes) as crash}
+		{#each getRegularCrashes(crashes) as crash (getCrashKey(crash))}
 			<div class:resolving={resolvingCrashes[crash.Hash] || resolvingAllCrashes} class="comment">
 				<div class="comment-body">
 					<div class="comment-main">
@@ -284,7 +290,7 @@
 								<p class="message">{stackMessage}</p>
 							{/each}
 							{#if shouldShowExpand(crash)}
-								<button class="expand-button" type="button" on:click={() => expandCrash(crash.Hash)}>
+								<button class="expand-button" type="button" on:click={() => expandCrash(crash)}>
 									Expand...
 								</button>
 							{/if}
@@ -499,7 +505,22 @@
 
 	.expand-button {
 		align-self: flex-start;
+		background: transparent;
+		border: 0;
+		color: #555;
+		font-size: 0.85rem;
+		font-weight: 700;
+		line-height: 1.35;
 		margin-top: 8px;
+		padding: 0;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	.expand-button:hover:not(:disabled) {
+		background: transparent;
+		border-color: transparent;
+		color: #111;
 	}
 
 	.access-violations {
