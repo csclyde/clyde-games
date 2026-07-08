@@ -20,10 +20,9 @@
 	let feedback = [];
 	let loadingFeedback = true;
 	let feedbackError = '';
-	let ticketStatus = {};
+	let helperStatus = {};
 	let resolvingFeedback = {};
 	let translatingFeedback = {};
-	let translations = {};
 
 	async function loadFeedback() {
 		loadingFeedback = true;
@@ -68,21 +67,41 @@
 		}
 	}
 
-	async function makeTicket(comment) {
-		ticketStatus = { ...ticketStatus, [comment.ID]: 'Making ticket...' };
+	async function copyTextToClipboard(text) {
+		if (navigator.clipboard && window.isSecureContext) {
+			await navigator.clipboard.writeText(text);
+			return;
+		}
 
-		const res = await fetch(`https://api.clyde.games/feedback/ticket?id=` + comment.ID, {
-			method: 'POST'
-		});
-		const result = await res.json();
+		const textarea = document.createElement('textarea');
+		textarea.value = text;
+		textarea.setAttribute('readonly', '');
+		textarea.style.position = 'fixed';
+		textarea.style.top = '-9999px';
+		document.body.appendChild(textarea);
+		textarea.select();
 
-		if (res.ok) {
-			const cardName = result.card && result.card.name ? result.card.name : 'ticket';
-			ticketStatus = { ...ticketStatus, [comment.ID]: `Created ${cardName}` };
-		} else {
-			ticketStatus = {
-				...ticketStatus,
-				[comment.ID]: result.error || 'Unable to make ticket'
+		try {
+			document.execCommand('copy');
+		} finally {
+			document.body.removeChild(textarea);
+		}
+	}
+
+	function valueOrUnknown(value) {
+		return value || 'unknown';
+	}
+
+	async function copyTicketText(comment) {
+		helperStatus = { ...helperStatus, [comment.ID]: { status: 'Copying...', error: '' } };
+
+		try {
+			await copyTextToClipboard(comment.Message || '');
+			helperStatus = { ...helperStatus, [comment.ID]: { status: 'Copied feedback text', error: '' } };
+		} catch (error) {
+			helperStatus = {
+				...helperStatus,
+				[comment.ID]: { status: '', error: error.message || 'Unable to copy text' }
 			};
 		}
 	}
@@ -157,10 +176,9 @@
 
 	async function translateFeedback(comment) {
 		translatingFeedback = { ...translatingFeedback, [comment.ID]: true };
-		translations = {
-			...translations,
+		helperStatus = {
+			...helperStatus,
 			[comment.ID]: {
-				text: translations[comment.ID] && translations[comment.ID].text,
 				error: '',
 				status: 'Translating...'
 			}
@@ -177,10 +195,9 @@
 			const sourceLanguage = await detectLanguage(messageParts.text);
 
 			if (sourceLanguage === 'en') {
-				translations = {
-					...translations,
+				helperStatus = {
+					...helperStatus,
 					[comment.ID]: {
-						text: '',
 						error: '',
 						status: 'Already English'
 					}
@@ -221,19 +238,17 @@
 				};
 			});
 
-			translations = {
-				...translations,
+			helperStatus = {
+				...helperStatus,
 				[comment.ID]: {
-					text: '',
 					error: '',
 					status: sourceLanguage === 'en' ? 'Already English' : 'Translated to English'
 				}
 			};
 		} catch (error) {
-			translations = {
-				...translations,
+			helperStatus = {
+				...helperStatus,
 				[comment.ID]: {
-					text: translations[comment.ID] && translations[comment.ID].text,
 					error: error.message,
 					status: ''
 				}
@@ -255,7 +270,7 @@
 	]
 
 	function metadataValue(value) {
-		return value || 'unknown';
+		return valueOrUnknown(value);
 	}
 
 	function formatDate(value) {
@@ -318,11 +333,11 @@
 							<span class="rating" style="background-color:{ colors[comment.Rating] }"></span>
 							<div class="message-stack">
 								<p class="message">{comment.Message}</p>
-								{#if translations[comment.ID] && translations[comment.ID].status}
-									<small class="translation-status">{translations[comment.ID].status}</small>
+								{#if helperStatus[comment.ID] && helperStatus[comment.ID].status}
+									<small class="helper-status">{helperStatus[comment.ID].status}</small>
 								{/if}
-								{#if translations[comment.ID] && translations[comment.ID].error}
-									<small class="translation-error">{translations[comment.ID].error}</small>
+								{#if helperStatus[comment.ID] && helperStatus[comment.ID].error}
+									<small class="helper-error">{helperStatus[comment.ID].error}</small>
 								{/if}
 							</div>
 						</div>
@@ -347,8 +362,8 @@
 							<button type="button" disabled={translatingFeedback[comment.ID] || resolvingFeedback[comment.ID]} on:click={() => translateFeedback(comment)}>
 								{translatingFeedback[comment.ID] ? 'Translating...' : 'Translate'}
 							</button>
-							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => makeTicket(comment)}>
-								Make Ticket
+							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => copyTicketText(comment)}>
+								Copy Text
 							</button>
 							<button type="button" disabled={!comment.SavegameID || resolvingFeedback[comment.ID]} on:click={() => downloadSavegame(comment)}>
 								Download Save
@@ -357,9 +372,6 @@
 								{resolvingFeedback[comment.ID] ? 'Resolving...' : 'Resolve'}
 							</button>
 						</div>
-						{#if ticketStatus[comment.ID]}
-							<small class="ticket-status">{ticketStatus[comment.ID]}</small>
-						{/if}
 					</div>
 				</div>
 			</div>
@@ -526,14 +538,14 @@
 		text-align: left;
 	}
 
-	.translation-status {
+	.helper-status {
 		color: #777;
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
 
-	.translation-error {
+	.helper-error {
 		color: #a40000;
 		max-width: 520px;
 	}
@@ -567,12 +579,6 @@
 		line-height: 1.3;
 		overflow-wrap: anywhere;
 		text-align: left;
-	}
-
-	.ticket-status {
-		color: #555;
-		max-width: 220px;
-		text-align: right;
 	}
 
 	.state-message {
@@ -639,9 +645,6 @@
 			flex: 1 1 96px;
 		}
 
-		.ticket-status {
-			text-align: left;
-		}
 	}
 
 	@media (max-width: 480px) {
