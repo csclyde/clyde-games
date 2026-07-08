@@ -5,22 +5,22 @@ html, body {
 }
 
 :root {
-	--paper: #e5e7e4;
-	--paper-warm: #dcdfdc;
-	--surface: #f2f3ef;
-	--surface-muted: #d4d8d5;
-	--line: #aeb5b2;
-	--line-strong: #68716f;
-	--text: #252a29;
-	--text-muted: #515a58;
-	--text-soft: #707a76;
-	--charcoal: #2b302f;
-	--forest: #314c45;
-	--olive: #5d675f;
-	--slate: #415f6c;
-	--rust: #81513d;
-	--ochre: #887746;
-	--safety: #aa6235;
+	--paper: #f4f4ee;
+	--paper-warm: #ebe5d8;
+	--surface: #fffefa;
+	--surface-muted: #e7e2d5;
+	--line: #d4d0c5;
+	--line-strong: #8e958f;
+	--text: #272b29;
+	--text-muted: #58615d;
+	--text-soft: #7a817a;
+	--charcoal: #2d332f;
+	--forest: #2f6657;
+	--olive: #6f775f;
+	--slate: #3f7590;
+	--rust: #a36348;
+	--ochre: #b38a42;
+	--safety: #d37a35;
 	--radius: 4px;
 	--content: 1180px;
 	--font-sans: "IBM Plex Sans", "Avenir Next", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
@@ -35,10 +35,11 @@ body {
 	margin: 0;
 	padding: 0;
 	background:
-		linear-gradient(rgba(43, 48, 47, 0.045) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(43, 48, 47, 0.035) 1px, transparent 1px),
+		linear-gradient(115deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0) 44%),
+		linear-gradient(rgba(47, 74, 60, 0.032) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(47, 74, 60, 0.024) 1px, transparent 1px),
 		var(--paper);
-	background-size: 48px 48px, 48px 48px, auto;
+	background-size: auto, 56px 56px, 56px 56px, auto;
 	color: var(--text);
 	font-family: var(--font-sans);
 	font-size: 16px;
@@ -47,8 +48,8 @@ body {
 }
 
 a {
-	color: var(--forest);
-	text-decoration-color: rgba(47, 74, 60, 0.35);
+	color: var(--slate);
+	text-decoration-color: rgba(63, 117, 144, 0.34);
 	text-decoration-thickness: 1px;
 	text-underline-offset: 3px;
 	transition: color 120ms ease, text-decoration-color 120ms ease;
@@ -56,7 +57,7 @@ a {
 
 a:hover {
 	color: var(--rust);
-	text-decoration-color: rgba(155, 87, 55, 0.5);
+	text-decoration-color: rgba(163, 99, 72, 0.45);
 }
 
 h1 {
@@ -120,5 +121,5 @@ select {
 }
 
 ::selection {
-	background: rgba(75, 100, 112, 0.26);
+	background: rgba(211, 122, 53, 0.24);
 }

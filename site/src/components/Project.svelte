@@ -4,11 +4,12 @@
 	export let img;
 	export let desc;
 	export let tools;
+	export let accent = 'var(--slate)';
 	
 	let target = href.includes('http') ? '_blank' : '_self';
 </script>
 
-<div>
+<div style:--project-accent={accent}>
 	<h3><a { href } { target }>{ name }</a></h3>
 
 	{#if img != undefined}
@@ -23,7 +24,7 @@
 	div {
 		background: var(--surface);
 		border: 1px solid var(--line);
-		border-left: 4px solid var(--slate);
+		border-left: 4px solid var(--project-accent);
 		border-radius: var(--radius);
 		display: flex;
 		flex-direction: column;
@@ -32,12 +33,20 @@
 	}
 
 	h3 {
-		border-bottom: 1px solid var(--line);
-		font-size: 1.35rem;
-		line-height: 1.1;
-		margin: 0 0 12px;
-		padding-bottom: 10px;
+		font-size: 1.55rem;
+		font-weight: 800;
+		line-height: 1;
+		margin: 0 0 16px;
 		text-align: left;
+	}
+
+	h3 a {
+		color: var(--charcoal);
+		text-decoration: none;
+	}
+
+	h3 a:hover {
+		color: var(--project-accent);
 	}
 
 	p {
@@ -51,7 +60,7 @@
 
 	small {
 		border-top: 1px solid var(--line);
-		color: var(--slate);
+		color: var(--project-accent);
 		display: block;
 		font-weight: 700;
 		padding-top: 10px;
@@ -63,7 +72,7 @@
 		aspect-ratio: 5 / 4;
 		border: 1px solid var(--line);
 		border-radius: 2px;
-		filter: saturate(0.82) contrast(0.96);
+		filter: saturate(0.92) contrast(0.98);
 		height: auto;
 		object-fit: cover;
 		width: 100%;

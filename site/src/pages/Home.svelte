@@ -2,6 +2,13 @@
 	import Project from '../components/Project.svelte';
 	import projects from '../data/projects.json';
 	import havamal from '../data/havamal.json';
+
+	const accents = [
+		'var(--slate)',
+		'var(--forest)',
+		'var(--ochre)',
+		'var(--rust)'
+	];
 </script>
 
 <main>
@@ -15,13 +22,14 @@
 	<small class="note">{havamal[Math.floor(Math.random()*havamal.length)]} - The Hávamál</small>
 
 	<section>
-		{#each projects as project}
+		{#each projects as project, index}
 			<Project
 				name={project.name}
 				href={project.href}
 				img={project.img}
 				desc={project.desc}
 				tools={project.tools}
+				accent={accents[index % accents.length]}
 			/>
 		{/each}
 	</section>
@@ -59,7 +67,7 @@
 		background: var(--surface-muted);
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
-		filter: saturate(0.78) contrast(0.96);
+		filter: saturate(0.92) contrast(0.98);
 		height: 132px;
 		object-fit: cover;
 		padding: 6px;
@@ -77,7 +85,7 @@
 	}
 
 	.note {
-		border-left: 3px solid var(--slate);
+		border-left: 3px solid var(--safety);
 		display: block;
 		max-width: 760px;
 		padding-left: 12px;

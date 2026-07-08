@@ -1,5 +1,8 @@
-<script>	
+<script>
+	import SubpageHeader from '../components/SubpageHeader.svelte';
 </script>
+
+<SubpageHeader label="Poetry" />
 
 <main>
 	<h3>The Waiting Room</h3>
@@ -399,22 +402,33 @@ to be truly alive
 	main {
 		margin: 0 auto;
 		max-width: 780px;
-		padding: 64px 24px 24px;
+		padding: 42px 24px 24px;
 	}
 
 	h3 {
-		border-top: 1px solid var(--line);
 		color: var(--charcoal);
-		margin-top: 16px;
-		padding-top: 24px;
-		text-align: left;
+		margin: 28px 0 0;
+		padding: 24px 24px 0;
+		text-align: center;
 	}
 
 	p {
 		color: var(--text-muted);
 		line-height: 1.65;
-		white-space: pre;
+		margin: 0;
+		padding: 0 24px 24px;
+		white-space: pre-wrap;
 		font-size: small;
-		text-align: left;
+		text-align: center;
+	}
+
+	h3:nth-of-type(odd),
+	h3:nth-of-type(odd) + p {
+		background: var(--surface);
+	}
+
+	h3:nth-of-type(even),
+	h3:nth-of-type(even) + p {
+		background: var(--paper-warm);
 	}
 </style>

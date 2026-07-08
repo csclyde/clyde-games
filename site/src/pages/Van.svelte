@@ -1,7 +1,10 @@
 <script>
+	import SubpageHeader from '../components/SubpageHeader.svelte';
 	import VanStep from '../components/VanStep.svelte';
 	import steps from '../data/van.json';
 </script>
+
+<SubpageHeader label="Camper Van Conversion" />
 
 <main>
 	<h2>Camper Van Conversion</h2>
@@ -18,7 +21,7 @@
 	main {
 		max-width: var(--content);
 		margin: 0 auto;
-		padding: 64px 24px 24px;
+		padding: 42px 24px 24px;
 	}
 
 	h2,
@@ -39,8 +42,8 @@
 
 	section {
 		display: grid;
-		gap: 16px;
-		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		gap: 20px;
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
 		margin-top: 32px;
 	}
 </style>
