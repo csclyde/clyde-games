@@ -6,16 +6,18 @@ import (
 
 type Feedback struct {
 	gorm.Model
-	PID      string `gorm:"type:tinytext"`
-	Project  string `gorm:"type:tinytext"`
-	Message  string `gorm:"type:text"`
-	Rating   uint8
-	Env      string `gorm:"type:tinytext"`
-	Category string `gorm:"type:tinytext"`
-	Platform string `gorm:"type:tinytext"`
-	Build    string `gorm:"type:tinytext"`
-	Commit   string `gorm:"type:tinytext"`
-	Resolved bool   `gorm:"type:boolean;default:false"`
+	PID              string `gorm:"type:tinytext"`
+	Project          string `gorm:"type:tinytext"`
+	Message          string `gorm:"type:text"`
+	Rating           uint8
+	Env              string `gorm:"type:tinytext"`
+	Category         string `gorm:"type:tinytext"`
+	Platform         string `gorm:"type:tinytext"`
+	Build            string `gorm:"type:tinytext"`
+	Commit           string `gorm:"type:tinytext"`
+	Resolved         bool   `gorm:"type:boolean;default:false"`
+	SavegameID       uint   `gorm:"-"`
+	SavegameFilename string `gorm:"-"`
 }
 
 func SelectAllFeedback() ([]Feedback, error) {
@@ -24,6 +26,10 @@ func SelectAllFeedback() ([]Feedback, error) {
 
 	if result.Error != nil {
 		return nil, result.Error
+	}
+
+	if err := attachSavegameMetadata(allFeedback); err != nil {
+		return nil, err
 	}
 
 	return allFeedback, nil
@@ -66,4 +72,36 @@ func ResolveFeedback(id string) (*Feedback, error) {
 	}
 
 	return &existingFeedback, nil
+}
+
+func attachSavegameMetadata(feedback []Feedback) error {
+	if len(feedback) == 0 {
+		return nil
+	}
+
+	feedbackByID := map[uint]*Feedback{}
+	feedbackIDs := make([]uint, 0, len(feedback))
+	for index := range feedback {
+		feedbackByID[feedback[index].ID] = &feedback[index]
+		feedbackIDs = append(feedbackIDs, feedback[index].ID)
+	}
+
+	var savegames []Savegame
+	result := AnalyticsDB.
+		Select("id, feedback_id, filename").
+		Where("feedback_id IN ?", feedbackIDs).
+		Order("created_at desc").
+		Find(&savegames)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	for _, savegame := range savegames {
+		if feedbackItem, ok := feedbackByID[savegame.FeedbackID]; ok && feedbackItem.SavegameID == 0 {
+			feedbackItem.SavegameID = savegame.ID
+			feedbackItem.SavegameFilename = savegame.Filename
+		}
+	}
+
+	return nil
 }

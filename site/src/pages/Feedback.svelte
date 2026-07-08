@@ -87,6 +87,17 @@
 		}
 	}
 
+	function downloadSavegame(comment) {
+		if (!comment.SavegameID) {
+			return;
+		}
+
+		const link = document.createElement('a');
+		link.href = `https://api.clyde.games/savegame/download?id=${comment.SavegameID}`;
+		link.download = comment.SavegameFilename || 'test.sav';
+		link.click();
+	}
+
 	function getTranslationApi() {
 		if (typeof Translator !== 'undefined') {
 			return Translator;
@@ -338,6 +349,9 @@
 							</button>
 							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => makeTicket(comment)}>
 								Make Ticket
+							</button>
+							<button type="button" disabled={!comment.SavegameID || resolvingFeedback[comment.ID]} on:click={() => downloadSavegame(comment)}>
+								Download Save
 							</button>
 							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => resolveFeedback(comment.ID)}>
 								{resolvingFeedback[comment.ID] ? 'Resolving...' : 'Resolve'}

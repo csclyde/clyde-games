@@ -4,6 +4,7 @@ import "gorm.io/gorm"
 
 type Savegame struct {
 	gorm.Model
+	FeedbackID  uint   `gorm:"index"`
 	PID         string `gorm:"type:tinytext"`
 	SID         string `gorm:"type:tinytext"`
 	Project     string `gorm:"type:tinytext"`

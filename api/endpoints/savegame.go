@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +25,7 @@ var errSavegameTooLarge = errors.New("savegame exceeds 1MB limit")
 type SavegameResponse struct {
 	ID          uint
 	CreatedAt   time.Time
+	FeedbackID  uint
 	PID         string
 	SID         string
 	Project     string
@@ -93,7 +96,12 @@ func DownloadSavegame(c *gin.Context) {
 		contentType = "application/octet-stream"
 	}
 
-	c.Header("Content-Disposition", `attachment; filename="test.sav"`)
+	filename := savegame.Filename
+	if filename == "" {
+		filename = "test.sav"
+	}
+
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	c.Data(http.StatusOK, contentType, savegame.Data)
 }
 
@@ -165,6 +173,10 @@ func readSavegame(c *gin.Context) (models.Savegame, error) {
 	}
 
 	hash := sha256.Sum256(savegame.Data)
+	savegame.FeedbackID = requestUintValue(c, "feedback_id")
+	if savegame.FeedbackID == 0 {
+		savegame.FeedbackID = requestUintValue(c, "feedbackId")
+	}
 	savegame.PID = requestValue(c, "pid")
 	savegame.SID = requestValue(c, "sid")
 	savegame.Project = requestValue(c, "project")
@@ -190,10 +202,25 @@ func requestValue(c *gin.Context, name string) string {
 	return c.Query(name)
 }
 
+func requestUintValue(c *gin.Context, name string) uint {
+	value := requestValue(c, name)
+	if value == "" {
+		return 0
+	}
+
+	parsed, err := strconv.ParseUint(value, 10, 0)
+	if err != nil {
+		return 0
+	}
+
+	return uint(parsed)
+}
+
 func savegameResponse(savegame models.Savegame) SavegameResponse {
 	return SavegameResponse{
 		ID:          savegame.ID,
 		CreatedAt:   savegame.CreatedAt,
+		FeedbackID:  savegame.FeedbackID,
 		PID:         savegame.PID,
 		SID:         savegame.SID,
 		Project:     savegame.Project,
