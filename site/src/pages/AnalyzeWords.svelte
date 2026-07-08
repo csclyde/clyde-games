@@ -47,12 +47,12 @@
 	}
 
 	let colors = [
-		'black',
-		'green',
-		'blue',
-		'orange',
-		'red',
-		'gray'
+		'var(--charcoal)',
+		'var(--forest)',
+		'var(--slate)',
+		'var(--ochre)',
+		'var(--rust)',
+		'var(--text-soft)'
 	]
 </script>
 
@@ -72,7 +72,7 @@
 		<small>Other: {pct(stats.Other / stats.Total)}%</small>
 	</section>
 	{:catch error}
-		<p style="color: red">{error.message}</p>
+		<p style="color: var(--rust)">{error.message}</p>
 	{/await}
 
 	<textarea bind:value={analysisText}></textarea>
@@ -96,7 +96,7 @@
 		{/each}
 	</div>
 	{:catch error}
-	<p style="color: red">{error.message}</p>
+	<p style="color: var(--rust)">{error.message}</p>
 	{/await}
 	{/if}
 
@@ -108,17 +108,53 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 16px;
+		margin: 0 auto;
+		max-width: var(--content);
+		padding: 64px 24px 24px;
+	}
+
+	h2 {
+		text-align: left;
+		width: 100%;
+	}
+
+	hr {
+		border: 0;
+		border-top: 1px solid var(--line);
+		width: 100%;
 	}
 
 	textarea {
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		color: var(--text);
+		font: inherit;
 		width: 75%;
 		height: 300px;
+		padding: 12px;
 	}
 
 	section {
 		display: flex;
 		gap: 16px;
 		flex-wrap: wrap;
+	}
+
+	button {
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius);
+		color: var(--text);
+		cursor: pointer;
+		font: inherit;
+		font-weight: 700;
+		padding: 8px 12px;
+	}
+
+	button:hover {
+		background: var(--paper-warm);
+		border-color: var(--charcoal);
 	}
 
 	.results {

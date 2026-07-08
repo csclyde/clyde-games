@@ -75,7 +75,7 @@
 
 <style>
 	.admin-page {
-		color: #171717;
+		color: var(--text);
 	}
 
 	.admin-header {
@@ -96,10 +96,10 @@
 	}
 
 	.admin-tabs a {
-		background: #fff;
-		border: 1px solid #bdbdbd;
+		background: var(--surface);
+		border: 1px solid var(--line);
 		border-radius: 4px 4px 0 0;
-		color: #333;
+		color: var(--text-muted);
 		font-size: 0.9rem;
 		font-weight: 800;
 		line-height: 1;
@@ -108,14 +108,14 @@
 	}
 
 	.admin-tabs a:hover {
-		background: #f4f4f4;
-		border-color: #777;
+		background: var(--paper-warm);
+		border-color: var(--line-strong);
 	}
 
 	.admin-tabs a.active {
-		background: #111;
-		border-color: #111;
-		color: #fff;
+		background: var(--charcoal);
+		border-color: var(--charcoal);
+		color: var(--surface);
 	}
 
 	.project-filter {
@@ -126,7 +126,7 @@
 	}
 
 	.project-filter span {
-		color: #555;
+		color: var(--olive);
 		font-size: 0.68rem;
 		font-weight: 800;
 		letter-spacing: 0.06em;
@@ -134,10 +134,10 @@
 	}
 
 	.project-filter select {
-		background: #fff;
-		border: 1px solid #bdbdbd;
+		background: var(--surface);
+		border: 1px solid var(--line);
 		border-radius: 4px;
-		color: #111;
+		color: var(--text);
 		font: inherit;
 		font-size: 0.9rem;
 		font-weight: 700;

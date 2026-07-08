@@ -5,10 +5,14 @@
 </script>
 
 <main>
-	<h1><u>CLYDE GAMES</u></h1>
-	<img class='portrait' src="/img/casey.jpeg" alt="Casey at Lake Tahoe">
-	<p>Below you will find a selection of games and other projects I have worked on.</p>
-	<small>{havamal[Math.floor(Math.random()*havamal.length)]} - The Hávamál</small>
+	<header class="studio-header">
+		<div class="title-block">
+			<h1>CLYDE GAMES</h1>
+		</div>
+		<img class='portrait' src="/img/casey.jpeg" alt="Casey at Lake Tahoe">
+	</header>
+	<p class="intro">Below you will find a selection of games and other projects I have worked on.</p>
+	<small class="note">{havamal[Math.floor(Math.random()*havamal.length)]} - The Hávamál</small>
 
 	<section>
 		{#each projects as project}
@@ -28,29 +32,83 @@
 
 <style>
 	main {
-		text-align: center;
-		padding: 1em;
-		max-width: none;
+		max-width: var(--content);
 		margin: 0 auto;
+		padding: 64px 24px 24px;
+	}
+
+	.studio-header {
+		align-items: end;
+		border-bottom: 1px solid var(--line);
+		display: grid;
+		gap: 24px;
+		grid-template-columns: minmax(0, 1fr) auto;
+		padding-bottom: 24px;
+	}
+
+	.title-block {
+		text-align: left;
+	}
+
+	.title-block h1 {
+		text-align: left;
 	}
 
 	.portrait {
-		width: auto;
-		height: 124px;
-		border-radius: 50%;
-		margin-top: 16px;
+		aspect-ratio: 1;
+		background: var(--surface-muted);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		filter: saturate(0.78) contrast(0.96);
+		height: 132px;
+		object-fit: cover;
+		padding: 6px;
+		width: 132px;
 	}
 
-	p {
-		font-size: 2em;
+	.intro {
+		color: var(--text-muted);
+		font-size: clamp(1.2rem, 2.4vw, 1.85rem);
 		font-weight: 600;
-		margin: 16px;
+		line-height: 1.25;
+		margin: 28px 0 10px;
+		max-width: 780px;
+		text-align: left;
+	}
+
+	.note {
+		border-left: 3px solid var(--slate);
+		display: block;
+		max-width: 760px;
+		padding-left: 12px;
+		text-align: left;
 	}
 
 	section {
-		display: flex;
-		flex-direction: row;
-		flex-wrap: wrap;
-		justify-content: center;
+		display: grid;
+		gap: 16px;
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+		margin: 44px 0 24px;
+	}
+
+	main > small:last-child {
+		display: block;
+		text-align: left;
+	}
+
+	@media (max-width: 640px) {
+		main {
+			padding: 36px 16px 16px;
+		}
+
+		.studio-header {
+			align-items: start;
+			grid-template-columns: 1fr;
+		}
+
+		.portrait {
+			height: 104px;
+			width: 104px;
+		}
 	}
 </style>

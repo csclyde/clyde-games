@@ -21,25 +21,51 @@
 
 <style>
 	div {
-		border-radius: 6px;
-		border: 2px solid black;
-		margin: 16px;
-		padding: 16px;
-		/* min-width: 300px; */
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-left: 4px solid var(--slate);
+		border-radius: var(--radius);
 		display: flex;
 		flex-direction: column;
+		min-height: 100%;
+		padding: 14px;
+	}
+
+	h3 {
+		border-bottom: 1px solid var(--line);
+		font-size: 1.35rem;
+		line-height: 1.1;
+		margin: 0 0 12px;
+		padding-bottom: 10px;
+		text-align: left;
 	}
 
 	p {
+		color: var(--text-muted);
 		font-weight: 500;
-		max-width: 330px;
 		flex-grow: 1;
+		line-height: 1.45;
+		margin: 14px 0;
+		text-align: left;
+	}
+
+	small {
+		border-top: 1px solid var(--line);
+		color: var(--slate);
+		display: block;
+		font-weight: 700;
+		padding-top: 10px;
+		text-align: left;
+		text-transform: uppercase;
 	}
 
 	img {
-		border-radius: 12px;
-		width: 315px;
-		height: 250px;
+		aspect-ratio: 5 / 4;
+		border: 1px solid var(--line);
+		border-radius: 2px;
+		filter: saturate(0.82) contrast(0.96);
+		height: auto;
 		object-fit: cover;
+		width: 100%;
 	}
 </style>

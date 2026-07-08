@@ -197,14 +197,14 @@
 
 <style>
 	main {
-		color: #171717;
+		color: var(--text);
 		max-width: 1400px;
 		margin: 0 auto;
 		padding: 12px 16px 32px;
 	}
 
 	.page-header {
-		border-bottom: 1px solid #d8d8d8;
+		border-bottom: 1px solid var(--line);
 		margin-bottom: 14px;
 		padding-bottom: 12px;
 	}
@@ -216,7 +216,7 @@
 	}
 
 	.page-header p {
-		color: #666;
+		color: var(--olive);
 		font-size: 0.85rem;
 		font-weight: 600;
 		letter-spacing: 0.02em;
@@ -232,10 +232,10 @@
 	}
 
 	.savegame {
-		background: #fff;
-		border: 1px solid #cfcfcf;
-		border-left: 4px solid #111;
-		border-radius: 4px;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-left: 4px solid var(--forest);
+		border-radius: var(--radius);
 		padding: 14px 16px;
 		transition: opacity 120ms ease, background-color 120ms ease;
 	}
@@ -267,7 +267,7 @@
 	}
 
 	.name {
-		color: #111;
+		color: var(--charcoal);
 		font-size: 1rem;
 		font-weight: 800;
 		line-height: 1.35;
@@ -284,7 +284,7 @@
 	}
 
 	.stats p {
-		color: #333;
+		color: var(--text-muted);
 		display: grid;
 		font-size: 0.82rem;
 		gap: 2px;
@@ -293,7 +293,7 @@
 	}
 
 	.stats span {
-		color: #777;
+		color: var(--text-soft);
 		font-size: 0.68rem;
 		font-weight: 800;
 		letter-spacing: 0.06em;
@@ -301,7 +301,7 @@
 	}
 
 	.reason {
-		color: #333;
+		color: var(--text-muted);
 		font-size: 0.9rem;
 		line-height: 1.35;
 		text-align: left;
@@ -314,10 +314,10 @@
 	}
 
 	.meta-list span {
-		background: #f4f4f4;
-		border: 1px solid #ddd;
+		background: var(--paper-warm);
+		border: 1px solid var(--line);
 		border-radius: 4px;
-		color: #555;
+		color: var(--text-muted);
 		font-size: 0.68rem;
 		line-height: 1.25;
 		max-width: 100%;
@@ -336,10 +336,10 @@
 	}
 
 	button {
-		background: #fff;
-		border: 1px solid #a8a8a8;
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
 		border-radius: 4px;
-		color: #111;
+		color: var(--text);
 		cursor: pointer;
 		font: inherit;
 		font-size: 0.82rem;
@@ -349,23 +349,23 @@
 	}
 
 	button:hover:not(:disabled) {
-		background: #f2f2f2;
-		border-color: #666;
+		background: var(--paper-warm);
+		border-color: var(--charcoal);
 	}
 
 	button:disabled {
-		color: #777;
+		color: var(--text-soft);
 		cursor: default;
 	}
 
 	.state-message {
-		color: #666;
+		color: var(--text-soft);
 		margin: 32px 0;
 		text-align: left;
 	}
 
 	.error {
-		color: #a40000;
+		color: var(--rust);
 	}
 
 	@media (max-width: 820px) {

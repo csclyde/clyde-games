@@ -45,10 +45,12 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		color: var(--text-soft);
 		padding: 24px;
-		margin: 24px;
+		margin: 48px auto 24px;
 		gap: 8px;
-		border-top: 1px black solid;
+		border-top: 1px solid var(--line);
+		max-width: var(--content);
 	}
 
 	footer small {

@@ -67,7 +67,7 @@
 		{/each}
 		</section>
 	{:catch error}
-		<p style="color: red">{error.message}</p>
+		<p style="color: var(--rust)">{error.message}</p>
 	{/await}
 </main>
 
@@ -77,6 +77,20 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 16px;
+		margin: 0 auto;
+		max-width: var(--content);
+		padding: 64px 24px 24px;
+	}
+
+	h2 {
+		text-align: left;
+		width: 100%;
+	}
+
+	hr {
+		border: 0;
+		border-top: 1px solid var(--line);
+		width: 100%;
 	}
 
 	section {
@@ -90,8 +104,33 @@
 		display: flex;
 		flex-direction: row;
 		gap: 8px;
-		padding: 4px;
-		border-bottom: 1px solid;
+		padding: 8px 0;
+		border-bottom: 1px solid var(--line);
+	}
+
+	input {
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		color: var(--text);
+		font: inherit;
+		padding: 7px 10px;
+	}
+
+	button {
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius);
+		color: var(--text);
+		cursor: pointer;
+		font: inherit;
+		font-weight: 700;
+		padding: 7px 10px;
+	}
+
+	button:hover {
+		background: var(--paper-warm);
+		border-color: var(--charcoal);
 	}
 
 	a {

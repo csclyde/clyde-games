@@ -17,23 +17,47 @@
 
 <style>
 	main {
+		max-width: var(--content);
+		margin: 0 auto;
+		padding: 64px 24px 24px;
 		flex-direction: column;
 		align-items: center;
 	}
 
-	section {
-		display: flex;
-		flex-direction: row;
-		flex-wrap: wrap;
-		gap: 16px;
-		margin-left: auto;
-		margin-right: auto;
-		justify-content: center;
+	h2,
+	p {
+		text-align: left;
 	}
+
+	h2 {
+		border-bottom: 1px solid var(--line);
+		padding-bottom: 16px;
+	}
+
+	p {
+		color: var(--text-muted);
+		font-size: 1.25rem;
+		font-weight: 500;
+		line-height: 1.45;
+		max-width: 760px;
+	}
+
+	section {
+		display: grid;
+		gap: 16px;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		margin: 36px auto 0;
+	}
+
 	img {
-		width: 300px;
-		height: 300px;
+		aspect-ratio: 1;
+		background: var(--surface-muted);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		filter: saturate(0.78) contrast(0.96);
+		height: auto;
 		object-fit: cover;
-		border-radius: 12px;
+		padding: 6px;
+		width: 100%;
 	}
 </style>

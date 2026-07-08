@@ -16,16 +16,31 @@
 
 <style>
 	main {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
+		max-width: var(--content);
+		margin: 0 auto;
+		padding: 64px 24px 24px;
+	}
+
+	h2,
+	p {
+		text-align: left;
+	}
+
+	h2 {
+		border-bottom: 1px solid var(--line);
+		padding-bottom: 16px;
+	}
+
+	p {
+		color: var(--text-muted);
+		font-size: 1.2rem;
+		font-weight: 500;
 	}
 
 	section {
-		display: flex;
-		flex-direction: row;
-		flex-wrap: wrap;
-		justify-content: center;
+		display: grid;
 		gap: 16px;
+		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		margin-top: 32px;
 	}
 </style>

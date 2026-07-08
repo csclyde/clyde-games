@@ -365,7 +365,7 @@
 
 <style>
 	main {
-		color: #171717;
+		color: var(--text);
 		max-width: 1400px;
 		margin: 0 auto;
 		padding: 12px 16px 32px;
@@ -373,7 +373,7 @@
 
 	.page-header {
 		align-items: flex-end;
-		border-bottom: 1px solid #d8d8d8;
+		border-bottom: 1px solid var(--line);
 		display: flex;
 		gap: 16px;
 		justify-content: space-between;
@@ -388,7 +388,7 @@
 	}
 
 	.page-header p {
-		color: #666;
+		color: var(--olive);
 		font-size: 0.85rem;
 		font-weight: 600;
 		letter-spacing: 0.02em;
@@ -404,10 +404,10 @@
 	}
 
 	.comment {
-		background: #fff;
-		border: 1px solid #bdbdbd;
-		border-left: 4px solid #111;
-		border-radius: 4px;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-left: 4px solid var(--forest);
+		border-radius: var(--radius);
 		box-sizing: border-box;
 		padding: 14px 16px;
 		transition: opacity 120ms ease, background-color 120ms ease;
@@ -457,7 +457,7 @@
 	}
 
 	.stats p {
-		color: #333;
+		color: var(--text-muted);
 		display: grid;
 		font-size: 0.82rem;
 		gap: 2px;
@@ -466,7 +466,7 @@
 	}
 
 	.stats span {
-		color: #777;
+		color: var(--text-soft);
 		font-size: 0.68rem;
 		font-weight: 800;
 		letter-spacing: 0.06em;
@@ -480,10 +480,10 @@
 	}
 
 	.meta-list span {
-		background: #f4f4f4;
-		border: 1px solid #ddd;
+		background: var(--paper-warm);
+		border: 1px solid var(--line);
 		border-radius: 4px;
-		color: #555;
+		color: var(--text-muted);
 		font-size: 0.68rem;
 		line-height: 1.25;
 		max-width: 100%;
@@ -493,7 +493,7 @@
 	}
 
 	.message {
-		color: #111;
+		color: var(--charcoal);
 		flex-grow: 1;
 		font-size: 0.9rem;
 		line-height: 1.35;
@@ -507,11 +507,11 @@
 	}
 
 	button {
-		background: #fff;
-		border: 1px solid #a8a8a8;
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
 		border-radius: 4px;
 		box-sizing: border-box;
-		color: #111;
+		color: var(--text);
 		cursor: pointer;
 		font: inherit;
 		font-size: 0.82rem;
@@ -528,12 +528,12 @@
 	}
 
 	button:hover:not(:disabled) {
-		background: #f2f2f2;
-		border-color: #666;
+		background: var(--paper-warm);
+		border-color: var(--charcoal);
 	}
 
 	button:disabled {
-		color: #777;
+		color: var(--text-soft);
 		cursor: default;
 	}
 
@@ -541,7 +541,7 @@
 		align-self: flex-start;
 		background: transparent;
 		border: 0;
-		color: #555;
+		color: var(--text-muted);
 		font-size: 0.85rem;
 		font-weight: 700;
 		line-height: 1.35;
@@ -554,13 +554,14 @@
 	.expand-button:hover:not(:disabled) {
 		background: transparent;
 		border-color: transparent;
-		color: #111;
+		color: var(--rust);
 	}
 
 	.access-violations {
-		border: 1px solid #bdbdbd;
-		border-left: 4px solid #111;
-		border-radius: 4px;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-left: 4px solid var(--safety);
+		border-radius: var(--radius);
 		box-sizing: border-box;
 		margin-bottom: 12px;
 		padding: 14px 16px;
@@ -578,7 +579,7 @@
 	}
 
 	.section-header p {
-		color: #666;
+		color: var(--olive);
 		font-size: 0.85rem;
 		letter-spacing: 0.02em;
 		margin: 0 0 0 auto;
@@ -601,7 +602,7 @@
 		grid-template-columns: 56px 1fr;
 		align-items: center;
 		gap: 8px;
-		border-top: 1px solid #ddd;
+		border-top: 1px solid var(--line);
 		padding: 7px 0;
 		text-align: left;
 	}
@@ -619,13 +620,13 @@
 	}
 
 	.state-message {
-		color: #666;
+		color: var(--text-soft);
 		margin: 32px 0;
 		text-align: left;
 	}
 
 	.error {
-		color: #a40000;
+		color: var(--rust);
 	}
 
 	@media (max-width: 820px) {
@@ -648,8 +649,8 @@
 
 		.comment,
 		.access-violations {
-			border: 1px solid #a8a8a8;
-			border-top: 4px solid #111;
+			border: 1px solid var(--line-strong);
+			border-top: 4px solid var(--forest);
 			border-left-width: 1px;
 			border-radius: 6px;
 			padding: 12px;

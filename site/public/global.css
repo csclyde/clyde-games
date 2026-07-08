@@ -4,41 +4,121 @@ html, body {
 	height: 100%;
 }
 
+:root {
+	--paper: #e5e7e4;
+	--paper-warm: #dcdfdc;
+	--surface: #f2f3ef;
+	--surface-muted: #d4d8d5;
+	--line: #aeb5b2;
+	--line-strong: #68716f;
+	--text: #252a29;
+	--text-muted: #515a58;
+	--text-soft: #707a76;
+	--charcoal: #2b302f;
+	--forest: #314c45;
+	--olive: #5d675f;
+	--slate: #415f6c;
+	--rust: #81513d;
+	--ochre: #887746;
+	--safety: #aa6235;
+	--radius: 4px;
+	--content: 1180px;
+	--font-sans: "IBM Plex Sans", "Avenir Next", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	--font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* {
+	box-sizing: border-box;
+}
+
 body {
 	margin: 0;
-	padding: 8px;
-	box-sizing: border-box;
-	font-family: "Maven Pro", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	padding: 0;
+	background:
+		linear-gradient(rgba(43, 48, 47, 0.045) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(43, 48, 47, 0.035) 1px, transparent 1px),
+		var(--paper);
+	background-size: 48px 48px, 48px 48px, auto;
+	color: var(--text);
+	font-family: var(--font-sans);
+	font-size: 16px;
+	line-height: 1.55;
+	text-rendering: optimizeLegibility;
 }
 
 a {
-    color: black;
+	color: var(--forest);
+	text-decoration-color: rgba(47, 74, 60, 0.35);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+	transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+
+a:hover {
+	color: var(--rust);
+	text-decoration-color: rgba(155, 87, 55, 0.5);
 }
 
 h1 {
-	color: black;
-	font-size: 6em;
+	color: var(--charcoal);
+	font-size: clamp(3rem, 9vw, 7rem);
 	font-weight: 800;
+	letter-spacing: 0;
+	line-height: 0.9;
 	margin-top: 0;
 	margin-bottom: 0;
 }
 
 h2 {
-	color: black;
-	font-size: 4em;
+	color: var(--charcoal);
+	font-size: clamp(2rem, 5vw, 4rem);
 	font-weight: 800;
+	letter-spacing: 0;
+	line-height: 0.95;
 	margin-top: 0;
 	margin-bottom: 0;
 }
 
 h3 {
-	color: black;
-	font-size: 2em;
+	color: var(--charcoal);
+	font-size: clamp(1.25rem, 2.5vw, 2rem);
 	font-weight: 600;
 	margin-top: 8px;
 	margin-bottom: 8px;
 }
 
+h4, h5 {
+	color: var(--charcoal);
+}
+
+p {
+	color: var(--text);
+}
+
+small {
+	color: var(--text-soft);
+	font-family: var(--font-mono);
+	font-size: 0.78rem;
+	letter-spacing: 0.03em;
+}
+
 h1, h2, h3, h4, h5, small, p {
 	text-align: center;
+}
+
+button,
+select,
+input,
+textarea {
+	font-family: inherit;
+}
+
+button,
+select {
+	font-family: var(--font-mono);
+	letter-spacing: 0;
+}
+
+::selection {
+	background: rgba(75, 100, 112, 0.26);
 }

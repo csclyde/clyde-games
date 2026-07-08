@@ -397,15 +397,24 @@ to be truly alive
 
 <style>
 	main {
-		margin: 36px;
+		margin: 0 auto;
+		max-width: 780px;
+		padding: 64px 24px 24px;
 	}
 
 	h3 {
+		border-top: 1px solid var(--line);
+		color: var(--charcoal);
 		margin-top: 16px;
+		padding-top: 24px;
+		text-align: left;
 	}
 
 	p {
+		color: var(--text-muted);
+		line-height: 1.65;
 		white-space: pre;
 		font-size: small;
+		text-align: left;
 	}
 </style>

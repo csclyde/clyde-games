@@ -270,14 +270,14 @@
 
 <style>
 	main {
-		color: #171717;
+		color: var(--text);
 		max-width: 1400px;
 		margin: 0 auto;
 		padding: 12px 16px 32px;
 	}
 
 	.page-header {
-		border-bottom: 1px solid #d8d8d8;
+		border-bottom: 1px solid var(--line);
 		margin-bottom: 14px;
 		padding-bottom: 12px;
 	}
@@ -289,7 +289,7 @@
 	}
 
 	.page-header p {
-		color: #666;
+		color: var(--olive);
 		font-size: 0.85rem;
 		font-weight: 600;
 		letter-spacing: 0.02em;
@@ -299,15 +299,16 @@
 	}
 
 	.builds {
-		border: 1px solid #cfcfcf;
-		border-left: 4px solid #111;
-		border-radius: 4px;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-left: 4px solid var(--forest);
+		border-radius: var(--radius);
 		margin-top: 14px;
 		padding: 4px 16px;
 	}
 
 	.section-header {
-		border-bottom: 1px solid #ddd;
+		border-bottom: 1px solid var(--line);
 		padding: 12px 0;
 	}
 
@@ -328,7 +329,7 @@
 		grid-template-columns: minmax(150px, max-content) minmax(100px, max-content) minmax(120px, 1fr) auto;
 		align-items: center;
 		column-gap: 16px;
-		border-top: 1px solid #ddd;
+		border-top: 1px solid var(--line);
 		padding: 12px 0;
 		text-align: left;
 		transition: opacity 120ms ease;
@@ -351,30 +352,30 @@
 	}
 
 	.build-project {
-		color: #555;
+		color: var(--text-muted);
 		font-size: 0.82rem;
 		font-weight: 800;
 		overflow-wrap: anywhere;
 	}
 
 	.build-date {
-		color: #111;
+		color: var(--charcoal);
 		font-size: 0.95rem;
 		font-weight: 800;
 	}
 
 	.build-count {
-		color: #666;
+		color: var(--text-soft);
 		font-size: 0.85rem;
 		font-weight: 600;
 		text-transform: uppercase;
 	}
 
 	button {
-		background: #fff;
-		border: 1px solid #a8a8a8;
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
 		border-radius: 4px;
-		color: #111;
+		color: var(--text);
 		cursor: pointer;
 		font: inherit;
 		font-size: 0.82rem;
@@ -384,29 +385,29 @@
 	}
 
 	button:hover:not(:disabled) {
-		background: #f2f2f2;
-		border-color: #666;
+		background: var(--paper-warm);
+		border-color: var(--charcoal);
 	}
 
 	button:disabled {
-		color: #777;
+		color: var(--text-soft);
 		cursor: default;
 	}
 
 	.empty-state {
-		color: #666;
+		color: var(--text-soft);
 		margin: 12px 0;
 		text-align: left;
 	}
 
 	.error {
-		color: #a40000;
+		color: var(--rust);
 		margin: 12px 0;
 		text-align: left;
 	}
 
 	.state-message {
-		color: #666;
+		color: var(--text-soft);
 		margin: 12px 0;
 		text-align: left;
 	}
