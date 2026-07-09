@@ -23,6 +23,9 @@
 	let helperStatus = {};
 	let resolvingFeedback = {};
 	let translatingFeedback = {};
+	let syncingSteam = false;
+	let steamSyncStatus = '';
+	let steamSyncError = '';
 
 	async function loadFeedback() {
 		loadingFeedback = true;
@@ -45,6 +48,31 @@
 			feedbackError = '';
 		} catch (error) {
 			feedbackError = error.message;
+		}
+	}
+
+	async function syncSteamReviews() {
+		syncingSteam = true;
+		steamSyncStatus = 'Syncing Steam reviews...';
+		steamSyncError = '';
+
+		try {
+			const res = await fetch(`https://api.clyde.games/steamreviews/import`, {
+				method: 'POST'
+			});
+			const result = await res.json();
+
+			if (!res.ok) {
+				throw new Error(result.error || result);
+			}
+
+			await refreshFeedback();
+			steamSyncStatus = `Steam synced: ${result.imported || 0} imported, ${result.skipped || 0} skipped`;
+		} catch (error) {
+			steamSyncStatus = '';
+			steamSyncError = error.message;
+		} finally {
+			syncingSteam = false;
 		}
 	}
 
@@ -172,6 +200,15 @@
 			text: message.slice(0, metadataMatch.index).trim(),
 			suffix: message.slice(metadataMatch.index)
 		};
+	}
+
+	function messageSegments(message) {
+		return message.split(/(https?:\/\/[^\s]+)/g).filter(Boolean).map(part => {
+			return {
+				text: part,
+				isURL: /^https?:\/\//.test(part)
+			};
+		});
 	}
 
 	async function translateFeedback(comment) {
@@ -315,6 +352,17 @@
 			<h2>Player Feedback</h2>
 			<p>{visibleFeedback.length} open item{visibleFeedback.length === 1 ? '' : 's'}</p>
 		</div>
+		<div class="header-actions">
+			<button type="button" disabled={syncingSteam} on:click={syncSteamReviews}>
+				{syncingSteam ? 'Syncing...' : 'Sync Steam'}
+			</button>
+			{#if steamSyncStatus}
+				<small>{steamSyncStatus}</small>
+			{/if}
+			{#if steamSyncError}
+				<small class="helper-error">{steamSyncError}</small>
+			{/if}
+		</div>
 	</header>
 
 	{#if loadingFeedback}
@@ -332,7 +380,15 @@
 						<div class="message-header">
 							<span class="rating" style="background-color:{ colors[comment.Rating] }"></span>
 							<div class="message-stack">
-								<p class="message">{comment.Message}</p>
+								<p class="message">
+									{#each messageSegments(comment.Message) as segment}
+										{#if segment.isURL}
+											<a target="_blank" rel="noreferrer" href={segment.text}>{segment.text}</a>
+										{:else}
+											{segment.text}
+										{/if}
+									{/each}
+								</p>
 								{#if helperStatus[comment.ID] && helperStatus[comment.ID].status}
 									<small class="helper-status">{helperStatus[comment.ID].status}</small>
 								{/if}
@@ -389,7 +445,11 @@
 	}
 
 	.page-header {
+		align-items: flex-start;
 		border-bottom: 1px solid var(--line);
+		display: flex;
+		gap: 18px;
+		justify-content: space-between;
 		margin-bottom: 14px;
 		padding-bottom: 12px;
 	}
@@ -408,6 +468,20 @@
 		margin: 6px 0 0;
 		text-align: left;
 		text-transform: uppercase;
+	}
+
+	.header-actions {
+		align-items: flex-end;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-top: 4px;
+		text-align: right;
+	}
+
+	.header-actions small {
+		max-width: 260px;
+		text-align: right;
 	}
 
 	.comment-list {
@@ -536,6 +610,7 @@
 		line-height: 1.4;
 		overflow-wrap: anywhere;
 		text-align: left;
+		white-space: pre-wrap;
 	}
 
 	.helper-status {
@@ -598,6 +673,20 @@
 
 		.page-header h2 {
 			font-size: 2rem;
+		}
+
+		.page-header {
+			align-items: flex-start;
+			flex-direction: column;
+		}
+
+		.header-actions {
+			align-items: flex-start;
+			text-align: left;
+		}
+
+		.header-actions small {
+			text-align: left;
 		}
 
 		.comment-list {

@@ -29,6 +29,7 @@ func main() {
 	router.GET("/feedback", endpoints.GetFeedback)
 	router.POST("/feedback", endpoints.AddFeedback)
 	router.GET("/resolvefeedback", endpoints.ResolveFeedback)
+	router.POST("/steamreviews/import", endpoints.ImportSteamReviewsNow)
 	router.GET("/event", endpoints.GetEvent)
 	router.GET("/event/builds", endpoints.GetEventBuilds)
 	router.POST("/event", endpoints.AddEvent)
@@ -65,6 +66,8 @@ func main() {
 	if err = models.MigrateEtymologyDB(); err != nil {
 		panic(err)
 	}
+
+	endpoints.StartSteamReviewImporter()
 
 	router.Run(":9990")
 }

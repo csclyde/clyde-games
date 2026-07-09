@@ -45,6 +45,16 @@ func AddFeedback(fb Feedback) (*Feedback, error) {
 	return &fb, nil
 }
 
+func FeedbackMessageContains(text string) (bool, error) {
+	var count int64
+	result := AnalyticsDB.Model(&Feedback{}).Where("message LIKE ?", "%"+text+"%").Count(&count)
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return count > 0, nil
+}
+
 func SelectFeedback(id string) (*Feedback, error) {
 	var feedback Feedback
 	result := AnalyticsDB.Where("id = ?", id).First(&feedback)
