@@ -18,7 +18,7 @@ import (
 const (
 	cursemarkSteamAppID = "3219180"
 	steamReviewBaseURL  = "https://store.steampowered.com/appreviews/" + cursemarkSteamAppID
-	steamReviewSyncName = "steam_reviews_cursemark"
+	steamSyncName       = "steam_cursemark"
 )
 
 var steamReviewImportLock sync.Mutex
@@ -83,7 +83,7 @@ func ImportSteamReviewsFromCheckpoint() (int, int, time.Time, time.Time, error) 
 	steamReviewImportLock.Lock()
 	defer steamReviewImportLock.Unlock()
 
-	state, err := models.GetSyncState(steamReviewSyncName)
+	state, err := models.GetSyncState(steamSyncName)
 	if err != nil {
 		return 0, 0, time.Time{}, time.Time{}, err
 	}
@@ -94,16 +94,30 @@ func ImportSteamReviewsFromCheckpoint() (int, int, time.Time, time.Time, error) 
 		from = state.LastSuccessAt
 	}
 
-	imported, skipped, err := ImportSteamReviewsSince(from, to)
+	imported, skipped, err := ImportSteamFeedbackSince(from, to)
 	if err != nil {
 		return imported, skipped, from, to, err
 	}
 
-	if _, err := models.SaveSyncSuccess(steamReviewSyncName, to); err != nil {
+	if _, err := models.SaveSyncSuccess(steamSyncName, to); err != nil {
 		return imported, skipped, from, to, err
 	}
 
 	return imported, skipped, from, to, nil
+}
+
+func ImportSteamFeedbackSince(cutoff time.Time, now time.Time) (int, int, error) {
+	reviewImported, reviewSkipped, err := ImportSteamReviewsSince(cutoff, now)
+	if err != nil {
+		return reviewImported, reviewSkipped, err
+	}
+
+	discussionImported, discussionSkipped, err := ImportSteamDiscussionsSince(cutoff, now)
+	if err != nil {
+		return reviewImported + discussionImported, reviewSkipped + discussionSkipped, err
+	}
+
+	return reviewImported + discussionImported, reviewSkipped + discussionSkipped, nil
 }
 
 func ImportSteamReviewsSince(cutoff time.Time, now time.Time) (int, int, error) {
