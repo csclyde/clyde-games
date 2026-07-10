@@ -1,5 +1,10 @@
+node_modules/
 site/node_modules/
+admin/node_modules/
 site/public/build/
+site/public/shared/
+admin/public/build/
+admin/public/shared/
 site/.env
 api/__pycache__
 api/lib

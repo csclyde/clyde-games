@@ -4,7 +4,6 @@
 	import About from './pages/About.svelte';
 	import Poetry from './pages/Poetry.svelte';
 	import Van from './pages/Van.svelte';
-	import Admin from './pages/Admin.svelte';
 	import AnalyzeWords from "./pages/AnalyzeWords.svelte";
 	import UnknownWords from "./pages/UnknownWords.svelte";
 
@@ -20,12 +19,9 @@
 	router('/about', () => setPage(About));
 	router('/poetry', () => setPage(Poetry));
 	router('/van', () => setPage(Van));
-	router('/admin', () => setPage(Admin, { tab: 'admin' }));
-	router('/feedback', () => setPage(Admin, { tab: 'feedback' }));
-	router('/crashes', () => setPage(Admin, { tab: 'crashes' }));
-	router('/savegames', () => setPage(Admin, { tab: 'savegames' }));
-	router('/save-games', () => setPage(Admin, { tab: 'savegames' }));
-	router('/metrics', () => setPage(Admin, { tab: 'admin' }));
+	for (const path of ['/admin', '/feedback', '/crashes', '/savegames', '/save-games', '/metrics']) {
+		router(path, () => window.location.replace(`https://admin.clyde.games${path}`));
+	}
 	router('/words/analyze', () => setPage(AnalyzeWords));
 	router('/words/unknown', () => setPage(UnknownWords));
 

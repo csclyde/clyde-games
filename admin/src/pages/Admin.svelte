@@ -67,7 +67,9 @@
 		</label>
 	</header>
 
-	<ServerStats />
+	{#if activeTab.id === 'admin'}
+		<ServerStats />
+	{/if}
 
 	<svelte:component
 		this={activeTab.component}

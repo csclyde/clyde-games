@@ -1,5 +1,5 @@
 {
-  "name": "clyde-games",
+  "name": "clyde-games-admin",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,7 @@
     "build": "npm run prepare-shared && rollup -c",
     "dev": "npm run prepare-shared && rollup -c -w",
     "start": "sirv public --no-clear --single",
-    "deploy": "npm run build && cp -r public/. /var/www/clyde.games/"
+    "deploy": "npm run build && mkdir -p /var/www/admin.clyde.games && cp -r public/. /var/www/admin.clyde.games/"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.0.0",

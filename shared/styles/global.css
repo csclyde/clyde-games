@@ -1,0 +1,125 @@
+html, body {
+	position: relative;
+	width: 100%;
+	height: 100%;
+}
+
+:root {
+	--paper: #f4f4ee;
+	--paper-warm: #ebe5d8;
+	--surface: #fffefa;
+	--surface-muted: #e7e2d5;
+	--line: #d4d0c5;
+	--line-strong: #8e958f;
+	--text: #272b29;
+	--text-muted: #58615d;
+	--text-soft: #7a817a;
+	--charcoal: #2d332f;
+	--forest: #2f6657;
+	--olive: #6f775f;
+	--slate: #3f7590;
+	--rust: #a36348;
+	--ochre: #b38a42;
+	--safety: #d37a35;
+	--radius: 4px;
+	--content: 1180px;
+	--font-sans: "IBM Plex Sans", "Avenir Next", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	--font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+	background:
+		linear-gradient(115deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0) 44%),
+		linear-gradient(rgba(47, 74, 60, 0.032) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(47, 74, 60, 0.024) 1px, transparent 1px),
+		var(--paper);
+	background-size: auto, 56px 56px, 56px 56px, auto;
+	color: var(--text);
+	font-family: var(--font-sans);
+	font-size: 16px;
+	line-height: 1.55;
+	text-rendering: optimizeLegibility;
+}
+
+a {
+	color: var(--slate);
+	text-decoration-color: rgba(63, 117, 144, 0.34);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+	transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+
+a:hover {
+	color: var(--rust);
+	text-decoration-color: rgba(163, 99, 72, 0.45);
+}
+
+h1 {
+	color: var(--charcoal);
+	font-size: clamp(3rem, 9vw, 7rem);
+	font-weight: 800;
+	letter-spacing: 0;
+	line-height: 0.9;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+h2 {
+	color: var(--charcoal);
+	font-size: clamp(2rem, 5vw, 4rem);
+	font-weight: 800;
+	letter-spacing: 0;
+	line-height: 0.95;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+h3 {
+	color: var(--charcoal);
+	font-size: clamp(1.25rem, 2.5vw, 2rem);
+	font-weight: 600;
+	margin-top: 8px;
+	margin-bottom: 8px;
+}
+
+h4, h5 {
+	color: var(--charcoal);
+}
+
+p {
+	color: var(--text);
+}
+
+small {
+	color: var(--text-soft);
+	font-family: var(--font-mono);
+	font-size: 0.78rem;
+	letter-spacing: 0.03em;
+}
+
+h1, h2, h3, h4, h5, small, p {
+	text-align: center;
+}
+
+button,
+select,
+input,
+textarea {
+	font-family: inherit;
+}
+
+button,
+select {
+	font-family: var(--font-mono);
+	letter-spacing: 0;
+}
+
+::selection {
+	background: rgba(211, 122, 53, 0.24);
+}

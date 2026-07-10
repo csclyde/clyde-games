@@ -1,0 +1,17 @@
+{
+  "name": "clyde-games-workspace",
+  "private": true,
+  "workspaces": [
+    "site",
+    "admin"
+  ],
+  "scripts": {
+    "deploy": "npm run deploy:api && npm run deploy:site && npm run deploy:admin",
+    "deploy:api": "make -C api",
+    "build": "npm run build --workspace clyde-games && npm run build --workspace clyde-games-admin",
+    "build:site": "npm run build --workspace clyde-games",
+    "build:admin": "npm run build --workspace clyde-games-admin",
+    "deploy:site": "npm run deploy --workspace clyde-games",
+    "deploy:admin": "npm run deploy --workspace clyde-games-admin"
+  }
+}
