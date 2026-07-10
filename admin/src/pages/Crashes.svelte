@@ -1,4 +1,6 @@
 <script>
+	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
+
 	export let selectedProject = 'Cursemark';
 	export let reportProjects = () => {};
 
@@ -36,6 +38,8 @@
 	let accessViolationError = '';
 	let resolvingCrashes = {};
 	let resolvingAllCrashes = false;
+	let helperStatus = {};
+	let ticketCrash = null;
 
 	async function loadCrashes() {
 		loadingCrashes = true;
@@ -238,6 +242,50 @@
 		}
 	}
 
+	function openTicketModal(crash) {
+		ticketCrash = crash;
+	}
+
+	function ticketName(crash) {
+		const source = crash.Message || getFirstStackLine(crash) || 'Crash report';
+		const firstLine = source.split('\n')[0].trim();
+		return firstLine.length > 120 ? firstLine.slice(0, 117) + '...' : firstLine;
+	}
+
+	function ticketDescription(crash) {
+		const details = [
+			crash.Message || '',
+			'',
+			'---',
+			`Crash Hash: ${metadataValue(crash.Hash)}`,
+			`Project: ${metadataValue(crash.Project)}`,
+			`Environment: ${metadataValue(crash.Env)}`,
+			`Platform: ${metadataValue(crash.Platform)}`,
+			`Category: ${metadataValue(crash.Category)}`,
+			`Build: ${metadataValue(crash.Build)}`,
+			`Commit: ${metadataValue(crash.Commit)}`,
+			`Player ID: ${metadataValue(crash.PID)}`,
+			`Count: ${metadataValue(crash.Count)}`,
+			`Last Seen: ${formatDate(crash.UpdatedAt)}`,
+			'',
+			'Stack:',
+			...getStack(crash)
+		];
+
+		return details.join('\n');
+	}
+
+	async function handleTicketCreated() {
+		const crash = ticketCrash;
+		if (!crash) {
+			return;
+		}
+
+		helperStatus = { ...helperStatus, [crash.Hash]: { status: 'Planka ticket created', error: '' } };
+		ticketCrash = null;
+		await resolveCrash(crash.Hash);
+	}
+
 	async function resolveAllCrashes() {
 		resolvingAllCrashes = true;
 
@@ -323,6 +371,12 @@
 							{#each getVisibleStack(crash) as stackMessage}
 								<p class="message">{stackMessage}</p>
 							{/each}
+							{#if helperStatus[crash.Hash] && helperStatus[crash.Hash].status}
+								<small class="helper-status">{helperStatus[crash.Hash].status}</small>
+							{/if}
+							{#if helperStatus[crash.Hash] && helperStatus[crash.Hash].error}
+								<small class="helper-error">{helperStatus[crash.Hash].error}</small>
+							{/if}
 							{#if shouldShowExpand(crash)}
 								<button class="expand-button" type="button" on:click={() => expandCrash(crash)}>
 									Expand...
@@ -351,6 +405,9 @@
 							<p><span>Total</span>{crash.Count}</p>
 						</div>
 						<div class="actions">
+							<button type="button" disabled={resolvingCrashes[crash.Hash] || resolvingAllCrashes} on:click={() => openTicketModal(crash)}>
+								Make Ticket
+							</button>
 							<button type="button" disabled={resolvingCrashes[crash.Hash] || resolvingAllCrashes} on:click={() => resolveCrash(crash.Hash)}>
 								{resolvingCrashes[crash.Hash] ? 'Resolving...' : 'Resolve'}
 							</button>
@@ -362,6 +419,14 @@
 		</div>
 	{/if}
 </main>
+
+<PlankaTicketModal
+	open={!!ticketCrash}
+	title={ticketCrash ? ticketName(ticketCrash) : ''}
+	description={ticketCrash ? ticketDescription(ticketCrash) : ''}
+	on:close={() => (ticketCrash = null)}
+	on:created={handleTicketCreated}
+/>
 
 <style>
 	main {
@@ -506,6 +571,18 @@
 		margin-bottom: 8px;
 	}
 
+	.helper-status {
+		color: var(--text-soft);
+		font-weight: 800;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.helper-error {
+		color: var(--rust);
+		max-width: 520px;
+	}
+
 	button {
 		background: var(--surface);
 		border: 1px solid var(--line-strong);
@@ -616,6 +693,13 @@
 
 	.empty-state {
 		margin: 8px 0 0;
+		text-align: left;
+	}
+
+	small {
+		font-size: 0.68rem;
+		line-height: 1.3;
+		overflow-wrap: anywhere;
 		text-align: left;
 	}
 
