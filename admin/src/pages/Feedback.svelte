@@ -95,42 +95,88 @@
 		}
 	}
 
-	async function copyTextToClipboard(text) {
-		if (navigator.clipboard && window.isSecureContext) {
-			await navigator.clipboard.writeText(text);
-			return;
-		}
-
-		const textarea = document.createElement('textarea');
-		textarea.value = text;
-		textarea.setAttribute('readonly', '');
-		textarea.style.position = 'fixed';
-		textarea.style.top = '-9999px';
-		document.body.appendChild(textarea);
-		textarea.select();
-
-		try {
-			document.execCommand('copy');
-		} finally {
-			document.body.removeChild(textarea);
-		}
-	}
-
 	function valueOrUnknown(value) {
 		return value || 'unknown';
 	}
 
-	async function copyTicketText(comment) {
-		helperStatus = { ...helperStatus, [comment.ID]: { status: 'Copying...', error: '' } };
+	let ticketComment = null;
+	let plankaProjects = [];
+	let selectedPlankaProject = '';
+	let selectedPlankaBoard = '';
+	let selectedPlankaList = '';
+	let loadingPlanka = false;
+	let creatingTicket = false;
+	let plankaError = '';
 
+	$: plankaBoards = (plankaProjects.find(project => project.id === selectedPlankaProject) || {}).boards || [];
+	$: plankaLists = (plankaBoards.find(board => board.id === selectedPlankaBoard) || {}).lists || [];
+
+	async function openTicketModal(comment) {
+		ticketComment = comment;
+		plankaError = '';
+		if (plankaProjects.length) return;
+		loadingPlanka = true;
 		try {
-			await copyTextToClipboard(comment.Message || '');
-			helperStatus = { ...helperStatus, [comment.ID]: { status: 'Copied feedback text', error: '' } };
+			const res = await fetch('https://api.clyde.games/planka/hierarchy');
+			const result = await res.json();
+			if (!res.ok) throw new Error(result.error || 'Unable to load Planka');
+			plankaProjects = result;
+			selectedPlankaProject = result[0] ? result[0].id : '';
+			selectedPlankaBoard = result[0] && result[0].boards[0] ? result[0].boards[0].id : '';
+			selectedPlankaList = result[0] && result[0].boards[0] && result[0].boards[0].lists[0] ? result[0].boards[0].lists[0].id : '';
 		} catch (error) {
-			helperStatus = {
-				...helperStatus,
-				[comment.ID]: { status: '', error: error.message || 'Unable to copy text' }
-			};
+			plankaError = error.message;
+		} finally {
+			loadingPlanka = false;
+		}
+	}
+
+	function changePlankaProject() {
+		selectedPlankaBoard = plankaBoards[0] ? plankaBoards[0].id : '';
+		selectedPlankaList = plankaBoards[0] && plankaBoards[0].lists[0] ? plankaBoards[0].lists[0].id : '';
+	}
+
+	function changePlankaBoard() {
+		selectedPlankaList = plankaLists[0] ? plankaLists[0].id : '';
+	}
+
+	function ticketName(comment) {
+		const firstLine = (comment.Message || 'Player feedback').split('\n')[0].trim();
+		return firstLine.length > 120 ? firstLine.slice(0, 117) + '...' : firstLine;
+	}
+
+	function ticketDescription(comment) {
+		const details = [
+			comment.Message || '', '', '---',
+			`Feedback ID: ${comment.ID}`,
+			`Project: ${valueOrUnknown(comment.Project)}`,
+			`Environment: ${valueOrUnknown(comment.Env)}`,
+			`Platform: ${valueOrUnknown(comment.Platform)}`,
+			`Category: ${valueOrUnknown(comment.Category)}`,
+			`Build: ${valueOrUnknown(comment.Build)}`,
+			`Commit: ${valueOrUnknown(comment.Commit)}`,
+			`Player ID: ${valueOrUnknown(comment.PID)}`
+		];
+		if (comment.SavegameID) details.push(`Savegame: https://api.clyde.games/savegame/download?id=${comment.SavegameID}`);
+		return details.join('\n');
+	}
+
+	async function createTicket() {
+		creatingTicket = true;
+		plankaError = '';
+		try {
+			const res = await fetch('https://api.clyde.games/planka/tickets', {
+				method: 'POST', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ listId: selectedPlankaList, name: ticketName(ticketComment), description: ticketDescription(ticketComment) })
+			});
+			const result = await res.json();
+			if (!res.ok) throw new Error(result.error || 'Unable to create ticket');
+			helperStatus = { ...helperStatus, [ticketComment.ID]: { status: 'Planka ticket created', error: '' } };
+			ticketComment = null;
+		} catch (error) {
+			plankaError = error.message;
+		} finally {
+			creatingTicket = false;
 		}
 	}
 
@@ -418,8 +464,8 @@
 							<button type="button" disabled={translatingFeedback[comment.ID] || resolvingFeedback[comment.ID]} on:click={() => translateFeedback(comment)}>
 								{translatingFeedback[comment.ID] ? 'Translating...' : 'Translate'}
 							</button>
-							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => copyTicketText(comment)}>
-								Copy Text
+							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => openTicketModal(comment)}>
+								Make Ticket
 							</button>
 							<button type="button" disabled={!comment.SavegameID || resolvingFeedback[comment.ID]} on:click={() => downloadSavegame(comment)}>
 								Download Save
@@ -435,6 +481,25 @@
 		</div>
 	{/if}
 </main>
+
+{#if ticketComment}
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
+	<div class="modal-backdrop" role="presentation" on:click|self={() => !creatingTicket && (ticketComment = null)}>
+		<section class="ticket-modal" role="dialog" aria-modal="true" aria-labelledby="ticket-modal-title">
+			<h3 id="ticket-modal-title">Make Planka Ticket</h3>
+			<p class="ticket-preview">{ticketName(ticketComment)}</p>
+			{#if loadingPlanka}
+				<p>Loading Planka projects...</p>
+			{:else}
+				<label>Project<select bind:value={selectedPlankaProject} on:change={changePlankaProject} disabled={creatingTicket}>{#each plankaProjects as project}<option value={project.id}>{project.name}</option>{/each}</select></label>
+				<label>Board<select bind:value={selectedPlankaBoard} on:change={changePlankaBoard} disabled={creatingTicket || !selectedPlankaProject}>{#each plankaBoards as board}<option value={board.id}>{board.name}</option>{/each}</select></label>
+				<label>List<select bind:value={selectedPlankaList} disabled={creatingTicket || !selectedPlankaBoard}>{#each plankaLists as list}<option value={list.id}>{list.name}</option>{/each}</select></label>
+			{/if}
+			{#if plankaError}<small class="helper-error">{plankaError}</small>{/if}
+			<div class="modal-actions"><button type="button" disabled={creatingTicket} on:click={() => ticketComment = null}>Cancel</button><button type="button" disabled={loadingPlanka || creatingTicket || !selectedPlankaList} on:click={createTicket}>{creatingTicket ? 'Creating...' : 'Create Ticket'}</button></div>
+		</section>
+	</div>
+{/if}
 
 <style>
 	main {
@@ -665,6 +730,14 @@
 	.error {
 		color: var(--rust);
 	}
+
+	.modal-backdrop { align-items: center; background: rgba(25, 28, 25, 0.65); display: flex; inset: 0; justify-content: center; padding: 16px; position: fixed; z-index: 1000; }
+	.ticket-modal { background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: 0 18px 60px rgba(0,0,0,.3); box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; max-width: 520px; padding: 22px; width: 100%; }
+	.ticket-modal h3, .ticket-modal p { margin: 0; text-align: left; }
+	.ticket-preview { color: var(--text-muted); overflow-wrap: anywhere; }
+	.ticket-modal label { color: var(--text-soft); display: flex; flex-direction: column; font-size: .72rem; font-weight: 800; gap: 5px; letter-spacing: .06em; text-transform: uppercase; }
+	.ticket-modal select { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); font: inherit; padding: 9px; }
+	.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
 
 	@media (max-width: 820px) {
 		main {

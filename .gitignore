@@ -9,4 +9,5 @@ site/.env
 api/__pycache__
 api/lib
 api/main
+api/.env
 .vscode/*.log

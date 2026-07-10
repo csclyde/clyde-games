@@ -24,11 +24,17 @@ func CORSMiddleware() gin.HandlerFunc {
 }
 
 func main() {
+	if err := loadAvailableDotEnv(); err != nil {
+		panic(err)
+	}
+
 	router := gin.Default()
 	router.Use(CORSMiddleware())
 	router.GET("/feedback", endpoints.GetFeedback)
 	router.POST("/feedback", endpoints.AddFeedback)
 	router.GET("/resolvefeedback", endpoints.ResolveFeedback)
+	router.GET("/planka/hierarchy", endpoints.GetPlankaHierarchy)
+	router.POST("/planka/tickets", endpoints.CreatePlankaTicket)
 	router.POST("/steamreviews/import", endpoints.ImportSteamReviewsNow)
 	router.GET("/event", endpoints.GetEvent)
 	router.GET("/event/builds", endpoints.GetEventBuilds)
