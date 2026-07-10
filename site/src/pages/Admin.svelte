@@ -3,6 +3,7 @@
 	import Crashes from './Crashes.svelte';
 	import Savegames from './Savegames.svelte';
 	import Metrics from './Metrics.svelte';
+	import ServerStats from '../components/ServerStats.svelte';
 
 	export let tab = 'admin';
 
@@ -65,6 +66,8 @@
 			</select>
 		</label>
 	</header>
+
+	<ServerStats />
 
 	<svelte:component
 		this={activeTab.component}
