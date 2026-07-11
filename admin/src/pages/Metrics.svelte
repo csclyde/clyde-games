@@ -38,6 +38,17 @@
 		}
 	}
 
+	async function getEventSettings() {
+		const res = await fetch(`https://api.clyde.games/event/settings`);
+		const settings = await parseResponse(res);
+
+		if (res.ok) {
+			return settings;
+		} else {
+			throw new Error(settings.error || settings);
+		}
+	}
+
 	let builds = [];
 	let savegameBuilds = [];
 	let loadingBuilds = true;
@@ -47,6 +58,10 @@
 	let deletingEventBuild = null;
 	let deletingSavegameBuild = null;
 	let deleteError = '';
+	let oldestBuild = '';
+	let settingsError = '';
+	let savingOldestBuild = false;
+	let oldestBuildSaved = false;
 
 	async function loadBuilds() {
 		loadingBuilds = true;
@@ -54,7 +69,11 @@
 		buildError = '';
 		savegameBuildError = '';
 
-		const [eventBuilds, savegameBuildItems] = await Promise.allSettled([getBuilds(), getSavegameBuilds()]);
+		const [eventBuilds, savegameBuildItems, eventSettings] = await Promise.allSettled([
+			getBuilds(),
+			getSavegameBuilds(),
+			getEventSettings()
+		]);
 
 		if (eventBuilds.status === 'fulfilled') {
 			builds = eventBuilds.value;
@@ -68,8 +87,42 @@
 			savegameBuildError = savegameBuildItems.reason.message || String(savegameBuildItems.reason);
 		}
 
+		if (eventSettings.status === 'fulfilled') {
+			oldestBuild = eventSettings.value.OldestBuild || '';
+		} else {
+			settingsError = eventSettings.reason.message || String(eventSettings.reason);
+		}
+
 		loadingBuilds = false;
 		loadingSavegameBuilds = false;
+	}
+
+	async function updateOldestBuild(event) {
+		const previousBuild = oldestBuild;
+		oldestBuild = event.currentTarget.value;
+		savingOldestBuild = true;
+		oldestBuildSaved = false;
+		settingsError = '';
+
+		try {
+			const res = await fetch(`https://api.clyde.games/event/settings`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ OldestBuild: oldestBuild })
+			});
+			const settings = await parseResponse(res);
+			if (!res.ok) {
+				throw new Error(settings.error || settings);
+			}
+			oldestBuild = settings.OldestBuild || '';
+			oldestBuildSaved = true;
+		} catch (error) {
+			oldestBuild = previousBuild;
+			oldestBuildSaved = false;
+			settingsError = error.message;
+		} finally {
+			savingOldestBuild = false;
+		}
 	}
 
 	loadBuilds();
@@ -184,6 +237,10 @@
 
 	$: visibleBuilds = builds.filter(matchesProject);
 	$: visibleSavegameBuilds = savegameBuilds.filter(matchesProject);
+	$: metricBuildDates = [...new Set([
+		...builds.map(build => build.Build),
+		...savegameBuilds.map(build => build.Build)
+	])].sort().reverse();
 	$: reportProjects('metrics', [
 		...builds.map(build => build.Project),
 		...savegameBuilds.map(build => build.Project)
@@ -200,6 +257,33 @@
 
 	{#if deleteError}
 		<p class="error">{deleteError}</p>
+	{/if}
+
+	<section class="settings">
+		<div>
+			<label for="oldest-build">Oldest accepted metric build</label>
+			<p>Metric events and savegames from builds before this date will be rejected.</p>
+		</div>
+		<div class="setting-control">
+			<select id="oldest-build" value={oldestBuild} disabled={loadingBuilds || savingOldestBuild} on:change={updateOldestBuild}>
+				<option value="">Accept all builds</option>
+				{#each metricBuildDates as build}
+					<option value={build}>{formatBuildDate(build)}</option>
+				{/each}
+			</select>
+			<div class="save-status" role="status" aria-live="polite">
+				{#if savingOldestBuild}
+					<span class="spinner" aria-hidden="true"></span>
+					<span>Saving</span>
+				{:else if oldestBuildSaved}
+					<span class="saved-check" aria-hidden="true">✓</span>
+					<span>Saved</span>
+				{/if}
+			</div>
+		</div>
+	</section>
+	{#if settingsError}
+		<p class="error">{settingsError}</p>
 	{/if}
 
 	<section class="builds">
@@ -305,6 +389,76 @@
 		border-radius: var(--radius);
 		margin-top: 14px;
 		padding: 4px 16px;
+	}
+
+	.settings {
+		align-items: center;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-left: 4px solid var(--forest);
+		border-radius: var(--radius);
+		display: flex;
+		justify-content: space-between;
+		gap: 20px;
+		padding: 14px 16px;
+	}
+
+	.settings label {
+		font-weight: 800;
+	}
+
+	.settings p {
+		color: var(--text-soft);
+		font-size: 0.85rem;
+		margin: 4px 0 0;
+	}
+
+	select {
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
+		border-radius: 4px;
+		color: var(--text);
+		font: inherit;
+		min-width: 240px;
+		padding: 7px 10px;
+	}
+
+	.setting-control {
+		align-items: center;
+		display: flex;
+		gap: 10px;
+	}
+
+	.save-status {
+		align-items: center;
+		color: var(--text-soft);
+		display: flex;
+		font-size: 0.82rem;
+		font-weight: 700;
+		gap: 6px;
+		min-width: 68px;
+	}
+
+	.spinner {
+		animation: spin 700ms linear infinite;
+		border: 2px solid var(--line-strong);
+		border-radius: 50%;
+		border-top-color: var(--forest);
+		display: inline-block;
+		height: 13px;
+		width: 13px;
+	}
+
+	.saved-check {
+		color: var(--forest);
+		font-size: 1rem;
+		line-height: 1;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.section-header {
@@ -419,6 +573,22 @@
 
 		.page-header h2 {
 			font-size: 2rem;
+		}
+
+		.settings {
+			align-items: stretch;
+			flex-direction: column;
+		}
+
+		select {
+			min-width: 0;
+			width: 100%;
+		}
+
+		.setting-control {
+			align-items: flex-start;
+			flex-direction: column;
+			gap: 6px;
 		}
 
 		.build-row {

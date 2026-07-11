@@ -38,6 +38,32 @@ func GetEventBuilds(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, builds)
 }
 
+func GetEventSettings(c *gin.Context) {
+	settings, err := models.GetEventSettings()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, settings)
+}
+
+func UpdateEventSettings(c *gin.Context) {
+	var settings models.EventSettings
+	if err := c.BindJSON(&settings); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updated, err := models.SaveOldestEventBuild(settings.OldestBuild)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updated)
+}
+
 func AddEvent(c *gin.Context) {
 	var event models.Event
 

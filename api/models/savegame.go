@@ -28,9 +28,15 @@ type SavegameBuild struct {
 }
 
 func AddSavegame(savegame Savegame) (*Savegame, error) {
-	result := AnalyticsDB.Create(&savegame)
-	if result.Error != nil {
-		return nil, result.Error
+	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		if err := rejectBuildBeforeOldest(tx, savegame.Build, "savegame"); err != nil {
+			return err
+		}
+
+		return tx.Create(&savegame).Error
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &savegame, nil

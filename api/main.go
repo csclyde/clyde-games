@@ -39,6 +39,8 @@ func main() {
 	router.POST("/reddit/import", endpoints.ImportRedditPostsNow)
 	router.GET("/event", endpoints.GetEvent)
 	router.GET("/event/builds", endpoints.GetEventBuilds)
+	router.GET("/event/settings", endpoints.GetEventSettings)
+	router.PUT("/event/settings", endpoints.UpdateEventSettings)
 	router.POST("/event", endpoints.AddEvent)
 	router.DELETE("/event/build", endpoints.DeleteEventsByBuild)
 	router.GET("/crash", endpoints.GetCrash)
