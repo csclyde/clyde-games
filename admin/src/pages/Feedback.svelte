@@ -417,7 +417,7 @@
 								<span>{feedbackContext(comment)}</span>
 							{/if}
 							{#if comment.PID}
-								<span>{comment.PID}</span>
+								<a class="user-id" href={`/user/${encodeURIComponent(comment.PID)}`}>{comment.PID}</a>
 							{/if}
 							{#if comment.Commit}
 								<span>{comment.Commit}</span>
@@ -611,6 +611,26 @@
 		overflow-wrap: anywhere;
 		padding: 3px 6px;
 		text-align: left;
+	}
+
+	.user-id {
+		background: var(--paper-warm);
+		border: 1px solid var(--line);
+		border-radius: 4px;
+		color: var(--text-muted);
+		font-size: 0.68rem;
+		line-height: 1.25;
+		max-width: 100%;
+		overflow-wrap: anywhere;
+		padding: 3px 6px;
+		text-align: left;
+		text-decoration: none;
+	}
+
+	.user-id:hover {
+		background: var(--surface);
+		border-color: var(--charcoal);
+		color: var(--text);
 	}
 
 	.comment p {

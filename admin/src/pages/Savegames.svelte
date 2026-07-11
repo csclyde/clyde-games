@@ -99,7 +99,7 @@
 	}
 
 	function playerContext(savegame) {
-		return [savegame.PID, savegame.SID].filter(Boolean).join(' / ');
+		return savegame.SID;
 	}
 
 	function matchesProject(item) {
@@ -164,6 +164,9 @@
 							{/if}
 							{#if playerContext(savegame)}
 								<span>{playerContext(savegame)}</span>
+							{/if}
+							{#if savegame.PID}
+								<a class="user-id" href={`/user/${encodeURIComponent(savegame.PID)}`}>{savegame.PID}</a>
 							{/if}
 							{#if savegame.Commit}
 								<span>{savegame.Commit}</span>
@@ -324,6 +327,26 @@
 		overflow-wrap: anywhere;
 		padding: 3px 6px;
 		text-align: left;
+	}
+
+	.user-id {
+		background: var(--paper-warm);
+		border: 1px solid var(--line);
+		border-radius: 4px;
+		color: var(--text-muted);
+		font-size: 0.68rem;
+		line-height: 1.25;
+		max-width: 100%;
+		overflow-wrap: anywhere;
+		padding: 3px 6px;
+		text-align: left;
+		text-decoration: none;
+	}
+
+	.user-id:hover {
+		background: var(--surface);
+		border-color: var(--charcoal);
+		color: var(--text);
 	}
 
 	.actions {

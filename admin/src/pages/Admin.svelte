@@ -4,8 +4,10 @@
 	import Savegames from './Savegames.svelte';
 	import Metrics from './Metrics.svelte';
 	import ServerStats from '../components/ServerStats.svelte';
+	import User from './User.svelte';
 
 	export let tab = 'admin';
+	export let userID = '';
 
 	const defaultProject = 'Cursemark';
 	const tabs = [
@@ -35,7 +37,7 @@
 		projectSources = { ...projectSources, [source]: nextProjects };
 	}
 
-	$: activeTab = tabs.find(item => item.id === tab) || tabs[0];
+	$: activeTab = tabs.find(item => item.id === tab) || { id: tab };
 	$: projectOptions = [...new Set(Object.values(projectSources).flat())].sort((a, b) => a.localeCompare(b));
 	$: visibleProjectOptions = selectedProject && selectedProject !== 'all' && !projectOptions.includes(selectedProject)
 		? [selectedProject, ...projectOptions]
@@ -56,6 +58,7 @@
 			{/each}
 		</nav>
 
+		{#if tab !== 'user'}
 		<label class="project-filter">
 			<span>Project</span>
 			<select bind:value={selectedProject}>
@@ -65,17 +68,22 @@
 				{/each}
 			</select>
 		</label>
+		{/if}
 	</header>
 
 	{#if activeTab.id === 'admin'}
 		<ServerStats />
 	{/if}
 
-	<svelte:component
-		this={activeTab.component}
-		selectedProject={selectedProject}
-		reportProjects={reportProjects}
-	/>
+	{#if tab === 'user'}
+		<User {userID} />
+	{:else}
+		<svelte:component
+			this={activeTab.component || Metrics}
+			selectedProject={selectedProject}
+			reportProjects={reportProjects}
+		/>
+	{/if}
 </div>
 
 <style>
