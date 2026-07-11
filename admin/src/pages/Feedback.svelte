@@ -25,9 +25,9 @@
 	let helperStatus = {};
 	let resolvingFeedback = {};
 	let translatingFeedback = {};
-	let syncingSteam = false;
-	let steamSyncStatus = '';
-	let steamSyncError = '';
+	let syncingSources = false;
+	let sourceSyncStatus = '';
+	let sourceSyncError = '';
 
 	async function loadFeedback() {
 		loadingFeedback = true;
@@ -53,29 +53,39 @@
 		}
 	}
 
-	async function syncSteamReviews() {
-		syncingSteam = true;
-		steamSyncStatus = 'Syncing Steam reviews...';
-		steamSyncError = '';
+	async function syncSource(name, endpoint) {
+		const res = await fetch(`https://api.clyde.games/${endpoint}`, { method: 'POST' });
+		const result = await res.json();
 
-		try {
-			const res = await fetch(`https://api.clyde.games/steamreviews/import`, {
-				method: 'POST'
-			});
-			const result = await res.json();
-
-			if (!res.ok) {
-				throw new Error(result.error || result);
-			}
-
-			await refreshFeedback();
-			steamSyncStatus = `Steam synced: ${result.imported || 0} imported, ${result.skipped || 0} skipped`;
-		} catch (error) {
-			steamSyncStatus = '';
-			steamSyncError = error.message;
-		} finally {
-			syncingSteam = false;
+		if (!res.ok) {
+			throw new Error(`${name}: ${result.error || result}`);
 		}
+
+		return { name, ...result };
+	}
+
+	async function syncSources() {
+		syncingSources = true;
+		sourceSyncStatus = 'Syncing Steam and Reddit...';
+		sourceSyncError = '';
+
+		const results = await Promise.allSettled([
+			syncSource('Steam', 'steamreviews/import'),
+			syncSource('Reddit', 'reddit/import')
+		]);
+		const synced = results.filter(result => result.status === 'fulfilled').map(result => result.value);
+		const failed = results.filter(result => result.status === 'rejected').map(result => result.reason.message);
+
+		if (synced.length > 0) {
+			await refreshFeedback();
+			sourceSyncStatus = synced
+				.map(result => `${result.name}: ${result.imported || 0} imported, ${result.skipped || 0} skipped`)
+				.join(' · ');
+		} else {
+			sourceSyncStatus = '';
+		}
+		sourceSyncError = failed.join(' · ');
+		syncingSources = false;
 	}
 
 	async function resolveFeedback(id) {
@@ -358,14 +368,14 @@
 			<p>{visibleFeedback.length} open item{visibleFeedback.length === 1 ? '' : 's'}</p>
 		</div>
 		<div class="header-actions">
-			<button type="button" disabled={syncingSteam} on:click={syncSteamReviews}>
-				{syncingSteam ? 'Syncing...' : 'Sync Steam'}
+			<button type="button" disabled={syncingSources} on:click={syncSources}>
+				{syncingSources ? 'Syncing...' : 'Sync Sources'}
 			</button>
-			{#if steamSyncStatus}
-				<small>{steamSyncStatus}</small>
+			{#if sourceSyncStatus}
+				<small>{sourceSyncStatus}</small>
 			{/if}
-			{#if steamSyncError}
-				<small class="helper-error">{steamSyncError}</small>
+			{#if sourceSyncError}
+				<small class="helper-error">{sourceSyncError}</small>
 			{/if}
 		</div>
 	</header>

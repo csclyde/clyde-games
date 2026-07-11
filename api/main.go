@@ -36,6 +36,7 @@ func main() {
 	router.GET("/planka/hierarchy", endpoints.GetPlankaHierarchy)
 	router.POST("/planka/tickets", endpoints.CreatePlankaTicket)
 	router.POST("/steamreviews/import", endpoints.ImportSteamReviewsNow)
+	router.POST("/reddit/import", endpoints.ImportRedditPostsNow)
 	router.GET("/event", endpoints.GetEvent)
 	router.GET("/event/builds", endpoints.GetEventBuilds)
 	router.POST("/event", endpoints.AddEvent)
@@ -75,6 +76,7 @@ func main() {
 	}
 
 	endpoints.StartSteamReviewImporter()
+	endpoints.StartRedditPostImporter()
 
 	router.Run(":9990")
 }
