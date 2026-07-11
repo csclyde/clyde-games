@@ -215,10 +215,6 @@
 		return formatDate(value);
 	}
 
-	function crashContext(crash) {
-		return [crash.Project, crash.Env, crash.Platform, crash.Category].filter(Boolean).join(' / ');
-	}
-
 	function matchesProject(item) {
 		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
 	}
@@ -384,17 +380,18 @@
 							{/if}
 						</div>
 						<div class="meta-list">
-							{#if crashContext(crash)}
-								<span>{crashContext(crash)}</span>
-							{/if}
+							{#if crash.Project}<span>project: {crash.Project}</span>{/if}
+							{#if crash.Env}<span>env: {crash.Env}</span>{/if}
+							{#if crash.Platform}<span>platform: {crash.Platform}</span>{/if}
+							{#if crash.Category}<span>category: {crash.Category}</span>{/if}
 							{#if crash.PID}
-								<a class="user-id" href={`/user/${encodeURIComponent(crash.PID)}`}>{crash.PID}</a>
+								<a class="user-id" href={`/user/${encodeURIComponent(crash.PID)}`}>user: {crash.PID}</a>
 							{/if}
 							{#if crash.Commit}
-								<span>{crash.Commit}</span>
+								<span>commit: {crash.Commit}</span>
 							{/if}
 							{#if crash.Hash}
-								<span>{crash.Hash}</span>
+								<span>hash: {crash.Hash}</span>
 							{/if}
 						</div>
 					</div>

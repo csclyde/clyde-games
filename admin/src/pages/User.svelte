@@ -35,10 +35,6 @@
 		});
 	}
 
-	function context(item) {
-		return [item.Project, item.Env, item.Platform, item.Category].filter(Boolean).join(' / ');
-	}
-
 	function makeTimeline(data) {
 		return [
 			...(data.Feedback || []).map(item => ({ kind: 'Feedback', item })),
@@ -100,10 +96,13 @@
 						{/if}
 
 						<div class="meta-list">
-							{#if context(entry.item)}<span>{context(entry.item)}</span>{/if}
-							{#if entry.item.Build}<span>{entry.item.Build}</span>{/if}
-							{#if entry.item.Commit}<span>{entry.item.Commit}</span>{/if}
-							{#if entry.item.SID}<span>Session {entry.item.SID}</span>{/if}
+							{#if entry.item.Project}<span>project: {entry.item.Project}</span>{/if}
+							{#if entry.item.Env}<span>env: {entry.item.Env}</span>{/if}
+							{#if entry.item.Platform}<span>platform: {entry.item.Platform}</span>{/if}
+							{#if entry.item.Category}<span>category: {entry.item.Category}</span>{/if}
+							{#if entry.item.Build}<span>build: {entry.item.Build}</span>{/if}
+							{#if entry.item.Commit}<span>commit: {entry.item.Commit}</span>{/if}
+							{#if entry.item.SID}<span>session: {entry.item.SID}</span>{/if}
 							{#if entry.kind === 'Crash' && entry.item.Count}<span>{entry.item.Count} occurrence{entry.item.Count === 1 ? '' : 's'}</span>{/if}
 							{#if entry.item.Resolved}<span>Resolved</span>{/if}
 						</div>

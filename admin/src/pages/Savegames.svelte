@@ -94,14 +94,6 @@
 		return `${Math.ceil(size / 1024)} KB`;
 	}
 
-	function savegameContext(savegame) {
-		return [savegame.Project, savegame.Env, savegame.Platform, savegame.Category].filter(Boolean).join(' / ');
-	}
-
-	function playerContext(savegame) {
-		return savegame.SID;
-	}
-
 	function matchesProject(item) {
 		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
 	}
@@ -159,20 +151,19 @@
 							<p class="reason">{savegame.Reason}</p>
 						{/if}
 						<div class="meta-list">
-							{#if savegameContext(savegame)}
-								<span>{savegameContext(savegame)}</span>
-							{/if}
-							{#if playerContext(savegame)}
-								<span>{playerContext(savegame)}</span>
-							{/if}
+							{#if savegame.Project}<span>project: {savegame.Project}</span>{/if}
+							{#if savegame.Env}<span>env: {savegame.Env}</span>{/if}
+							{#if savegame.Platform}<span>platform: {savegame.Platform}</span>{/if}
+							{#if savegame.Category}<span>category: {savegame.Category}</span>{/if}
+							{#if savegame.SID}<span>session: {savegame.SID}</span>{/if}
 							{#if savegame.PID}
-								<a class="user-id" href={`/user/${encodeURIComponent(savegame.PID)}`}>{savegame.PID}</a>
+								<a class="user-id" href={`/user/${encodeURIComponent(savegame.PID)}`}>user: {savegame.PID}</a>
 							{/if}
 							{#if savegame.Commit}
-								<span>{savegame.Commit}</span>
+								<span>commit: {savegame.Commit}</span>
 							{/if}
 							{#if savegame.Hash}
-								<span>{savegame.Hash}</span>
+								<span>hash: {savegame.Hash}</span>
 							{/if}
 						</div>
 					</div>

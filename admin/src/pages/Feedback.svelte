@@ -349,10 +349,6 @@
 		return formatDate(value);
 	}
 
-	function feedbackContext(comment) {
-		return [comment.Project, comment.Env, comment.Platform, comment.Category].filter(Boolean).join(' / ');
-	}
-
 	function matchesProject(item) {
 		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
 	}
@@ -413,14 +409,15 @@
 							</div>
 						</div>
 						<div class="meta-list">
-							{#if feedbackContext(comment)}
-								<span>{feedbackContext(comment)}</span>
-							{/if}
+							{#if comment.Project}<span>project: {comment.Project}</span>{/if}
+							{#if comment.Env}<span>env: {comment.Env}</span>{/if}
+							{#if comment.Platform}<span>platform: {comment.Platform}</span>{/if}
+							{#if comment.Category}<span>category: {comment.Category}</span>{/if}
 							{#if comment.PID}
-								<a class="user-id" href={`/user/${encodeURIComponent(comment.PID)}`}>{comment.PID}</a>
+								<a class="user-id" href={`/user/${encodeURIComponent(comment.PID)}`}>user: {comment.PID}</a>
 							{/if}
 							{#if comment.Commit}
-								<span>{comment.Commit}</span>
+								<span>commit: {comment.Commit}</span>
 							{/if}
 						</div>
 					</div>
