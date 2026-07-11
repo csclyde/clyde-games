@@ -1,0 +1,20 @@
+{
+  "name": "littleclyde",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^17.4.2"
+  },
+  "overrides": {
+    "@discordjs/rest": "2.1.0"
+  }
+}
