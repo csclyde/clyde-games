@@ -36,12 +36,30 @@
 	}
 
 	function makeTimeline(data) {
-		return [
+		const entries = [
 			...(data.Feedback || []).map(item => ({ kind: 'Feedback', item })),
 			...(data.Crashes || []).map(item => ({ kind: 'Crash', item })),
 			...(data.Savegames || []).map(item => ({ kind: 'Save game', item })),
 			...(data.Events || []).map(item => ({ kind: 'Event', item }))
 		].sort((a, b) => new Date(eventDate(a.item)) - new Date(eventDate(b.item)));
+
+		return entries.reduce((timeline, entry) => {
+			const previous = timeline[timeline.length - 1];
+			if (entry.kind === 'Event' && previous?.kind === 'Event' && previous.item.Type === entry.item.Type) {
+				previous.count += 1;
+				return timeline;
+			}
+
+			timeline.push({ ...entry, count: 1 });
+			return timeline;
+		}, []);
+	}
+
+	function historyItemCount(data) {
+		return (data.Feedback || []).length
+			+ (data.Crashes || []).length
+			+ (data.Savegames || []).length
+			+ (data.Events || []).length;
 	}
 
 	function downloadSavegame(item) {
@@ -55,6 +73,7 @@
 
 	$: if (userID && userID !== loadedUserID) loadUser(userID);
 	$: timeline = makeTimeline(history);
+	$: itemCount = historyItemCount(history);
 </script>
 
 <main>
@@ -62,7 +81,7 @@
 		<div>
 			<p class="eyebrow">User history</p>
 			<h2>{userID}</h2>
-			<p>{timeline.length} item{timeline.length === 1 ? '' : 's'} · oldest to newest</p>
+			<p>{itemCount} item{itemCount === 1 ? '' : 's'} · {timeline.length} shown · oldest to newest</p>
 		</div>
 	</header>
 
@@ -79,6 +98,7 @@
 					<div class="item-main">
 						<div class="item-heading">
 							<span class="kind">{entry.kind}</span>
+							{#if entry.count > 1}<span class="event-count" title={`${entry.count} consecutive events`}>×{entry.count}</span>{/if}
 							<time datetime={eventDate(entry.item)}>{formatDate(eventDate(entry.item))}</time>
 						</div>
 
@@ -130,6 +150,7 @@
 	.item-main { display: flex; flex: 1; flex-direction: column; gap: 9px; min-width: 0; }
 	.item-heading { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
 	.kind { color: var(--charcoal); font-size: .75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+	.event-count { background: var(--slate); border-radius: 999px; color: var(--surface); font-size: .68rem; font-weight: 800; line-height: 1; padding: 4px 7px; }
 	time { color: var(--text-soft); font-size: .75rem; }
 	.title { color: var(--charcoal); font-size: 1rem; line-height: 1.4; margin: 0; overflow-wrap: anywhere; text-align: left; white-space: pre-wrap; }
 	.detail { color: var(--text-muted); font-size: .85rem; line-height: 1.35; margin: 0; max-height: 8.1em; overflow: hidden; overflow-wrap: anywhere; text-align: left; white-space: pre-wrap; }
