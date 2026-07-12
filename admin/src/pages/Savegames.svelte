@@ -1,5 +1,5 @@
 <script>
-	export let selectedProject = 'Cursemark';
+	export let selectedProject = 'cursemark';
 	export let reportProjects = () => {};
 
 	async function parseResponse(res) {

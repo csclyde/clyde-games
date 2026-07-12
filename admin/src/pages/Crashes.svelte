@@ -1,7 +1,7 @@
 <script>
 	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
 
-	export let selectedProject = 'Cursemark';
+	export let selectedProject = 'cursemark';
 	export let reportProjects = () => {};
 
 	async function getCrashes() {

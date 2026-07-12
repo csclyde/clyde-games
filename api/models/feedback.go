@@ -36,6 +36,7 @@ func SelectAllFeedback() ([]Feedback, error) {
 }
 
 func AddFeedback(fb Feedback) (*Feedback, error) {
+	fb.Project = NormalizeProjectName(fb.Project)
 	result := AnalyticsDB.Create(&fb)
 
 	if result.Error != nil {

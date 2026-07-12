@@ -98,10 +98,11 @@
 </section>
 
 <style>
-	.server-health { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; margin: 12px auto 0; max-width: 1368px; padding: 14px; }
-	header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 12px; }
-	h2 { font-size: 1rem; margin: 0; }
-	header p, .stat p { color: var(--text-muted); font-size: .75rem; margin: 3px 0 0; }
+	.server-health { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin: 12px auto 0; max-width: 1368px; padding: 14px; }
+	header { align-items: flex-start; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; }
+	h2 { font-size: 1.5rem; line-height: 1.15; margin: 0; text-align: left; }
+	header p { color: var(--text-muted); font-size: .82rem; margin: 3px 0 0; text-align: left; }
+	.stat p { color: var(--text-muted); font-size: .75rem; margin: 3px 0 0; }
 	button { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 4px; color: var(--text); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 700; padding: 6px 9px; }
 	button:disabled { cursor: wait; opacity: .6; }
 	.stat-grid { display: grid; gap: 12px; grid-template-columns: repeat(6, 1fr); }

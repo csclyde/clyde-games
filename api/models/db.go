@@ -22,6 +22,9 @@ func MigrateAnalyticsDB() error {
 	if err := AnalyticsDB.AutoMigrate(&Crash{}, &Event{}, &EventItem{}, &EventSetting{}, &Feedback{}, &Savegame{}, &SyncState{}); err != nil {
 		return err
 	}
+	if err := NormalizeKnownProjects(); err != nil {
+		return err
+	}
 
 	return CreateSavegameRetentionEvent()
 }

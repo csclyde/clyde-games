@@ -147,7 +147,7 @@ func importRedditPostsSince(client http.Client, feedURL string, cutoff time.Time
 
 		feedback := models.Feedback{
 			PID:      strings.TrimPrefix(strings.TrimSpace(entry.Author.Name), "/u/"),
-			Project:  "Cursemark",
+			Project:  "cursemark",
 			Message:  redditFeedbackMessage(entry),
 			Rating:   3,
 			Env:      "production",

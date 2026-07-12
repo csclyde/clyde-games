@@ -142,7 +142,7 @@ func importSteamDiscussionTopic(client http.Client, topic steamDiscussionTopic, 
 
 			feedback := models.Feedback{
 				PID:      post.Author,
-				Project:  "Cursemark",
+				Project:  "cursemark",
 				Message:  steamDiscussionFeedbackMessage(topic, post),
 				Rating:   3,
 				Env:      "production",

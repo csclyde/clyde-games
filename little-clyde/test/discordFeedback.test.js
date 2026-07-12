@@ -29,13 +29,13 @@ test("builds feedback payload from a Discord message", () => {
   };
 
   const payload = buildFeedbackPayload(message, {
-    feedbackProject: "Cursemark",
+    feedbackProject: "cursemark",
     feedbackEnv: "production",
     feedbackCategory: "Discord",
   });
 
   assert.equal(payload.PID, "444");
-  assert.equal(payload.Project, "Cursemark");
+  assert.equal(payload.Project, "cursemark");
   assert.equal(payload.Rating, 0);
   assert.equal(payload.Env, "production");
   assert.equal(payload.Category, "Discord");

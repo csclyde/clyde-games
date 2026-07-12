@@ -179,6 +179,7 @@ func rejectBuildBeforeOldest(tx *gorm.DB, build string, subject string) error {
 // }
 
 func AddEvent(event Event) (*Event, error) {
+	event.Project = NormalizeProjectName(event.Project)
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
 		if err := rejectBuildBeforeOldest(tx, event.Build, "event"); err != nil {
 			return err

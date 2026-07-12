@@ -50,6 +50,7 @@ func SelectRecentAccessViolationCrashes() ([]Crash, error) {
 }
 
 func AddCrash(crash Crash) (*Crash, error) {
+	crash.Project = NormalizeProjectName(crash.Project)
 
 	var existingCrash Crash
 	result := AnalyticsDB.Where("hash = ?", crash.Hash).First(&existingCrash)

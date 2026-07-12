@@ -158,7 +158,7 @@ func ImportSteamReviewsSince(cutoff time.Time, now time.Time) (int, int, error) 
 
 			feedback := models.Feedback{
 				PID:      review.Author.SteamID,
-				Project:  "Cursemark",
+				Project:  "cursemark",
 				Message:  strings.TrimSpace(review.Review) + "\n" + reviewURL,
 				Rating:   steamReviewRating(review),
 				Env:      "production",

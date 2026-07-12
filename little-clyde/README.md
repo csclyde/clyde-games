@@ -16,7 +16,7 @@ Fill in `.env`:
 ```sh
 DISCORD_TOKEN=your-discord-bot-token
 FEEDBACK_API_URL=http://localhost:9990/feedback
-FEEDBACK_PROJECT=Cursemark
+FEEDBACK_PROJECT=cursemark
 FEEDBACK_ENV=production
 FEEDBACK_CATEGORY=Discord
 ```

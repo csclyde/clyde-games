@@ -55,6 +55,7 @@ func main() {
 	router.DELETE("/savegame", endpoints.DeleteSavegame)
 	router.DELETE("/savegame/build", endpoints.DeleteSavegamesByBuild)
 	router.GET("/user/:id", endpoints.GetUserHistory)
+	router.GET("/projects", endpoints.GetProjects)
 
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
 	router.POST("/words/unknown", endpoints.GetUnknownWords)

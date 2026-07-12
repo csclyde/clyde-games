@@ -5,11 +5,12 @@
 	import Metrics from './Metrics.svelte';
 	import ServerStats from '../components/ServerStats.svelte';
 	import User from './User.svelte';
+	import Projects from '../components/Projects.svelte';
 
 	export let tab = 'admin';
 	export let userID = '';
 
-	const defaultProject = 'Cursemark';
+	const defaultProject = 'cursemark';
 	const tabs = [
 		{ id: 'admin', label: 'Admin', href: '/admin', component: Metrics },
 		{ id: 'feedback', label: 'Feedback', href: '/feedback', component: Feedback },
@@ -37,8 +38,19 @@
 		projectSources = { ...projectSources, [source]: nextProjects };
 	}
 
+	function collectProjectOptions(sources) {
+		const projects = new Map();
+		for (const project of Object.values(sources).flat()) {
+			const normalized = normalizeProject(project);
+			if (!normalized) continue;
+			const key = normalized.toLowerCase();
+			if (!projects.has(key) || key === 'cursemark') projects.set(key, key === 'cursemark' ? 'cursemark' : normalized);
+		}
+		return [...projects.values()].sort((a, b) => a.localeCompare(b));
+	}
+
 	$: activeTab = tabs.find(item => item.id === tab) || { id: tab };
-	$: projectOptions = [...new Set(Object.values(projectSources).flat())].sort((a, b) => a.localeCompare(b));
+	$: projectOptions = collectProjectOptions(projectSources);
 	$: visibleProjectOptions = selectedProject && selectedProject !== 'all' && !projectOptions.includes(selectedProject)
 		? [selectedProject, ...projectOptions]
 		: projectOptions;
@@ -73,16 +85,19 @@
 
 	{#if activeTab.id === 'admin'}
 		<ServerStats />
+		<Projects {reportProjects} />
 	{/if}
 
 	{#if tab === 'user'}
 		<User {userID} />
 	{:else}
-		<svelte:component
-			this={activeTab.component || Metrics}
-			selectedProject={selectedProject}
-			reportProjects={reportProjects}
-		/>
+		{#key `${activeTab.id}:${selectedProject}`}
+			<svelte:component
+				this={activeTab.component || Metrics}
+				selectedProject={selectedProject}
+				reportProjects={reportProjects}
+			/>
+		{/key}
 	{/if}
 </div>
 

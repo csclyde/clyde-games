@@ -1,5 +1,5 @@
 <script>
-	export let selectedProject = 'Cursemark';
+	export let selectedProject = 'cursemark';
 	export let reportProjects = () => {};
 
 	async function parseResponse(res) {
@@ -354,53 +354,53 @@
 
 <style>
 	main {
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
 		color: var(--text);
-		max-width: 1400px;
-		margin: 0 auto;
-		padding: 12px 16px 32px;
+		max-width: 1368px;
+		margin: 12px auto 32px;
+		padding: 14px;
 	}
 
 	.page-header {
 		border-bottom: 1px solid var(--line);
-		margin-bottom: 14px;
-		padding-bottom: 12px;
+		margin-bottom: 12px;
+		padding-bottom: 10px;
 	}
 
 	.page-header h2 {
-		font-size: 2.5rem;
-		line-height: 1;
+		font-size: 1.5rem;
+		line-height: 1.15;
 		text-align: left;
 	}
 
 	.page-header p {
-		color: var(--olive);
-		font-size: 0.85rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		margin: 6px 0 0;
+		color: var(--text-muted);
+		font-size: .82rem;
+		font-weight: 400;
+		letter-spacing: 0;
+		margin: 3px 0 0;
 		text-align: left;
-		text-transform: uppercase;
 	}
 
 	.builds {
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-left: 4px solid var(--forest);
-		border-radius: var(--radius);
-		margin-top: 14px;
-		padding: 4px 16px;
+		background: var(--paper-warm);
+		border-left: 3px solid var(--forest);
+		border-radius: 3px;
+		margin-top: 12px;
+		padding: 4px 10px;
 	}
 
 	.settings {
 		align-items: center;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-left: 4px solid var(--forest);
-		border-radius: var(--radius);
+		background: var(--paper-warm);
+		border-left: 3px solid var(--forest);
+		border-radius: 3px;
 		display: flex;
 		justify-content: space-between;
 		gap: 20px;
-		padding: 14px 16px;
+		padding: 10px;
 	}
 
 	.settings label {
@@ -527,15 +527,15 @@
 
 	button {
 		background: var(--surface);
-		border: 1px solid var(--line-strong);
+		border: 1px solid var(--line);
 		border-radius: 4px;
 		color: var(--text);
 		cursor: pointer;
 		font: inherit;
-		font-size: 0.82rem;
+		font-size: .75rem;
 		font-weight: 700;
 		line-height: 1;
-		padding: 7px 10px;
+		padding: 6px 9px;
 	}
 
 	button:hover:not(:disabled) {
@@ -568,11 +568,8 @@
 
 	@media (max-width: 520px) {
 		main {
-			padding: 8px;
-		}
-
-		.page-header h2 {
-			font-size: 2rem;
+			margin: 10px 8px 24px;
+			padding: 14px;
 		}
 
 		.settings {

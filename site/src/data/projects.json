@@ -1,7 +1,7 @@
 [
     {
-        "name": "Cursemark",
-        "href": "https://store.steampowered.com/app/3219180/Cursemark/",
+        "name": "cursemark",
+        "href": "https://store.steampowered.com/app/3219180/cursemark/",
         "img": "/img/cursemark.png",
         "desc": "An Action-Exploration roguelike about exploring a cursed land.",
         "tools": "Haxe, Heaps.io"

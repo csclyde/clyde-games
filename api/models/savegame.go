@@ -28,6 +28,7 @@ type SavegameBuild struct {
 }
 
 func AddSavegame(savegame Savegame) (*Savegame, error) {
+	savegame.Project = NormalizeProjectName(savegame.Project)
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
 		if err := rejectBuildBeforeOldest(tx, savegame.Build, "savegame"); err != nil {
 			return err
