@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net/http"
+	"strconv"
+	"time"
 
 	"api.clyde.games/models"
 	"github.com/gin-gonic/gin"
@@ -30,7 +32,11 @@ func GetCrash(c *gin.Context) {
 }
 
 func GetAccessViolationCrashes(c *gin.Context) {
-	crashes, err := models.SelectRecentAccessViolationCrashes()
+	days := 30
+	if requestedDays, err := strconv.Atoi(c.DefaultQuery("days", "30")); err == nil && requestedDays > 0 && requestedDays <= 365 {
+		days = requestedDays
+	}
+	crashes, err := models.SelectAccessViolationCrashesSince(time.Now().AddDate(0, 0, -days))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

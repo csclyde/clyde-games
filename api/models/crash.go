@@ -33,13 +33,12 @@ func SelectAllCrash() ([]Crash, error) {
 	return allCrash, nil
 }
 
-func SelectRecentAccessViolationCrashes() ([]Crash, error) {
+func SelectAccessViolationCrashesSince(since time.Time) ([]Crash, error) {
 	var crashes []Crash
-	oneMonthAgo := time.Now().AddDate(0, -1, 0)
 	result := AnalyticsDB.
 		Where("message LIKE ?", "%Access Violation%").
-		Where("updated_at >= ?", oneMonthAgo).
-		Order("updated_at desc").
+		Where("created_at >= ?", since).
+		Order("created_at desc").
 		Find(&crashes)
 
 	if result.Error != nil {

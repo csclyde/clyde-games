@@ -20,7 +20,7 @@
 	}
 
 	async function getAccessViolations() {
-		const res = await fetch(`https://api.clyde.games/crash/accessviolations`);
+		const res = await fetch(`https://api.clyde.games/crash/accessviolations?days=${accessRangeDays}`);
 		const crashes = await res.json();
 
 		if (res.ok) {
@@ -36,6 +36,7 @@
 	let loadingAccessViolations = true;
 	let crashError = '';
 	let accessViolationError = '';
+	let accessRangeDays = 30;
 	let resolvingCrashes = {};
 	let resolvingAllCrashes = false;
 	let helperStatus = {};
@@ -148,14 +149,49 @@
 	}
 
 	function getRecentAccessViolations(crashes) {
-		const oneMonthAgo = new Date();
-		oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+		const cutoff = new Date();
+		cutoff.setDate(cutoff.getDate() - accessRangeDays);
 
 		return crashes.filter(crash => {
-			const lastSeen = new Date(crash.UpdatedAt);
+			const firstSeen = new Date(crash.CreatedAt);
 
-			return !isNaN(lastSeen.getTime()) && lastSeen >= oneMonthAgo;
+			return !isNaN(firstSeen.getTime()) && firstSeen >= cutoff;
 		});
+	}
+
+	function accessRangeLabel() {
+		return accessRangeDays === 30 ? 'last month' : `last ${accessRangeDays} days`;
+	}
+
+	function getAccessViolationTimeline(crashes) {
+		const bucketDays = accessRangeDays <= 31 ? 1 : 7;
+		const bucketCount = Math.ceil(accessRangeDays / bucketDays);
+		const now = new Date();
+		const start = new Date(now);
+		start.setHours(0, 0, 0, 0);
+		start.setDate(start.getDate() - (bucketCount * bucketDays) + 1);
+		const buckets = Array.from({ length: bucketCount }, (_, index) => {
+			const date = new Date(start);
+			date.setDate(date.getDate() + index * bucketDays);
+			return { date, count: 0 };
+		});
+
+		for (const crash of getRecentAccessViolations(crashes)) {
+			const firstSeen = new Date(crash.CreatedAt);
+			const index = Math.floor((firstSeen - start) / (bucketDays * 86400000));
+			if (index >= 0 && index < buckets.length) buckets[index].count += 1;
+		}
+
+		const max = Math.max(1, ...buckets.map(bucket => bucket.count));
+		return buckets.map(bucket => ({
+			...bucket,
+			height: bucket.count / max * 100,
+			label: bucket.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+		}));
+	}
+
+	async function changeAccessRange() {
+		await loadAccessViolations();
 	}
 
 	function getRegularCrashes(crashes) {
@@ -300,6 +336,7 @@
 
 	$: visibleCrashes = crashes.filter(matchesProject);
 	$: visibleAccessViolations = accessViolations.filter(matchesProject);
+	$: accessViolationTimeline = getAccessViolationTimeline(visibleAccessViolations);
 	$: visibleRegularCrashes = getRegularCrashes(visibleCrashes);
 	$: reportProjects('crashes', [
 		...crashes.map(crash => crash.Project),
@@ -319,23 +356,47 @@
 	</header>
 
 	<section class="access-violations">
+		<div class="section-header">
+			<div>
+				<h3>Access Violations</h3>
+				{#if loadingAccessViolations}
+					<p>loading...</p>
+				{:else if accessViolationError}
+					<p>error</p>
+				{:else}
+					<p>{getAccessViolationTotal(visibleAccessViolations)} incident{getAccessViolationTotal(visibleAccessViolations) === 1 ? '' : 's'} / {getAccessViolationPlayerTotal(visibleAccessViolations)} player{getAccessViolationPlayerTotal(visibleAccessViolations) === 1 ? '' : 's'} {accessRangeLabel()}</p>
+				{/if}
+			</div>
+			<label class="range-control">
+				<span>Show</span>
+				<select bind:value={accessRangeDays} on:change={changeAccessRange} disabled={loadingAccessViolations}>
+					<option value={7}>Last 7 days</option>
+					<option value={30}>Last month</option>
+					<option value={90}>Last 3 months</option>
+					<option value={180}>Last 6 months</option>
+					<option value={365}>Last year</option>
+				</select>
+			</label>
+		</div>
 		{#if loadingAccessViolations}
-			<div class="section-header">
-				<h3>Access Violations</h3>
-				<p>loading...</p>
-			</div>
+			<p class="empty-state">Loading access violations…</p>
 		{:else if accessViolationError}
-			<div class="section-header">
-				<h3>Access Violations</h3>
-				<p>error</p>
-			</div>
 			<p class="empty-state">{accessViolationError}</p>
 		{:else}
-			<div class="section-header">
-				<h3>Access Violations</h3>
-				<p>{getAccessViolationTotal(visibleAccessViolations)} incident{getAccessViolationTotal(visibleAccessViolations) === 1 ? '' : 's'} / {getAccessViolationPlayerTotal(visibleAccessViolations)} player{getAccessViolationPlayerTotal(visibleAccessViolations) === 1 ? '' : 's'} last month</p>
-			</div>
 			{#if getAccessViolationTotal(visibleAccessViolations) > 0}
+				<div class="incident-chart" aria-label={`Access violation incidents ${accessRangeLabel()}`}>
+					<div class="chart-bars">
+						{#each accessViolationTimeline as bucket, index}
+							<div class="chart-column" title={`${bucket.label}: ${bucket.count} incident${bucket.count === 1 ? '' : 's'}`}>
+								<span class="chart-value">{bucket.count || ''}</span>
+								<div class="chart-bar" style={`height: ${bucket.height}%`}></div>
+								{#if index === 0 || index === accessViolationTimeline.length - 1 || index % Math.ceil(accessViolationTimeline.length / 5) === 0}
+									<span class="chart-label">{bucket.label}</span>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
 				<div class="access-list">
 					{#each getAccessViolationSummary(visibleAccessViolations) as group}
 						<div class="access-row">
@@ -345,7 +406,7 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="empty-state">No Access Violations in the last month.</p>
+				<p class="empty-state">No Access Violations {accessRangeLabel()}.</p>
 			{/if}
 		{/if}
 	</section>
@@ -662,8 +723,12 @@
 	}
 
 	.section-header {
-		display: flex;
 		align-items: center;
+		border-bottom: 1px solid var(--line);
+		display: flex;
+		gap: 16px;
+		justify-content: space-between;
+		padding-bottom: 10px;
 	}
 
 	.section-header h3 {
@@ -674,12 +739,82 @@
 
 	.section-header p {
 		color: var(--olive);
-		font-size: 0.85rem;
-		letter-spacing: 0.02em;
-		margin: 0 0 0 auto;
+		font-size: 0.8rem;
+		font-weight: 700;
+		margin: 3px 0 0;
+		text-align: left;
+	}
+
+	.range-control {
+		align-items: center;
+		display: flex;
+		gap: 8px;
+	}
+
+	.range-control span {
+		color: var(--text-soft);
+		font-size: .7rem;
 		font-weight: 800;
-		text-align: right;
+		letter-spacing: .05em;
 		text-transform: uppercase;
+	}
+
+	.range-control select {
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
+		border-radius: 4px;
+		color: var(--text);
+		font: inherit;
+		font-size: .82rem;
+		font-weight: 700;
+		padding: 6px 9px;
+	}
+
+	.incident-chart {
+		border-bottom: 1px solid var(--line);
+		padding: 14px 0 10px;
+	}
+
+	.chart-bars {
+		align-items: flex-end;
+		display: flex;
+		gap: 3px;
+		height: 150px;
+		margin-bottom: 18px;
+	}
+
+	.chart-column {
+		align-items: center;
+		display: flex;
+		flex: 1 1 0;
+		flex-direction: column;
+		height: 100%;
+		justify-content: flex-end;
+		min-width: 2px;
+		position: relative;
+	}
+
+	.chart-bar {
+		background: var(--safety);
+		border-radius: 2px 2px 0 0;
+		max-width: 28px;
+		width: 72%;
+	}
+
+	.chart-value {
+		color: var(--text-muted);
+		font-size: .65rem;
+		font-weight: 800;
+		line-height: 1;
+		margin-bottom: 3px;
+	}
+
+	.chart-label {
+		bottom: -18px;
+		color: var(--text-soft);
+		font-size: .62rem;
+		position: absolute;
+		white-space: nowrap;
 	}
 
 	.access-list {
@@ -742,6 +877,16 @@
 
 		.page-header h2 {
 			font-size: 2rem;
+		}
+
+		.section-header {
+			align-items: stretch;
+			flex-direction: column;
+			gap: 8px;
+		}
+
+		.range-control {
+			justify-content: space-between;
 		}
 
 		.comment-list {

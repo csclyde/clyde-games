@@ -80,7 +80,7 @@ func RenameProject(oldName, newName string) error {
 		for _, model := range []interface{}{&Crash{}, &Feedback{}, &Savegame{}, &Event{}} {
 			if err := tx.Unscoped().Model(model).
 				Where("LOWER(TRIM(project)) = ?", strings.ToLower(oldName)).
-				Update("project", newName).Error; err != nil {
+				UpdateColumn("project", newName).Error; err != nil {
 				return err
 			}
 		}
