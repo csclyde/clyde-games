@@ -14,15 +14,30 @@ var ErrBuildTooOld = errors.New("build is older than the oldest accepted build")
 
 type Event struct {
 	gorm.Model
-	PID       string      `gorm:"type:varchar(32)"`
-	SID       string      `gorm:"type:varchar(32)"`
-	Env       string      `gorm:"type:varchar(32)"`
-	Build     string      `gorm:"type:varchar(32)"`
-	Project   string      `gorm:"type:varchar(32)"`
-	Type      string      `gorm:"not null;type:varchar(32)"`
-	Level     string      `gorm:"type:varchar(32)"`
-	Cursemark int         `gorm:"type:tinyint"`
-	Items     []EventItem `gorm:"foreignKey:EventID"`
+	PID       string         `gorm:"type:varchar(32)"`
+	SID       string         `gorm:"type:varchar(32)"`
+	Env       string         `gorm:"type:varchar(32)"`
+	Build     string         `gorm:"type:varchar(32)"`
+	Project   string         `gorm:"type:varchar(32)"`
+	Type      string         `gorm:"not null;type:varchar(32)"`
+	Level     string         `gorm:"type:varchar(32)"`
+	Cursemark int            `gorm:"type:tinyint"`
+	Resources EventResources `gorm:"embedded;embeddedPrefix:resource_"`
+	Actions   EventActions   `gorm:"embedded;embeddedPrefix:action_"`
+	Items     []EventItem    `gorm:"foreignKey:EventID"`
+}
+
+type EventResources struct {
+	Essence int `gorm:"type:int"`
+	Tears   int `gorm:"type:int"`
+}
+
+type EventActions struct {
+	Attack int `gorm:"type:int"`
+	Spell  int `gorm:"type:int"`
+	Ward   int `gorm:"type:int"`
+	Ult    int `gorm:"type:int"`
+	Botyl  int `gorm:"type:int"`
 }
 
 type EventItem struct {
