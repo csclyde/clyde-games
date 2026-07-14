@@ -52,6 +52,10 @@ func AddSavegame(c *gin.Context) {
 
 	createdSavegame, err := models.AddSavegame(savegame)
 	if err != nil {
+		if errors.Is(err, models.ErrUserBlocked) {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

@@ -3,8 +3,9 @@
 
 	let loadedUserID = '';
 	let loading = false;
+	let blocking = false;
 	let error = '';
-	let history = { Feedback: [], Crashes: [], Savegames: [], Events: [] };
+	let history = { Blocked: false, Feedback: [], Crashes: [], Savegames: [], Events: [] };
 
 	async function loadUser(id) {
 		loadedUserID = id;
@@ -20,6 +21,22 @@
 			if (loadedUserID === id) error = loadError.message;
 		} finally {
 			if (loadedUserID === id) loading = false;
+		}
+	}
+
+	async function blockUser() {
+		if (!confirm(`Block ${userID}? Their metrics events and save games will be permanently deleted.`)) return;
+		blocking = true;
+		error = '';
+		try {
+			const response = await fetch(`https://api.clyde.games/user/${encodeURIComponent(userID)}/block`, { method: 'POST' });
+			const result = await response.json();
+			if (!response.ok) throw new Error(result.error || result);
+			history = { ...history, Blocked: true, Savegames: [], Events: [] };
+		} catch (blockError) {
+			error = blockError.message;
+		} finally {
+			blocking = false;
 		}
 	}
 
@@ -83,6 +100,11 @@
 			<h2>{userID}</h2>
 			<p>{itemCount} item{itemCount === 1 ? '' : 's'} · {timeline.length} shown · oldest to newest</p>
 		</div>
+		{#if history.Blocked}
+			<span class="blocked-badge">Blocked</span>
+		{:else}
+			<button class="danger" type="button" disabled={loading || blocking} on:click={blockUser}>{blocking ? 'Blocking…' : 'Block User'}</button>
+		{/if}
 	</header>
 
 	{#if loading}
@@ -138,7 +160,7 @@
 
 <style>
 	main { color: var(--text); max-width: 1400px; margin: 0 auto; padding: 12px 16px 32px; }
-	.page-header { border-bottom: 1px solid var(--line); margin-bottom: 14px; padding-bottom: 12px; }
+	.page-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; gap: 16px; justify-content: space-between; margin-bottom: 14px; padding-bottom: 12px; }
 	.page-header h2 { font-size: 2.5rem; line-height: 1.05; overflow-wrap: anywhere; text-align: left; }
 	.page-header p { color: var(--olive); font-size: .85rem; font-weight: 600; letter-spacing: .02em; margin: 6px 0 0; text-align: left; text-transform: uppercase; }
 	.page-header .eyebrow { color: var(--text-soft); font-size: .68rem; font-weight: 800; margin: 0 0 5px; }
@@ -158,6 +180,10 @@
 	.meta-list span { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 4px; color: var(--text-muted); font-size: .68rem; line-height: 1.25; max-width: 100%; overflow-wrap: anywhere; padding: 3px 6px; text-align: left; }
 	button { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); cursor: pointer; font: inherit; font-size: .82rem; font-weight: 700; line-height: 1; padding: 7px 10px; }
 	button:hover { background: var(--paper-warm); border-color: var(--charcoal); }
+	button:disabled { cursor: wait; opacity: .6; }
+	button.danger { border-color: var(--rust); color: var(--rust); }
+	button.danger:hover { background: var(--rust); color: var(--surface); }
+	.blocked-badge { background: var(--rust); border-radius: 4px; color: var(--surface); font-size: .75rem; font-weight: 800; padding: 7px 10px; text-transform: uppercase; }
 	.state-message { color: var(--text-soft); margin: 32px 0; text-align: left; }
 	.error { color: var(--rust); }
 	@media (max-width: 820px) {

@@ -28,6 +28,7 @@
 	let syncingSources = false;
 	let sourceSyncStatus = '';
 	let sourceSyncError = '';
+	let searchText = '';
 
 	async function loadFeedback() {
 		loadingFeedback = true;
@@ -51,6 +52,10 @@
 		} catch (error) {
 			feedbackError = error.message;
 		}
+	}
+
+	function clearSearch() {
+		searchText = '';
 	}
 
 	async function syncSource(name, endpoint) {
@@ -353,7 +358,11 @@
 		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
 	}
 
-	$: visibleFeedback = feedback.filter(matchesProject);
+	$: projectFeedback = feedback.filter(matchesProject);
+	$: normalizedSearch = searchText.trim().toLowerCase();
+	$: visibleFeedback = normalizedSearch
+		? projectFeedback.filter(comment => (comment.Message || '').toLowerCase().includes(normalizedSearch)).slice(0, 100)
+		: projectFeedback;
 	$: reportProjects('feedback', feedback.map(comment => comment.Project));
 </script>
 
@@ -376,12 +385,21 @@
 		</div>
 	</header>
 
+	<div class="search">
+		<label for="feedback-search">Search message text</label>
+		<div class="search-controls">
+			<input id="feedback-search" type="search" bind:value={searchText} placeholder="Search player feedback…" autocomplete="off" />
+			{#if searchText}<button class="clear-search" type="button" on:click={clearSearch}>Clear</button>{/if}
+		</div>
+		{#if normalizedSearch}<small>Showing up to 100 matching visible items.</small>{/if}
+	</div>
+
 	{#if loadingFeedback}
 		<p class="state-message">loading...</p>
 	{:else if feedbackError}
 		<p class="state-message error">{feedbackError}</p>
 	{:else if visibleFeedback.length === 0}
-		<p class="state-message">No open feedback.</p>
+		<p class="state-message">{normalizedSearch ? 'No matching feedback.' : 'No open feedback.'}</p>
 	{:else}
 		<div class="comment-list">
 		{#each visibleFeedback as comment}
@@ -503,6 +521,14 @@
 		max-width: 260px;
 		text-align: right;
 	}
+
+	.search { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 14px; padding: 12px; }
+	.search label { color: var(--text-soft); display: block; font-size: .68rem; font-weight: 800; letter-spacing: .06em; margin-bottom: 6px; text-transform: uppercase; }
+	.search-controls { display: flex; gap: 6px; }
+	.search input { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); flex: 1; font: inherit; min-width: 0; padding: 7px 10px; }
+	.search input:focus { border-color: var(--charcoal); outline: 2px solid transparent; }
+	.search small { color: var(--text-muted); display: block; margin-top: 7px; }
+	.clear-search { color: var(--rust); }
 
 	.comment-list {
 		display: flex;
@@ -728,6 +754,9 @@
 		.header-actions small {
 			text-align: left;
 		}
+
+		.search-controls { flex-wrap: wrap; }
+		.search input { flex-basis: 100%; }
 
 		.comment-list {
 			gap: 12px;

@@ -12,6 +12,7 @@
 	router('/crashes', () => tab = 'crashes');
 	router('/savegames', () => tab = 'savegames');
 	router('/save-games', () => router.redirect('/savegames'));
+	router('/users', () => router.redirect('/admin'));
 	router('/user/:id', context => {
 		userID = context.params.id;
 		tab = 'user';

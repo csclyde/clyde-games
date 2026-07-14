@@ -5,6 +5,7 @@
 	import Metrics from './Metrics.svelte';
 	import ServerStats from '../components/ServerStats.svelte';
 	import User from './User.svelte';
+	import Users from './Users.svelte';
 	import Projects from '../components/Projects.svelte';
 
 	export let tab = 'admin';
@@ -98,6 +99,10 @@
 				reportProjects={reportProjects}
 			/>
 		{/key}
+	{/if}
+
+	{#if activeTab.id === 'admin'}
+		<Users />
 	{/if}
 </div>
 
