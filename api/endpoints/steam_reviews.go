@@ -37,15 +37,29 @@ type steamReviewAuthor struct {
 
 func StartSteamReviewImporter() {
 	go func() {
-		importAllSteamReviewsFromCheckpoints()
+		location, err := time.LoadLocation("America/Los_Angeles")
+		if err != nil {
+			log.Printf("steam importer could not load Pacific timezone: %v", err)
+			return
+		}
 
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
-
-		for range ticker.C {
+		for {
+			nextRun := nextSteamImportTime(time.Now(), location)
+			log.Printf("next automatic steam import scheduled for %s", nextRun.Format(time.RFC3339))
+			timer := time.NewTimer(time.Until(nextRun))
+			<-timer.C
 			importAllSteamReviewsFromCheckpoints()
 		}
 	}()
+}
+
+func nextSteamImportTime(now time.Time, location *time.Location) time.Time {
+	localNow := now.In(location)
+	next := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 6, 0, 0, 0, location)
+	if !next.After(localNow) {
+		next = time.Date(localNow.Year(), localNow.Month(), localNow.Day()+1, 6, 0, 0, 0, location)
+	}
+	return next
 }
 
 func ImportSteamReviewsNow(c *gin.Context) {

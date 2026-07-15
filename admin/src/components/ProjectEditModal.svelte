@@ -9,16 +9,30 @@
 	let subredditUrl = '';
 	let saving = false;
 	let error = '';
+	let loadedProjectId = null;
 
-	$: if (project) {
+	$: if (!project) {
+		loadedProjectId = null;
+	} else if (loadedProjectId !== project.id) {
 		name = project.name;
 		steamAppId = project.steamAppId || '';
 		subredditUrl = project.subredditUrl || '';
 		error = '';
+		loadedProjectId = project.id;
 	}
 
 	function close() {
-		if (!saving) dispatch('close');
+		if (saving) return;
+		discardDraft();
+		dispatch('close');
+	}
+
+	function discardDraft() {
+		name = '';
+		steamAppId = '';
+		subredditUrl = '';
+		error = '';
+		loadedProjectId = null;
 	}
 
 	async function save() {
@@ -43,6 +57,7 @@
 			const body = await response.json();
 			if (!response.ok) throw new Error(body.error || 'Unable to update project');
 			dispatch('saved', body);
+			discardDraft();
 			dispatch('close');
 		} catch (saveError) {
 			error = saveError.message || 'Unable to update project';
@@ -68,7 +83,7 @@
 			{#if error}<p class="modal-error">{error}</p>{/if}
 			<div class="modal-actions">
 				<button type="button" on:click={close} disabled={saving}>Cancel</button>
-				<button type="submit" class="primary" disabled={saving || !name.trim()}>{saving ? 'Saving…' : 'Save'}</button>
+				<button type="submit" class="primary" disabled={saving || !name.trim()}>{saving ? 'Saving…' : 'Confirm changes'}</button>
 			</div>
 		</form>
 	</div>
