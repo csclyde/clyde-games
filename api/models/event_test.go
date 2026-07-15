@@ -96,3 +96,25 @@ func TestBuildIsBeforeRejectsInvalidDate(t *testing.T) {
 		t.Fatal("expected an invalid event build to return an error")
 	}
 }
+
+func TestEventExceedsResourceLimits(t *testing.T) {
+	tests := []struct {
+		name      string
+		resources EventResources
+		want      bool
+	}{
+		{"below limits", EventResources{Essence: 99999, Tears: 9999}, false},
+		{"at limits", EventResources{Essence: 100000, Tears: 10000}, false},
+		{"excessive essence", EventResources{Essence: 100001}, true},
+		{"excessive tears", EventResources{Tears: 10001}, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := eventExceedsResourceLimits(Event{Resources: test.resources})
+			if got != test.want {
+				t.Fatalf("eventExceedsResourceLimits() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}

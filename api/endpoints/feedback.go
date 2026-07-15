@@ -48,7 +48,15 @@ func AddFeedback(c *gin.Context) {
 }
 
 func ResolveFeedback(c *gin.Context) {
+	feedback, err := models.ResolveFeedback(c.Query("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if feedback == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Feedback not found"})
+		return
+	}
 
-	models.ResolveFeedback(c.Query("id"))
-
+	c.IndentedJSON(http.StatusOK, feedback)
 }

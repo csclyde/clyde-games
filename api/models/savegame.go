@@ -48,7 +48,11 @@ func AddSavegame(savegame Savegame) (*Savegame, error) {
 
 func SelectAllSavegames() ([]Savegame, error) {
 	var savegames []Savegame
-	result := AnalyticsDB.Omit("Data").Order("created_at desc").Find(&savegames)
+	result := AnalyticsDB.
+		Omit("Data").
+		Where("feedback_id = ?", 0).
+		Order("created_at desc").
+		Find(&savegames)
 	if result.Error != nil {
 		return nil, result.Error
 	}

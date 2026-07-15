@@ -10,6 +10,11 @@ import (
 
 const oldestBuildSetting = "oldest_build"
 
+const (
+	maxEventEssence = 100000
+	maxEventTears   = 10000
+)
+
 var ErrBuildTooOld = errors.New("build is older than the oldest accepted build")
 
 type Event struct {
@@ -195,6 +200,13 @@ func rejectBuildBeforeOldest(tx *gorm.DB, build string, subject string) error {
 
 func AddEvent(event Event) (*Event, error) {
 	event.Project = NormalizeProjectName(event.Project)
+	if eventExceedsResourceLimits(event) {
+		if err := BlockUser(event.PID); err != nil {
+			return nil, fmt.Errorf("block user with excessive event resources: %w", err)
+		}
+		return nil, fmt.Errorf("%w: event resource limit exceeded", ErrUserBlocked)
+	}
+
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
 		if err := rejectBlockedUser(tx, event.PID); err != nil {
 			return err
@@ -227,6 +239,10 @@ func AddEvent(event Event) (*Event, error) {
 	}
 
 	return &event, nil
+}
+
+func eventExceedsResourceLimits(event Event) bool {
+	return event.Resources.Essence > maxEventEssence || event.Resources.Tears > maxEventTears
 }
 
 func DeleteEventsByBuild(build string, project string) (int64, error) {

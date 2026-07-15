@@ -69,17 +69,27 @@ func SelectFeedback(id string) (*Feedback, error) {
 
 func ResolveFeedback(id string) (*Feedback, error) {
 	var existingFeedback Feedback
-	result := AnalyticsDB.Where("id = ?", id).First(&existingFeedback)
+	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Where("id = ?", id).First(&existingFeedback)
+		if result.Error != nil {
+			if result.Error == gorm.ErrRecordNotFound {
+				return nil
+			}
+			return result.Error
+		}
 
-	if result.RowsAffected > 0 {
 		existingFeedback.Resolved = true
-		result = AnalyticsDB.Save(&existingFeedback)
-	} else {
-		return nil, nil
-	}
+		if err := tx.Save(&existingFeedback).Error; err != nil {
+			return err
+		}
 
-	if result.Error != nil {
-		return nil, result.Error
+		return tx.Where("feedback_id = ?", existingFeedback.ID).Delete(&Savegame{}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	if existingFeedback.ID == 0 {
+		return nil, nil
 	}
 
 	return &existingFeedback, nil
