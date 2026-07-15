@@ -208,6 +208,9 @@ func AddEvent(event Event) (*Event, error) {
 	}
 
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		if err := ensureProject(tx, event.Project); err != nil {
+			return err
+		}
 		if err := rejectBlockedUser(tx, event.PID); err != nil {
 			return err
 		}

@@ -32,6 +32,7 @@ func main() {
 	router.Use(CORSMiddleware())
 	router.GET("/feedback", endpoints.GetFeedback)
 	router.POST("/feedback", endpoints.AddFeedback)
+	router.PUT("/feedback/translation", endpoints.UpdateFeedbackTranslation)
 	router.GET("/resolvefeedback", endpoints.ResolveFeedback)
 	router.GET("/planka/hierarchy", endpoints.GetPlankaHierarchy)
 	router.POST("/planka/tickets", endpoints.CreatePlankaTicket)
@@ -59,6 +60,7 @@ func main() {
 	router.GET("/users/blocked", endpoints.GetBlockedUsers)
 	router.DELETE("/users/blocked/:id", endpoints.UnblockUser)
 	router.GET("/projects", endpoints.GetProjects)
+	router.PUT("/projects/:id", endpoints.UpdateProject)
 
 	router.POST("/words/analyze", endpoints.AnalyzeWords)
 	router.POST("/words/unknown", endpoints.GetUnknownWords)

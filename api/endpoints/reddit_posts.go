@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	redditSyncName         = "reddit_cursemark"
-	redditFeedURL          = "https://www.reddit.com/r/cursemark/new.rss"
 	redditDefaultUserAgent = "server:clyde-games-feedback:v1.0 (contact: https://clyde.games)"
 	redditFeedCacheTTL     = 2 * time.Minute
 )
@@ -54,22 +52,35 @@ type redditFeedLink struct {
 
 func StartRedditPostImporter() {
 	go func() {
-		importRedditPostsFromCheckpoint()
+		importAllRedditPostsFromCheckpoints()
 
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			importRedditPostsFromCheckpoint()
+			importAllRedditPostsFromCheckpoints()
 		}
 	}()
 }
 
 func ImportRedditPostsNow(c *gin.Context) {
-	imported, skipped, from, to, err := ImportRedditPostsFromCheckpoint()
+	projects, err := redditProjectsForRequest(c.Query("project"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	imported, skipped := 0, 0
+	var from, to time.Time
+	for _, project := range projects {
+		projectImported, projectSkipped, projectFrom, projectTo, syncErr := ImportRedditPostsFromCheckpoint(project)
+		if syncErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": syncErr.Error()})
+			return
+		}
+		imported += projectImported
+		skipped += projectSkipped
+		from = projectFrom
+		to = projectTo
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -80,21 +91,28 @@ func ImportRedditPostsNow(c *gin.Context) {
 	})
 }
 
-func importRedditPostsFromCheckpoint() {
-	imported, skipped, from, to, err := ImportRedditPostsFromCheckpoint()
+func importAllRedditPostsFromCheckpoints() {
+	projects, err := models.SelectProjectsWithSubreddit()
 	if err != nil {
-		log.Printf("reddit post import failed: %v", err)
+		log.Printf("reddit project lookup failed: %v", err)
 		return
 	}
-
-	log.Printf("reddit post import complete: from=%s to=%s imported=%d skipped=%d", from.Format(time.RFC3339), to.Format(time.RFC3339), imported, skipped)
+	for _, project := range projects {
+		imported, skipped, from, to, syncErr := ImportRedditPostsFromCheckpoint(project)
+		if syncErr != nil {
+			log.Printf("reddit import failed for %s: %v", project.ID, syncErr)
+			continue
+		}
+		log.Printf("reddit import complete for %s: from=%s to=%s imported=%d skipped=%d", project.ID, from.Format(time.RFC3339), to.Format(time.RFC3339), imported, skipped)
+	}
 }
 
-func ImportRedditPostsFromCheckpoint() (int, int, time.Time, time.Time, error) {
+func ImportRedditPostsFromCheckpoint(project models.Project) (int, int, time.Time, time.Time, error) {
 	redditPostImportLock.Lock()
 	defer redditPostImportLock.Unlock()
 
-	state, err := models.GetSyncState(redditSyncName)
+	syncName := "reddit_" + project.ID
+	state, err := models.GetSyncState(syncName)
 	if err != nil {
 		return 0, 0, time.Time{}, time.Time{}, err
 	}
@@ -105,19 +123,19 @@ func ImportRedditPostsFromCheckpoint() (int, int, time.Time, time.Time, error) {
 		from = state.LastSuccessAt
 	}
 
-	imported, skipped, err := importRedditPostsSince(http.Client{Timeout: 12 * time.Second}, redditFeedURL, from, to)
+	imported, skipped, err := importRedditPostsSince(http.Client{Timeout: 12 * time.Second}, redditFeedURL(project.SubredditURL), project.ID, from, to)
 	if err != nil {
 		return imported, skipped, from, to, err
 	}
 
-	if _, err := models.SaveSyncSuccess(redditSyncName, to); err != nil {
+	if _, err := models.SaveSyncSuccess(syncName, to); err != nil {
 		return imported, skipped, from, to, err
 	}
 
 	return imported, skipped, from, to, nil
 }
 
-func importRedditPostsSince(client http.Client, feedURL string, cutoff time.Time, now time.Time) (int, int, error) {
+func importRedditPostsSince(client http.Client, feedURL string, projectID string, cutoff time.Time, now time.Time) (int, int, error) {
 	feed, err := fetchRedditFeed(client, feedURL)
 	if err != nil {
 		return 0, 0, err
@@ -147,7 +165,7 @@ func importRedditPostsSince(client http.Client, feedURL string, cutoff time.Time
 
 		feedback := models.Feedback{
 			PID:      strings.TrimPrefix(strings.TrimSpace(entry.Author.Name), "/u/"),
-			Project:  "cursemark",
+			Project:  projectID,
 			Message:  redditFeedbackMessage(entry),
 			Rating:   3,
 			Env:      "production",
@@ -163,6 +181,34 @@ func importRedditPostsSince(client http.Client, feedURL string, cutoff time.Time
 	}
 
 	return imported, skipped, nil
+}
+
+func redditFeedURL(subredditURL string) string {
+	value := strings.TrimRight(strings.TrimSpace(subredditURL), "/")
+	if strings.HasSuffix(value, ".rss") {
+		return value
+	}
+	if strings.HasSuffix(value, "/new") {
+		return value + ".rss"
+	}
+	return value + "/new.rss"
+}
+
+func redditProjectsForRequest(id string) ([]models.Project, error) {
+	if strings.TrimSpace(id) == "" || id == "all" {
+		return models.SelectProjectsWithSubreddit()
+	}
+	project, err := models.SelectProject(id)
+	if err != nil {
+		return nil, err
+	}
+	if project == nil {
+		return nil, fmt.Errorf("project %q was not found", id)
+	}
+	if project.SubredditURL == "" {
+		return nil, fmt.Errorf("project %q has no subreddit URL", id)
+	}
+	return []models.Project{*project}, nil
 }
 
 func fetchRedditFeed(client http.Client, feedURL string) (redditFeed, error) {

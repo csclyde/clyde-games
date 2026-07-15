@@ -15,12 +15,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	cursemarkSteamAppID = "3219180"
-	steamReviewBaseURL  = "https://store.steampowered.com/appreviews/" + cursemarkSteamAppID
-	steamSyncName       = "steam_cursemark"
-)
-
 var steamReviewImportLock sync.Mutex
 
 type steamReviewsResponse struct {
@@ -43,22 +37,35 @@ type steamReviewAuthor struct {
 
 func StartSteamReviewImporter() {
 	go func() {
-		importSteamReviewsFromCheckpoint()
+		importAllSteamReviewsFromCheckpoints()
 
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			importSteamReviewsFromCheckpoint()
+			importAllSteamReviewsFromCheckpoints()
 		}
 	}()
 }
 
 func ImportSteamReviewsNow(c *gin.Context) {
-	imported, skipped, from, to, err := ImportSteamReviewsFromCheckpoint()
+	projects, err := steamProjectsForRequest(c.Query("project"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	imported, skipped := 0, 0
+	var from, to time.Time
+	for _, project := range projects {
+		projectImported, projectSkipped, projectFrom, projectTo, syncErr := ImportSteamReviewsFromCheckpoint(project)
+		if syncErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": syncErr.Error()})
+			return
+		}
+		imported += projectImported
+		skipped += projectSkipped
+		from = projectFrom
+		to = projectTo
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -69,21 +76,28 @@ func ImportSteamReviewsNow(c *gin.Context) {
 	})
 }
 
-func importSteamReviewsFromCheckpoint() {
-	imported, skipped, from, to, err := ImportSteamReviewsFromCheckpoint()
+func importAllSteamReviewsFromCheckpoints() {
+	projects, err := models.SelectProjectsWithSteam()
 	if err != nil {
-		log.Printf("steam review import failed: %v", err)
+		log.Printf("steam project lookup failed: %v", err)
 		return
 	}
-
-	log.Printf("steam review import complete: from=%s to=%s imported=%d skipped=%d", from.Format(time.RFC3339), to.Format(time.RFC3339), imported, skipped)
+	for _, project := range projects {
+		imported, skipped, from, to, syncErr := ImportSteamReviewsFromCheckpoint(project)
+		if syncErr != nil {
+			log.Printf("steam import failed for %s: %v", project.ID, syncErr)
+			continue
+		}
+		log.Printf("steam import complete for %s: from=%s to=%s imported=%d skipped=%d", project.ID, from.Format(time.RFC3339), to.Format(time.RFC3339), imported, skipped)
+	}
 }
 
-func ImportSteamReviewsFromCheckpoint() (int, int, time.Time, time.Time, error) {
+func ImportSteamReviewsFromCheckpoint(project models.Project) (int, int, time.Time, time.Time, error) {
 	steamReviewImportLock.Lock()
 	defer steamReviewImportLock.Unlock()
 
-	state, err := models.GetSyncState(steamSyncName)
+	syncName := "steam_" + project.ID
+	state, err := models.GetSyncState(syncName)
 	if err != nil {
 		return 0, 0, time.Time{}, time.Time{}, err
 	}
@@ -94,25 +108,25 @@ func ImportSteamReviewsFromCheckpoint() (int, int, time.Time, time.Time, error) 
 		from = state.LastSuccessAt
 	}
 
-	imported, skipped, err := ImportSteamFeedbackSince(from, to)
+	imported, skipped, err := ImportSteamFeedbackSince(project, from, to)
 	if err != nil {
 		return imported, skipped, from, to, err
 	}
 
-	if _, err := models.SaveSyncSuccess(steamSyncName, to); err != nil {
+	if _, err := models.SaveSyncSuccess(syncName, to); err != nil {
 		return imported, skipped, from, to, err
 	}
 
 	return imported, skipped, from, to, nil
 }
 
-func ImportSteamFeedbackSince(cutoff time.Time, now time.Time) (int, int, error) {
-	reviewImported, reviewSkipped, err := ImportSteamReviewsSince(cutoff, now)
+func ImportSteamFeedbackSince(project models.Project, cutoff time.Time, now time.Time) (int, int, error) {
+	reviewImported, reviewSkipped, err := ImportSteamReviewsSince(project, cutoff, now)
 	if err != nil {
 		return reviewImported, reviewSkipped, err
 	}
 
-	discussionImported, discussionSkipped, err := ImportSteamDiscussionsSince(cutoff, now)
+	discussionImported, discussionSkipped, err := ImportSteamDiscussionsSince(project, cutoff, now)
 	if err != nil {
 		return reviewImported + discussionImported, reviewSkipped + discussionSkipped, err
 	}
@@ -120,7 +134,7 @@ func ImportSteamFeedbackSince(cutoff time.Time, now time.Time) (int, int, error)
 	return reviewImported + discussionImported, reviewSkipped + discussionSkipped, nil
 }
 
-func ImportSteamReviewsSince(cutoff time.Time, now time.Time) (int, int, error) {
+func ImportSteamReviewsSince(project models.Project, cutoff time.Time, now time.Time) (int, int, error) {
 	client := http.Client{Timeout: 12 * time.Second}
 	cursor := "*"
 	dayRange := steamReviewDayRange(cutoff, now)
@@ -128,7 +142,7 @@ func ImportSteamReviewsSince(cutoff time.Time, now time.Time) (int, int, error) 
 	skipped := 0
 
 	for page := 0; page < 20; page++ {
-		response, err := fetchSteamReviewsPage(client, cursor, dayRange)
+		response, err := fetchSteamReviewsPage(client, project.SteamAppID, cursor, dayRange)
 		if err != nil {
 			return imported, skipped, err
 		}
@@ -145,7 +159,7 @@ func ImportSteamReviewsSince(cutoff time.Time, now time.Time) (int, int, error) 
 			}
 
 			shouldContinue = true
-			reviewURL := steamReviewURL(review)
+			reviewURL := steamReviewURL(review, project.SteamAppID)
 			exists, err := models.FeedbackMessageContains(reviewURL)
 			if err != nil {
 				return imported, skipped, err
@@ -158,7 +172,7 @@ func ImportSteamReviewsSince(cutoff time.Time, now time.Time) (int, int, error) 
 
 			feedback := models.Feedback{
 				PID:      review.Author.SteamID,
-				Project:  "cursemark",
+				Project:  project.ID,
 				Message:  strings.TrimSpace(review.Review) + "\n" + reviewURL,
 				Rating:   steamReviewRating(review),
 				Env:      "production",
@@ -185,7 +199,7 @@ func ImportSteamReviewsSince(cutoff time.Time, now time.Time) (int, int, error) 
 	return imported, skipped, nil
 }
 
-func fetchSteamReviewsPage(client http.Client, cursor string, dayRange int) (steamReviewsResponse, error) {
+func fetchSteamReviewsPage(client http.Client, appID string, cursor string, dayRange int) (steamReviewsResponse, error) {
 	values := url.Values{}
 	values.Set("json", "1")
 	values.Set("filter", "recent")
@@ -195,7 +209,7 @@ func fetchSteamReviewsPage(client http.Client, cursor string, dayRange int) (ste
 	values.Set("day_range", fmt.Sprintf("%d", dayRange))
 	values.Set("cursor", cursor)
 
-	requestURL := steamReviewBaseURL + "?" + values.Encode()
+	requestURL := "https://store.steampowered.com/appreviews/" + url.PathEscape(appID) + "?" + values.Encode()
 	res, err := client.Get(requestURL)
 	if err != nil {
 		return steamReviewsResponse{}, err
@@ -235,10 +249,27 @@ func steamReviewRating(review steamReview) uint8 {
 	return 1
 }
 
-func steamReviewURL(review steamReview) string {
+func steamReviewURL(review steamReview, appID string) string {
 	if review.Author.SteamID != "" {
-		return "https://steamcommunity.com/profiles/" + review.Author.SteamID + "/recommended/" + cursemarkSteamAppID + "/"
+		return "https://steamcommunity.com/profiles/" + review.Author.SteamID + "/recommended/" + appID + "/"
 	}
 
-	return "https://steamcommunity.com/app/" + cursemarkSteamAppID + "/reviews/" + review.RecommendationID + "/"
+	return "https://steamcommunity.com/app/" + appID + "/reviews/" + review.RecommendationID + "/"
+}
+
+func steamProjectsForRequest(id string) ([]models.Project, error) {
+	if strings.TrimSpace(id) == "" || id == "all" {
+		return models.SelectProjectsWithSteam()
+	}
+	project, err := models.SelectProject(id)
+	if err != nil {
+		return nil, err
+	}
+	if project == nil {
+		return nil, fmt.Errorf("project %q was not found", id)
+	}
+	if project.SteamAppID == "" {
+		return nil, fmt.Errorf("project %q has no Steam app ID", id)
+	}
+	return []models.Project{*project}, nil
 }

@@ -25,6 +25,7 @@
 	let helperStatus = {};
 	let resolvingFeedback = {};
 	let translatingFeedback = {};
+	let showingOriginalFeedback = {};
 	let syncingSources = false;
 	let sourceSyncStatus = '';
 	let sourceSyncError = '';
@@ -59,7 +60,10 @@
 	}
 
 	async function syncSource(name, endpoint) {
-		const res = await fetch(`https://api.clyde.games/${endpoint}`, { method: 'POST' });
+		const projectQuery = selectedProject && selectedProject !== 'all'
+			? `?project=${encodeURIComponent(selectedProject)}`
+			: '';
+		const res = await fetch(`https://api.clyde.games/${endpoint}${projectQuery}`, { method: 'POST' });
 		const result = await res.json();
 
 		if (!res.ok) {
@@ -231,6 +235,21 @@
 		});
 	}
 
+	function displayedMessage(comment) {
+		if (comment.Translated && !showingOriginalFeedback[comment.ID]) {
+			return comment.Translated;
+		}
+
+		return comment.Message;
+	}
+
+	function toggleOriginal(comment) {
+		showingOriginalFeedback = {
+			...showingOriginalFeedback,
+			[comment.ID]: !showingOriginalFeedback[comment.ID]
+		};
+	}
+
 	async function translateFeedback(comment) {
 		translatingFeedback = { ...translatingFeedback, [comment.ID]: true };
 		helperStatus = {
@@ -283,6 +302,16 @@
 			}
 
 			const translatedMessage = translatedText + messageParts.suffix;
+			const res = await fetch(`https://api.clyde.games/feedback/translation?id=${comment.ID}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ translated: translatedMessage })
+			});
+			const result = await res.json();
+
+			if (!res.ok) {
+				throw new Error(result.error || 'Could not save the translation.');
+			}
 
 			feedback = feedback.map(item => {
 				if (item.ID !== comment.ID) {
@@ -291,9 +320,10 @@
 
 				return {
 					...item,
-					Message: translatedMessage
+					Translated: result.Translated || translatedMessage
 				};
 			});
+			showingOriginalFeedback = { ...showingOriginalFeedback, [comment.ID]: false };
 
 			helperStatus = {
 				...helperStatus,
@@ -361,7 +391,7 @@
 	$: projectFeedback = feedback.filter(matchesProject);
 	$: normalizedSearch = searchText.trim().toLowerCase();
 	$: visibleFeedback = normalizedSearch
-		? projectFeedback.filter(comment => (comment.Message || '').toLowerCase().includes(normalizedSearch)).slice(0, 100)
+		? projectFeedback.filter(comment => `${comment.Message || ''}\n${comment.Translated || ''}`.toLowerCase().includes(normalizedSearch)).slice(0, 100)
 		: projectFeedback;
 	$: reportProjects('feedback', feedback.map(comment => comment.Project));
 </script>
@@ -410,7 +440,7 @@
 							<span class="rating" style="background-color:{ colors[comment.Rating] }"></span>
 							<div class="message-stack">
 								<p class="message">
-									{#each messageSegments(comment.Message) as segment}
+									{#each messageSegments(displayedMessage(comment)) as segment}
 										{#if segment.isURL}
 											<a target="_blank" rel="noreferrer" href={segment.text}>{segment.text}</a>
 										{:else}
@@ -418,6 +448,11 @@
 										{/if}
 									{/each}
 								</p>
+								{#if comment.Translated}
+									<button class="original-toggle" type="button" on:click={() => toggleOriginal(comment)}>
+										{showingOriginalFeedback[comment.ID] ? 'See Translation' : 'See Original'}
+									</button>
+								{/if}
 								{#if helperStatus[comment.ID] && helperStatus[comment.ID].status}
 									<small class="helper-status">{helperStatus[comment.ID].status}</small>
 								{/if}
@@ -684,6 +719,23 @@
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
+	}
+
+	.original-toggle {
+		align-self: flex-start;
+		background: none;
+		border: 0;
+		color: var(--text-muted);
+		font-size: 0.68rem;
+		font-weight: 600;
+		padding: 0;
+		text-decoration: underline;
+	}
+
+	.original-toggle:hover:not(:disabled) {
+		background: none;
+		border-color: transparent;
+		color: var(--text);
 	}
 
 	.helper-error {

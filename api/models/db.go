@@ -19,10 +19,13 @@ func GetDB(name string) (*gorm.DB, error) {
 }
 
 func MigrateAnalyticsDB() error {
-	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &Crash{}, &Event{}, &EventItem{}, &EventSetting{}, &Feedback{}, &Savegame{}, &SyncState{}); err != nil {
+	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &Project{}, &Crash{}, &Event{}, &EventItem{}, &EventSetting{}, &Feedback{}, &Savegame{}, &SyncState{}); err != nil {
 		return err
 	}
-	if err := NormalizeKnownProjects(); err != nil {
+	if err := BackfillProjects(); err != nil {
+		return err
+	}
+	if err := SeedProjectSources(); err != nil {
 		return err
 	}
 

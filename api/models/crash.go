@@ -50,22 +50,23 @@ func SelectAccessViolationCrashesSince(since time.Time) ([]Crash, error) {
 
 func AddCrash(crash Crash) (*Crash, error) {
 	crash.Project = NormalizeProjectName(crash.Project)
-
-	var existingCrash Crash
-	result := AnalyticsDB.Where("hash = ?", crash.Hash).First(&existingCrash)
-
-	if result.RowsAffected > 0 {
-		existingCrash.Count += 1
-		existingCrash.Resolved = false
-		result = AnalyticsDB.Save(&existingCrash)
-	} else {
+	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		if err := ensureProject(tx, crash.Project); err != nil {
+			return err
+		}
+		var existingCrash Crash
+		result := tx.Where("hash = ?", crash.Hash).First(&existingCrash)
+		if result.RowsAffected > 0 {
+			existingCrash.Count++
+			existingCrash.Resolved = false
+			return tx.Save(&existingCrash).Error
+		}
 		crash.Count = 1
 		crash.Resolved = false
-		result = AnalyticsDB.Save(&crash)
-	}
-
-	if result.Error != nil {
-		return nil, result.Error
+		return tx.Save(&crash).Error
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &crash, nil

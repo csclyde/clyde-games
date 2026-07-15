@@ -2,10 +2,15 @@ package endpoints
 
 import (
 	"net/http"
+	"strings"
 
 	"api.clyde.games/models"
 	"github.com/gin-gonic/gin"
 )
+
+type feedbackTranslationRequest struct {
+	Translated string `json:"translated"`
+}
 
 func GetFeedback(c *gin.Context) {
 
@@ -45,6 +50,32 @@ func AddFeedback(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusCreated, updatedFeedback)
+}
+
+func UpdateFeedbackTranslation(c *gin.Context) {
+	var request feedbackTranslationRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	request.Translated = strings.TrimSpace(request.Translated)
+	if request.Translated == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Translated feedback is required"})
+		return
+	}
+
+	feedback, err := models.UpdateFeedbackTranslation(c.Query("id"), request.Translated)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if feedback == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Feedback not found"})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, feedback)
 }
 
 func ResolveFeedback(c *gin.Context) {

@@ -30,6 +30,9 @@ type SavegameBuild struct {
 func AddSavegame(savegame Savegame) (*Savegame, error) {
 	savegame.Project = NormalizeProjectName(savegame.Project)
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		if err := ensureProject(tx, savegame.Project); err != nil {
+			return err
+		}
 		if err := rejectBlockedUser(tx, savegame.PID); err != nil {
 			return err
 		}

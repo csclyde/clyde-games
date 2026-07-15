@@ -9,6 +9,7 @@ type Feedback struct {
 	PID              string `gorm:"type:tinytext"`
 	Project          string `gorm:"type:tinytext"`
 	Message          string `gorm:"type:text"`
+	Translated       string `gorm:"type:text"`
 	Rating           uint8
 	Env              string `gorm:"type:tinytext"`
 	Category         string `gorm:"type:tinytext"`
@@ -18,6 +19,24 @@ type Feedback struct {
 	Resolved         bool   `gorm:"type:boolean;default:false"`
 	SavegameID       uint   `gorm:"-"`
 	SavegameFilename string `gorm:"-"`
+}
+
+func UpdateFeedbackTranslation(id string, translated string) (*Feedback, error) {
+	var feedback Feedback
+	result := AnalyticsDB.Where("id = ?", id).First(&feedback)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, result.Error
+	}
+
+	feedback.Translated = translated
+	if err := AnalyticsDB.Model(&feedback).Update("translated", translated).Error; err != nil {
+		return nil, err
+	}
+
+	return &feedback, nil
 }
 
 func SelectAllFeedback() ([]Feedback, error) {
@@ -37,10 +56,14 @@ func SelectAllFeedback() ([]Feedback, error) {
 
 func AddFeedback(fb Feedback) (*Feedback, error) {
 	fb.Project = NormalizeProjectName(fb.Project)
-	result := AnalyticsDB.Create(&fb)
-
-	if result.Error != nil {
-		return nil, result.Error
+	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		if err := ensureProject(tx, fb.Project); err != nil {
+			return err
+		}
+		return tx.Create(&fb).Error
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &fb, nil

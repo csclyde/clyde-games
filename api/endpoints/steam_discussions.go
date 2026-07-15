@@ -37,30 +37,30 @@ type steamDiscussionPost struct {
 	IsTopic   bool
 }
 
-var steamDiscussionForums = []steamDiscussionForum{
-	{
+func steamDiscussionForums(appID string) []steamDiscussionForum {
+	return []steamDiscussionForum{{
 		Name: "Steam Discussion",
-		URL:  steamCommunityBaseURL + "/app/" + cursemarkSteamAppID + "/discussions/0/",
+		URL:  steamCommunityBaseURL + "/app/" + url.PathEscape(appID) + "/discussions/0/",
 	},
-	{
-		Name: "Steam Announcement Discussion",
-		URL:  steamCommunityBaseURL + "/app/" + cursemarkSteamAppID + "/eventcomments/",
-	},
+		{
+			Name: "Steam Announcement Discussion",
+			URL:  steamCommunityBaseURL + "/app/" + url.PathEscape(appID) + "/eventcomments/",
+		}}
 }
 
-func ImportSteamDiscussionsSince(cutoff time.Time, now time.Time) (int, int, error) {
+func ImportSteamDiscussionsSince(project models.Project, cutoff time.Time, now time.Time) (int, int, error) {
 	client := http.Client{Timeout: 12 * time.Second}
 	imported := 0
 	skipped := 0
 
-	for _, forum := range steamDiscussionForums {
+	for _, forum := range steamDiscussionForums(project.SteamAppID) {
 		topics, err := fetchSteamDiscussionTopicsSince(client, forum, cutoff)
 		if err != nil {
 			return imported, skipped, err
 		}
 
 		for _, topic := range topics {
-			postImported, postSkipped, err := importSteamDiscussionTopic(client, topic, cutoff)
+			postImported, postSkipped, err := importSteamDiscussionTopic(client, project.ID, topic, cutoff)
 			if err != nil {
 				return imported + postImported, skipped + postSkipped, err
 			}
@@ -105,7 +105,7 @@ func fetchSteamDiscussionTopicsSince(client http.Client, forum steamDiscussionFo
 	return topics, nil
 }
 
-func importSteamDiscussionTopic(client http.Client, topic steamDiscussionTopic, cutoff time.Time) (int, int, error) {
+func importSteamDiscussionTopic(client http.Client, projectID string, topic steamDiscussionTopic, cutoff time.Time) (int, int, error) {
 	imported := 0
 	skipped := 0
 	totalPages := 1
@@ -142,7 +142,7 @@ func importSteamDiscussionTopic(client http.Client, topic steamDiscussionTopic, 
 
 			feedback := models.Feedback{
 				PID:      post.Author,
-				Project:  "cursemark",
+				Project:  projectID,
 				Message:  steamDiscussionFeedbackMessage(topic, post),
 				Rating:   3,
 				Env:      "production",
