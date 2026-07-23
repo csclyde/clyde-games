@@ -177,19 +177,77 @@
 		return null;
 	}
 
-	async function detectLanguage(text) {
+	async function detectLanguage(text, detector) {
 		if (typeof LanguageDetector === 'undefined') {
 			throw new Error('Chrome language detection is not available in this browser.');
 		}
 
-		const detector = await LanguageDetector.create();
-		const results = await detector.detect(text);
+		const languageDetector = detector || await LanguageDetector.create();
+		const results = await languageDetector.detect(text);
 
 		if (results && results.length > 0 && results[0].detectedLanguage) {
 			return results[0].detectedLanguage;
 		}
 
 		throw new Error('Could not detect the source language.');
+	}
+
+	function getLanguageSamples(text) {
+		const samples = [];
+		const addSample = sample => {
+			const normalized = sample.trim();
+
+			if (normalized.length >= 2 && normalized !== text.trim() && !samples.includes(normalized)) {
+				samples.push(normalized);
+			}
+		};
+
+		// Source labels such as "STEAM community:" commonly make the detector
+		// classify an otherwise non-English review as English.
+		text.split(/\r?\n/).forEach(line => {
+			const colonIndex = line.indexOf(':');
+
+			if (colonIndex >= 0 && colonIndex <= 80) {
+				addSample(line.slice(colonIndex + 1));
+			}
+		});
+
+		text.split(/\r?\n/).forEach(addSample);
+
+		const sentenceMatches = text.match(/[^.!?。！？]+[.!?。！？]?/g) || [];
+		sentenceMatches.forEach(addSample);
+
+		return samples.slice(0, 12);
+	}
+
+	async function detectSourceLanguage(text) {
+		if (typeof LanguageDetector === 'undefined') {
+			throw new Error('Chrome language detection is not available in this browser.');
+		}
+
+		const detector = await LanguageDetector.create();
+
+		try {
+			const detectedLanguage = await detectLanguage(text, detector);
+
+			if (detectedLanguage !== 'en') {
+				return detectedLanguage;
+			}
+
+			for (const sample of getLanguageSamples(text)) {
+				const sampleLanguage = await detectLanguage(sample, detector);
+
+				if (sampleLanguage !== 'en' && sampleLanguage !== 'und') {
+					return sampleLanguage;
+				}
+			}
+
+			return detectedLanguage;
+		} finally {
+			if (detector.destroy) {
+				detector.destroy();
+			}
+		}
 	}
 
 	function getTranslatedText(result) {
@@ -268,7 +326,7 @@
 			}
 
 			const messageParts = getTranslatableMessage(comment.Message);
-			const sourceLanguage = await detectLanguage(messageParts.text);
+			const sourceLanguage = await detectSourceLanguage(messageParts.text);
 
 			if (sourceLanguage === 'en') {
 				helperStatus = {
