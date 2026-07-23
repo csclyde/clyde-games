@@ -1,0 +1,38 @@
+[
+    {
+        "img": "/img/admin1.png",
+        "desc": "In the admin panel, I can monitor and control the server and incoming data."
+    },
+    {
+        "img": "/img/admin2.png",
+        "desc": "Here, I funnel together all sources of feedback into one place. Players can leave feedback within the game itself, and my system scrapes Steam reviews and discussion forums daily for anything new."
+    },
+    {
+        "img": "/img/admin5.png",
+        "desc": "The in-game feedback system. This is great for getting moment-to-moment thoughts that would otherwise be forgotten or ignored. It also sends the users Save Game, so I can inspect it if needed."
+    },
+    {
+        "img": "/img/admin6.png",
+        "desc": "There's also a Discord bot that collects feedback. If anyone tags a message with the 'bug' emoji, the bot will make a feedback item of that message and give it a green checkmark to indicate that it was received."
+    },
+    {
+        "img": "/img/admin3.png",
+        "desc": "All feedback can be translated to English, and then promoted to a Planka ticket, or just resolved."
+    },
+    {
+        "img": "/img/admin4.png",
+        "desc": "Planka is the self-hosted open source ticket tracking software I use to keep track of issues and feedback I want to act on."
+    },
+    {
+        "img": "/img/admin7.png",
+        "desc": "Back in my tool suite, I also collect stack traces from crashes. This is like a mini-Sentry.io, where identical crashes are flattened together and the time is noted."
+    },
+    {
+        "img": "/img/admin8.png",
+        "desc": "Next, I can trigger the game to send a Save Game at any point. So if the user gets into a situation I want to understand better, I can trigger a send and load into their game."
+    },
+    {
+        "img": "/img/admin9.png",
+        "desc": "In the game, I can also send Metrics events to my database. Then, I run Metabase to visualize that data and get insights about the game. I can attach data like what items people are using. Events can be things like clearing a level, dying, solving a secret, etc..."
+    }
+]

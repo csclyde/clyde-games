@@ -4,6 +4,7 @@
 	import About from './pages/About.svelte';
 	import Poetry from './pages/Poetry.svelte';
 	import Van from './pages/Van.svelte';
+	import AnalyticsTools from './pages/AnalyticsTools.svelte';
 	import AnalyzeWords from "./pages/AnalyzeWords.svelte";
 	import UnknownWords from "./pages/UnknownWords.svelte";
 
@@ -19,6 +20,7 @@
 	router('/about', () => setPage(About));
 	router('/poetry', () => setPage(Poetry));
 	router('/van', () => setPage(Van));
+	router('/analytics-tools', () => setPage(AnalyticsTools));
 	for (const path of ['/admin', '/feedback', '/crashes', '/savegames', '/save-games', '/metrics']) {
 		router(path, () => window.location.replace(`https://admin.clyde.games${path}`));
 	}

@@ -1,7 +1,14 @@
 [
     {
-        "name": "cursemark",
-        "href": "https://store.steampowered.com/app/3219180/cursemark/",
+        "name": "Game Analytics Tools",
+        "href": "/analytics-tools",
+        "img": "/img/admin.png",
+        "desc": "A suite of tools for monitoring, analyzing, and improving my games.",
+        "tools": "Golang, Svelte"
+    },
+    {
+        "name": "Cursemark",
+        "href": "https://store.steampowered.com/app/3219180/Cursemark/",
         "img": "/img/cursemark.png",
         "desc": "An Action-Exploration roguelike about exploring a cursed land.",
         "tools": "Haxe, Heaps.io"
