@@ -30,6 +30,25 @@
 			: project);
 	}
 
+	function formatNumber(value) {
+		if (value === null || value === undefined) return '0';
+		return value.toLocaleString();
+	}
+
+	function steamReviewCount(project) {
+		const reviews = project.steamReviews;
+		if (!reviews || reviews.unavailableReason) return 'Unavailable';
+		return `${formatNumber(reviews.countedReviews)} (${formatNumber(reviews.totalReviews)})`;
+	}
+
+	function steamReviewScore(project) {
+		const reviews = project.steamReviews;
+		if (!reviews || reviews.unavailableReason) return '';
+		const tag = reviews.reviewScoreTag || 'Unrated';
+		const percent = (reviews.positivePercentRaw || 0).toFixed(2);
+		return `${percent}% | ${tag}`;
+	}
+
 	loadProjects();
 </script>
 
@@ -59,6 +78,15 @@
 						<div><dt>Save games</dt><dd>{project.savegames}</dd></div>
 						<div><dt>Events</dt><dd>{project.events}</dd></div>
 					</dl>
+					{#if project.steamAppId}
+						<div class="steam-reviews">
+							<div>
+								<span>Steam reviews</span>
+								<strong>{steamReviewCount(project)}</strong>
+							</div>
+							<p>{steamReviewScore(project) || 'Review score unavailable'}</p>
+						</div>
+					{/if}
 				</article>
 			{/each}
 		</div>
@@ -84,11 +112,15 @@
 	dl div { background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 8px; text-align: center; }
 	dt { color: var(--text-muted); font-size: .65rem; font-weight: 800; text-transform: uppercase; }
 	dd { font-size: 1.15rem; font-weight: 800; margin: 3px 0 0; }
+	.steam-reviews { align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 3px; display: flex; gap: 10px; justify-content: space-between; margin-top: 8px; padding: 8px 10px; }
+	.steam-reviews span { color: var(--text-muted); display: block; font-size: .65rem; font-weight: 800; text-transform: uppercase; }
+	.steam-reviews strong { display: block; font-size: .96rem; margin-top: 2px; }
+	.steam-reviews p { color: var(--text-soft); font-size: .82rem; font-weight: 800; text-align: right; }
 	button { border: 1px solid var(--line); border-radius: 4px; font: inherit; padding: 6px 9px; }
 	button { background: var(--paper-warm); color: var(--text); cursor: pointer; font-size: .75rem; font-weight: 700; }
 	button:hover:not(:disabled) { border-color: var(--charcoal); }
 	button:disabled { cursor: default; opacity: .6; }
 	.message { color: var(--text-muted); padding: 16px 0 0; }
 	.message.error { color: var(--red, #9b2c2c); }
-	@media (max-width: 650px) { .projects { margin: 10px 8px 0; } dl { grid-template-columns: repeat(2, 1fr); } }
+	@media (max-width: 650px) { .projects { margin: 10px 8px 0; } dl { grid-template-columns: repeat(2, 1fr); } .steam-reviews { align-items: flex-start; flex-direction: column; } .steam-reviews p { text-align: left; } }
 </style>

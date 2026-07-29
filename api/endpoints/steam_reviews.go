@@ -18,9 +18,19 @@ import (
 var steamReviewImportLock sync.Mutex
 
 type steamReviewsResponse struct {
-	Success int           `json:"success"`
-	Cursor  string        `json:"cursor"`
-	Reviews []steamReview `json:"reviews"`
+	Success      int                     `json:"success"`
+	Cursor       string                  `json:"cursor"`
+	QuerySummary steamReviewQuerySummary `json:"query_summary"`
+	Reviews      []steamReview           `json:"reviews"`
+}
+
+type steamReviewQuerySummary struct {
+	NumReviews      int    `json:"num_reviews"`
+	ReviewScore     int    `json:"review_score"`
+	ReviewScoreDesc string `json:"review_score_desc"`
+	TotalPositive   int    `json:"total_positive"`
+	TotalNegative   int    `json:"total_negative"`
+	TotalReviews    int    `json:"total_reviews"`
 }
 
 type steamReview struct {
@@ -224,6 +234,53 @@ func fetchSteamReviewsPage(client http.Client, appID string, cursor string, dayR
 	values.Set("cursor", cursor)
 
 	requestURL := "https://store.steampowered.com/appreviews/" + url.PathEscape(appID) + "?" + values.Encode()
+	return fetchSteamReviews(requestURL, client)
+}
+
+func FetchSteamReviewSummary(client http.Client, appID string) (models.SteamReviewStats, error) {
+	countedResponse, err := fetchSteamReviewSummaryForPurchaseType(client, appID, "steam")
+	if err != nil {
+		return models.SteamReviewStats{}, err
+	}
+	totalResponse, err := fetchSteamReviewSummaryForPurchaseType(client, appID, "all")
+	if err != nil {
+		return models.SteamReviewStats{}, err
+	}
+
+	countedSummary := countedResponse.QuerySummary
+	totalSummary := totalResponse.QuerySummary
+	positivePercent := 0
+	positivePercentRaw := 0.0
+	if countedSummary.TotalReviews > 0 {
+		positivePercentRaw = float64(countedSummary.TotalPositive) / float64(countedSummary.TotalReviews) * 100
+		positivePercent = int(positivePercentRaw)
+	}
+
+	return models.SteamReviewStats{
+		CountedReviews:     countedSummary.TotalReviews,
+		TotalReviews:       totalSummary.TotalReviews,
+		PositiveReviews:    countedSummary.TotalPositive,
+		NegativeReviews:    countedSummary.TotalNegative,
+		PositivePercent:    positivePercent,
+		PositivePercentRaw: positivePercentRaw,
+		ReviewScore:        countedSummary.ReviewScore,
+		ReviewScoreTag:     countedSummary.ReviewScoreDesc,
+	}, nil
+}
+
+func fetchSteamReviewSummaryForPurchaseType(client http.Client, appID string, purchaseType string) (steamReviewsResponse, error) {
+	values := url.Values{}
+	values.Set("json", "1")
+	values.Set("filter", "summary")
+	values.Set("language", "all")
+	values.Set("purchase_type", purchaseType)
+	values.Set("num_per_page", "0")
+
+	requestURL := "https://store.steampowered.com/appreviews/" + url.PathEscape(appID) + "?" + values.Encode()
+	return fetchSteamReviews(requestURL, client)
+}
+
+func fetchSteamReviews(requestURL string, client http.Client) (steamReviewsResponse, error) {
 	res, err := client.Get(requestURL)
 	if err != nil {
 		return steamReviewsResponse{}, err

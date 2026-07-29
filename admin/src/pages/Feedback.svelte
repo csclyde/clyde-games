@@ -1,7 +1,7 @@
 <script>
 	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
 
-	export let selectedProject = 'cursemark';
+	export let selectedProject = 'all';
 	export let reportProjects = () => {};
 
 	async function getFeedback() {
@@ -520,7 +520,7 @@
 							</div>
 						</div>
 						<div class="meta-list">
-							{#if comment.Project}<span>project: {comment.Project}</span>{/if}
+							{#if comment.Project}<span class="project-tag">project: {comment.Project}</span>{/if}
 							{#if comment.Env}<span>env: {comment.Env}</span>{/if}
 							{#if comment.Platform}<span>platform: {comment.Platform}</span>{/if}
 							{#if comment.Category}<span>category: {comment.Category}</span>{/if}
@@ -727,6 +727,12 @@
 		overflow-wrap: anywhere;
 		padding: 3px 6px;
 		text-align: left;
+	}
+
+	.meta-list .project-tag {
+		background: var(--surface);
+		border-color: var(--forest);
+		color: var(--charcoal);
 	}
 
 	.user-id {

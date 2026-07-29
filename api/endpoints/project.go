@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"api.clyde.games/models"
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,7 @@ func GetProjects(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	attachSteamReviewSummaries(projects)
 	sort.Slice(projects, func(i, j int) bool {
 		if projects[i].Name == projects[j].Name {
 			return projects[i].ID < projects[j].ID
@@ -22,6 +25,28 @@ func GetProjects(c *gin.Context) {
 		return projects[i].Name < projects[j].Name
 	})
 	c.JSON(http.StatusOK, projects)
+}
+
+func attachSteamReviewSummaries(projects []models.ProjectStats) {
+	client := http.Client{Timeout: 6 * time.Second}
+	var wg sync.WaitGroup
+	for index := range projects {
+		if strings.TrimSpace(projects[index].SteamAppID) == "" {
+			continue
+		}
+
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			summary, err := FetchSteamReviewSummary(client, projects[index].SteamAppID)
+			if err != nil {
+				projects[index].SteamReviews = &models.SteamReviewStats{UnavailableReason: err.Error()}
+				return
+			}
+			projects[index].SteamReviews = &summary
+		}(index)
+	}
+	wg.Wait()
 }
 
 type updateProjectRequest struct {

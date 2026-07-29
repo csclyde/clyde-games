@@ -1,5 +1,12 @@
 [
     {
+        "name": "Valley of Nysa",
+        "href": "https://www.youtube.com/watch?v=6WoWG2p9oPg",
+        "img": "/img/nysa.png",
+        "desc": "An atmospheric album about a fictional place.",
+        "tools": "E-Mu Proteus/1, Reaper"
+    },
+    {
         "name": "Game Analytics Tools",
         "href": "/analytics-tools",
         "img": "/img/admin.png",

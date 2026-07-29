@@ -1,5 +1,5 @@
 <script>
-	export let selectedProject = 'cursemark';
+	export let selectedProject = 'all';
 	export let reportProjects = () => {};
 
 	async function parseResponse(res) {
@@ -151,7 +151,7 @@
 							<p class="reason">{savegame.Reason}</p>
 						{/if}
 						<div class="meta-list">
-							{#if savegame.Project}<span>project: {savegame.Project}</span>{/if}
+							{#if savegame.Project}<span class="project-tag">project: {savegame.Project}</span>{/if}
 							{#if savegame.Env}<span>env: {savegame.Env}</span>{/if}
 							{#if savegame.Platform}<span>platform: {savegame.Platform}</span>{/if}
 							{#if savegame.Category}<span>category: {savegame.Category}</span>{/if}
@@ -318,6 +318,12 @@
 		overflow-wrap: anywhere;
 		padding: 3px 6px;
 		text-align: left;
+	}
+
+	.meta-list .project-tag {
+		background: var(--surface);
+		border-color: var(--forest);
+		color: var(--charcoal);
 	}
 
 	.user-id {

@@ -9,6 +9,7 @@ import (
 )
 
 const oldestBuildSetting = "oldest_build"
+const oldestCrashBuildSetting = "oldest_crash_build"
 
 const (
 	maxEventEssence = 100000
@@ -169,8 +170,12 @@ func buildIsBefore(build string, oldestBuild string) (bool, error) {
 }
 
 func rejectBuildBeforeOldest(tx *gorm.DB, build string, subject string) error {
+	return rejectBuildBeforeSetting(tx, oldestBuildSetting, build, subject)
+}
+
+func rejectBuildBeforeSetting(tx *gorm.DB, settingKey string, build string, subject string) error {
 	var setting EventSetting
-	result := tx.Where("`key` = ?", oldestBuildSetting).First(&setting)
+	result := tx.Where("`key` = ?", settingKey).First(&setting)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return result.Error
 	}

@@ -1,8 +1,22 @@
 <script>
 	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
 
-	export let selectedProject = 'cursemark';
+	export let selectedProject = 'all';
 	export let reportProjects = () => {};
+
+	async function parseResponse(res) {
+		const text = await res.text();
+
+		try {
+			return JSON.parse(text);
+		} catch (error) {
+			if (res.ok) {
+				throw new Error('Expected JSON response from crash API');
+			}
+
+			throw new Error(text || res.statusText);
+		}
+	}
 
 	async function getCrashes() {
 		const res = await fetch(`https://api.clyde.games/crash`);
@@ -30,17 +44,45 @@
 		}
 	}
 
+	async function getCrashBuilds() {
+		const res = await fetch(`https://api.clyde.games/crash/builds`);
+		const builds = await parseResponse(res);
+
+		if (res.ok) {
+			return builds;
+		} else {
+			throw new Error(builds.error || builds);
+		}
+	}
+
+	async function getCrashSettings() {
+		const res = await fetch(`https://api.clyde.games/crash/settings`);
+		const settings = await parseResponse(res);
+
+		if (res.ok) {
+			return settings;
+		} else {
+			throw new Error(settings.error || settings);
+		}
+	}
+
 	let crashes = [];
 	let accessViolations = [];
+	let crashBuilds = [];
 	let loadingCrashes = true;
 	let loadingAccessViolations = true;
+	let loadingCrashSettings = true;
 	let crashError = '';
 	let accessViolationError = '';
+	let crashSettingsError = '';
 	let accessRangeDays = 30;
 	let resolvingCrashes = {};
 	let resolvingAllCrashes = false;
 	let helperStatus = {};
 	let ticketCrash = null;
+	let oldestCrashBuild = '';
+	let savingOldestCrashBuild = false;
+	let oldestCrashBuildSaved = false;
 
 	async function loadCrashes() {
 		loadingCrashes = true;
@@ -68,8 +110,33 @@
 		}
 	}
 
+	async function loadCrashSettings() {
+		loadingCrashSettings = true;
+		crashSettingsError = '';
+
+		const [buildItems, settings] = await Promise.allSettled([
+			getCrashBuilds(),
+			getCrashSettings()
+		]);
+
+		if (buildItems.status === 'fulfilled') {
+			crashBuilds = buildItems.value;
+		} else {
+			crashSettingsError = buildItems.reason.message || String(buildItems.reason);
+		}
+
+		if (settings.status === 'fulfilled') {
+			oldestCrashBuild = settings.value.OldestBuild || '';
+		} else {
+			crashSettingsError = settings.reason.message || String(settings.reason);
+		}
+
+		loadingCrashSettings = false;
+	}
+
 	loadCrashes();
 	loadAccessViolations();
+	loadCrashSettings();
 
 	async function refreshCrashLists() {
 		try {
@@ -84,6 +151,34 @@
 			accessViolationError = '';
 		} catch (error) {
 			accessViolationError = error.message;
+		}
+	}
+
+	async function updateOldestCrashBuild(event) {
+		const previousBuild = oldestCrashBuild;
+		oldestCrashBuild = event.currentTarget.value;
+		savingOldestCrashBuild = true;
+		oldestCrashBuildSaved = false;
+		crashSettingsError = '';
+
+		try {
+			const res = await fetch(`https://api.clyde.games/crash/settings`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ OldestBuild: oldestCrashBuild })
+			});
+			const settings = await parseResponse(res);
+			if (!res.ok) {
+				throw new Error(settings.error || settings);
+			}
+			oldestCrashBuild = settings.OldestBuild || '';
+			oldestCrashBuildSaved = true;
+		} catch (error) {
+			oldestCrashBuild = previousBuild;
+			oldestCrashBuildSaved = false;
+			crashSettingsError = error.message;
+		} finally {
+			savingOldestCrashBuild = false;
 		}
 	}
 
@@ -338,6 +433,7 @@
 	$: visibleAccessViolations = accessViolations.filter(matchesProject);
 	$: accessViolationTimeline = getAccessViolationTimeline(visibleAccessViolations);
 	$: visibleRegularCrashes = getRegularCrashes(visibleCrashes);
+	$: crashBuildDates = [...new Set(crashBuilds.map(build => build.Build))].sort().reverse();
 	$: reportProjects('crashes', [
 		...crashes.map(crash => crash.Project),
 		...accessViolations.map(crash => crash.Project)
@@ -350,10 +446,34 @@
 			<h2>Crash Reports</h2>
 			<p>{visibleRegularCrashes.length} open item{visibleRegularCrashes.length === 1 ? '' : 's'}</p>
 		</div>
-		<button type="button" disabled={resolvingAllCrashes || visibleRegularCrashes.length === 0} on:click={resolveAllCrashes}>
-			{resolvingAllCrashes ? 'Closing...' : 'Close All'}
-		</button>
+		<div class="header-actions">
+			<label class="build-cutoff-control" for="oldest-crash-build">
+				<span>Oldest Build</span>
+				<select id="oldest-crash-build" value={oldestCrashBuild} disabled={loadingCrashSettings || savingOldestCrashBuild} on:change={updateOldestCrashBuild}>
+					<option value="">Accept all builds</option>
+					{#each crashBuildDates as build}
+						<option value={build}>{formatBuildDate(build)}</option>
+					{/each}
+				</select>
+			</label>
+			<div class="save-status" role="status" aria-live="polite">
+				{#if savingOldestCrashBuild}
+					<span class="spinner" aria-hidden="true"></span>
+					<span>Saving</span>
+				{:else if oldestCrashBuildSaved}
+					<span class="saved-check" aria-hidden="true">✓</span>
+					<span>Saved</span>
+				{/if}
+			</div>
+			<button type="button" disabled={resolvingAllCrashes || visibleRegularCrashes.length === 0} on:click={resolveAllCrashes}>
+				{resolvingAllCrashes ? 'Closing...' : 'Close All'}
+			</button>
+		</div>
 	</header>
+
+	{#if crashSettingsError}
+		<p class="state-message error">{crashSettingsError}</p>
+	{/if}
 
 	<section class="access-violations">
 		<div class="section-header">
@@ -441,7 +561,7 @@
 							{/if}
 						</div>
 						<div class="meta-list">
-							{#if crash.Project}<span>project: {crash.Project}</span>{/if}
+							{#if crash.Project}<span class="project-tag">project: {crash.Project}</span>{/if}
 							{#if crash.Env}<span>env: {crash.Env}</span>{/if}
 							{#if crash.Platform}<span>platform: {crash.Platform}</span>{/if}
 							{#if crash.Category}<span>category: {crash.Category}</span>{/if}
@@ -518,6 +638,73 @@
 		margin: 6px 0 0;
 		text-align: left;
 		text-transform: uppercase;
+	}
+
+	.header-actions {
+		align-items: flex-end;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		justify-content: flex-end;
+	}
+
+	.build-cutoff-control {
+		align-items: flex-start;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.build-cutoff-control span {
+		color: var(--text-soft);
+		font-size: .7rem;
+		font-weight: 800;
+		letter-spacing: .05em;
+		text-transform: uppercase;
+	}
+
+	select {
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
+		border-radius: 4px;
+		color: var(--text);
+		font: inherit;
+		font-size: 0.82rem;
+		min-width: 220px;
+		padding: 6px 9px;
+	}
+
+	.save-status {
+		align-items: center;
+		color: var(--text-soft);
+		display: flex;
+		font-size: 0.82rem;
+		font-weight: 700;
+		gap: 6px;
+		min-height: 30px;
+		min-width: 68px;
+	}
+
+	.spinner {
+		animation: spin 700ms linear infinite;
+		border: 2px solid var(--line-strong);
+		border-radius: 50%;
+		border-top-color: var(--forest);
+		display: inline-block;
+		height: 13px;
+		width: 13px;
+	}
+
+	.saved-check {
+		color: var(--forest);
+		font-size: 1rem;
+		line-height: 1;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.comment-list {
@@ -613,6 +800,12 @@
 		overflow-wrap: anywhere;
 		padding: 3px 6px;
 		text-align: left;
+	}
+
+	.meta-list .project-tag {
+		background: var(--surface);
+		border-color: var(--forest);
+		color: var(--charcoal);
 	}
 
 	.user-id {
@@ -873,6 +1066,16 @@
 		.page-header {
 			align-items: flex-start;
 			flex-direction: column;
+		}
+
+		.header-actions {
+			justify-content: flex-start;
+			width: 100%;
+		}
+
+		.build-cutoff-control,
+		.build-cutoff-control select {
+			width: 100%;
 		}
 
 		.page-header h2 {

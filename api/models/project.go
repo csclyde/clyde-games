@@ -22,14 +22,27 @@ type Project struct {
 }
 
 type ProjectStats struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	SteamAppID   string `json:"steamAppId"`
-	SubredditURL string `json:"subredditUrl"`
-	Crashes      int64  `json:"crashes"`
-	Feedback     int64  `json:"feedback"`
-	Savegames    int64  `json:"savegames"`
-	Events       int64  `json:"events"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	SteamAppID   string            `json:"steamAppId"`
+	SubredditURL string            `json:"subredditUrl"`
+	SteamReviews *SteamReviewStats `json:"steamReviews,omitempty"`
+	Crashes      int64             `json:"crashes"`
+	Feedback     int64             `json:"feedback"`
+	Savegames    int64             `json:"savegames"`
+	Events       int64             `json:"events"`
+}
+
+type SteamReviewStats struct {
+	CountedReviews     int     `json:"countedReviews"`
+	TotalReviews       int     `json:"totalReviews"`
+	PositiveReviews    int     `json:"positiveReviews"`
+	NegativeReviews    int     `json:"negativeReviews"`
+	PositivePercent    int     `json:"positivePercent"`
+	PositivePercentRaw float64 `json:"positivePercentRaw"`
+	ReviewScore        int     `json:"reviewScore"`
+	ReviewScoreTag     string  `json:"reviewScoreTag"`
+	UnavailableReason  string  `json:"unavailableReason,omitempty"`
 }
 
 type projectCount struct {

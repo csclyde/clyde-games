@@ -11,7 +11,7 @@
 	export let tab = 'admin';
 	export let userID = '';
 
-	const defaultProject = 'cursemark';
+	const defaultProject = 'all';
 	const tabs = [
 		{ id: 'admin', label: 'Admin', href: '/admin', component: Metrics },
 		{ id: 'feedback', label: 'Feedback', href: '/feedback', component: Feedback },

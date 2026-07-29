@@ -138,7 +138,7 @@
 						{/if}
 
 						<div class="meta-list">
-							{#if entry.item.Project}<span>project: {entry.item.Project}</span>{/if}
+							{#if entry.item.Project}<span class="project-tag">project: {entry.item.Project}</span>{/if}
 							{#if entry.item.Env}<span>env: {entry.item.Env}</span>{/if}
 							{#if entry.item.Platform}<span>platform: {entry.item.Platform}</span>{/if}
 							{#if entry.item.Category}<span>category: {entry.item.Category}</span>{/if}
@@ -178,6 +178,7 @@
 	.detail { color: var(--text-muted); font-size: .85rem; line-height: 1.35; margin: 0; max-height: 8.1em; overflow: hidden; overflow-wrap: anywhere; text-align: left; white-space: pre-wrap; }
 	.meta-list { display: flex; flex-wrap: wrap; gap: 6px; }
 	.meta-list span { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 4px; color: var(--text-muted); font-size: .68rem; line-height: 1.25; max-width: 100%; overflow-wrap: anywhere; padding: 3px 6px; text-align: left; }
+	.meta-list .project-tag { background: var(--surface); border-color: var(--forest); color: var(--charcoal); }
 	button { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); cursor: pointer; font: inherit; font-size: .82rem; font-weight: 700; line-height: 1; padding: 7px 10px; }
 	button:hover { background: var(--paper-warm); border-color: var(--charcoal); }
 	button:disabled { cursor: wait; opacity: .6; }

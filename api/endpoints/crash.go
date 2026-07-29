@@ -45,6 +45,43 @@ func GetAccessViolationCrashes(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, crashes)
 }
 
+func GetCrashBuilds(c *gin.Context) {
+	builds, err := models.SelectCrashBuilds()
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, builds)
+}
+
+func GetCrashSettings(c *gin.Context) {
+	settings, err := models.GetCrashSettings()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, settings)
+}
+
+func UpdateCrashSettings(c *gin.Context) {
+	var settings models.CrashSettings
+	if err := c.BindJSON(&settings); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updated, err := models.SaveOldestCrashBuild(settings.OldestBuild)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updated)
+}
+
 func FNV32a(text string) string {
 	algorithm := fnv.New32a()
 	algorithm.Write([]byte(text))
