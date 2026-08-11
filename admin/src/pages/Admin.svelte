@@ -7,6 +7,7 @@
 	import User from './User.svelte';
 	import Users from './Users.svelte';
 	import Projects from '../components/Projects.svelte';
+	import PackratDocs from '../components/PackratDocs.svelte';
 
 	export let tab = 'admin';
 	export let userID = '';
@@ -103,6 +104,7 @@
 
 	{#if activeTab.id === 'admin'}
 		<Users />
+		<PackratDocs />
 	{/if}
 </div>
 

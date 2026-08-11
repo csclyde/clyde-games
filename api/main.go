@@ -54,6 +54,7 @@ func main() {
 	router.GET("/savegame", endpoints.GetSavegames)
 	router.GET("/savegame/builds", endpoints.GetSavegameBuilds)
 	router.GET("/system/stats", endpoints.GetSystemStats)
+	router.POST("/packrat/rebuild", endpoints.RebuildPackratDocs)
 	router.POST("/savegame", endpoints.AddSavegame)
 	router.GET("/savegame/download", endpoints.DownloadSavegame)
 	router.DELETE("/savegame", endpoints.DeleteSavegame)
