@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"api.clyde.games/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -49,6 +50,42 @@ func RebuildPackratDocs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Packrat documentation deployed", "output": trimCommandOutput(output)})
+}
+
+func GetPackratVersion(c *gin.Context) {
+	check, err := models.CheckPackratVersion(c.Query("current"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, check)
+}
+
+func GetPackratVersionSettings(c *gin.Context) {
+	settings, err := models.GetPackratVersionSettings()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, settings)
+}
+
+func UpdatePackratVersionSettings(c *gin.Context) {
+	var settings models.PackratVersionSettings
+	if err := c.BindJSON(&settings); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updated, err := models.SavePackratLatestVersion(settings.LatestVersion)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updated)
 }
 
 func trimCommandOutput(output []byte) string {
