@@ -1,5 +1,19 @@
 [
     {
+        "name": "Packrat",
+        "href": "https://clydegames.itch.io/packrat",
+        "img": "/img/packrat.png",
+        "desc": "A fast, portable, useful, sprite atlas packer.",
+        "tools": "Zig, Dear ImGui"
+    },
+    {
+        "name": "CDBVS",
+        "href": "https://marketplace.visualstudio.com/items?itemName=CLYDE.cdbvs",
+        "img": "/img/cdbvs.png",
+        "desc": "A VS Code extension for editing CastleDB files.",
+        "tools": "JavaScript"
+    },
+    {
         "name": "Valley of Nysa",
         "href": "https://www.youtube.com/watch?v=6WoWG2p9oPg",
         "img": "/img/nysa.png",
