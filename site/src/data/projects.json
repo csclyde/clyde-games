@@ -42,6 +42,13 @@
         "tools": "Haxe, Heaps.io"
     },
     {
+        "name": "hxdist",
+        "href": "https://lib.haxe.org/p/hxdist/",
+        "img": "/img/hxdist.jpeg",
+        "desc": "A tool that builds distributable Haxe packages.",
+        "tools": "Haxe"
+    },
+    {
         "name": "Word Origin Analysis",
         "href": "/words/analyze",
         "img": "/img/monk.jpeg",
