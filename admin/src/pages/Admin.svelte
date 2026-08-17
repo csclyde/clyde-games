@@ -7,7 +7,7 @@
 	import User from './User.svelte';
 	import Users from './Users.svelte';
 	import Projects from '../components/Projects.svelte';
-	import PackratDocs from '../components/PackratDocs.svelte';
+	import Tools from './Tools.svelte';
 
 	export let tab = 'admin';
 	export let userID = '';
@@ -17,7 +17,8 @@
 		{ id: 'admin', label: 'Admin', href: '/admin', component: Metrics },
 		{ id: 'feedback', label: 'Feedback', href: '/feedback', component: Feedback },
 		{ id: 'crashes', label: 'Crashes', href: '/crashes', component: Crashes },
-		{ id: 'savegames', label: 'Save Games', href: '/savegames', component: Savegames }
+		{ id: 'savegames', label: 'Save Games', href: '/savegames', component: Savegames },
+		{ id: 'tools', label: 'Tools', href: '/tools', component: Tools }
 	];
 
 	let selectedProject = defaultProject;
@@ -72,7 +73,7 @@
 			{/each}
 		</nav>
 
-		{#if tab !== 'user'}
+		{#if tab !== 'user' && activeTab.id !== 'tools'}
 		<label class="project-filter">
 			<span>Project</span>
 			<select bind:value={selectedProject}>
@@ -104,7 +105,6 @@
 
 	{#if activeTab.id === 'admin'}
 		<Users />
-		<PackratDocs />
 	{/if}
 </div>
 
