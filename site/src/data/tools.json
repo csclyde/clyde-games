@@ -1,0 +1,37 @@
+[
+    {
+        "name": "Callisto",
+        "href": "https://clydegames.itch.io/callisto",
+        "img": "/img/callisto.png",
+        "desc": "A bitmap font renderer with raster, SDF, and MSDF rendering.",
+        "tools": "Zig, Dear ImGui"
+    },
+    {
+        "name": "Packrat",
+        "href": "https://clydegames.itch.io/packrat",
+        "img": "/img/packrat.png",
+        "desc": "A fast, portable, useful, sprite atlas packer.",
+        "tools": "Zig, Dear ImGui"
+    },
+    {
+        "name": "CDBVS",
+        "href": "https://marketplace.visualstudio.com/items?itemName=CLYDE.cdbvs",
+        "img": "/img/cdbvs.png",
+        "desc": "A VS Code extension for editing CastleDB files.",
+        "tools": "JavaScript"
+    },
+    {
+        "name": "Game Analytics Tools",
+        "href": "/analytics-tools",
+        "img": "/img/admin.png",
+        "desc": "A suite of tools for monitoring, analyzing, and improving my games.",
+        "tools": "Golang, Svelte"
+    },
+    {
+        "name": "hxdist",
+        "href": "https://lib.haxe.org/p/hxdist/",
+        "img": "/img/hxdist.png",
+        "desc": "A tool that builds distributable Haxe packages.",
+        "tools": "Haxe"
+    }
+]

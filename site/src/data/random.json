@@ -1,0 +1,37 @@
+[
+    {
+        "name": "Valley of Nysa",
+        "href": "https://www.youtube.com/watch?v=6WoWG2p9oPg",
+        "img": "/img/nysa.png",
+        "desc": "An atmospheric album about a fictional place.",
+        "tools": "E-Mu Proteus/1, Reaper"
+    },
+    {
+        "name": "Van Conversion",
+        "href": "/van",
+        "img": "/img/van.png",
+        "desc": "A camper van conversion, to allow easy travel and exploration.",
+        "tools": "Ram ProMaster, Baltic Birch"
+    },
+    {
+        "name": "Word Origin Analysis",
+        "href": "/words/analyze",
+        "img": "/img/monk.jpeg",
+        "desc": "A tool to analyze and display the origin of English words.",
+        "tools": "Golang, Svelte"
+    },
+    {
+        "name": "A Neocortical Theory",
+        "href": "https://docs.google.com/document/d/e/2PACX-1vR36VpZ6VpXY63o3_MMqPnrSnRXhQtDu79TFigDkL18Ui0iDGFtXpibn8YuZKKFV_olGhcjQiptRera/pub",
+        "img": "/img/neo.png",
+        "desc": "A theory on how the neocortex can be understood algorithmically.",
+        "tools": "Research, Thinking"
+    },
+    {
+        "name": "Poetry",
+        "href": "/poetry",
+        "img": "/img/lyre.png",
+        "desc": "Various poems I have written over the years.",
+        "tools": "Notebook"
+    }
+]

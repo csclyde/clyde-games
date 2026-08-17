@@ -1,0 +1,37 @@
+[
+    {
+        "name": "Cursemark",
+        "href": "https://store.steampowered.com/app/3219180/Cursemark/",
+        "img": "/img/cursemark.png",
+        "desc": "An Action-Exploration roguelike about exploring a cursed land.",
+        "tools": "Haxe, Heaps.io"
+    },
+    {
+        "name": "Into the Necrovale",
+        "href": "https://store.steampowered.com/app/1717090/Into_the_Necrovale/",
+        "img": "/img/necrovale.png",
+        "desc": "An action RPG about fighting hordes of monsters with powerful combinations of items.",
+        "tools": "Haxe, Heaps.io"
+    },
+    {
+        "name": "VectorLance",
+        "href": "https://clydegames.itch.io/vectorlance",
+        "img": "/img/vl.png",
+        "desc": "An arcade-style game about popping bubbles in space.",
+        "tools": "Haxe, Heaps.io"
+    },
+    {
+        "name": "Frauki's Adventure!",
+        "href": "https://store.steampowered.com/app/1570850/Fraukis_Adventure/",
+        "img": "/img/frauki.png",
+        "desc": "A 2D game about exploring and fighting difficult enemies.",
+        "tools": "JavaScript, Phaser.io, Electron"
+    },
+    {
+        "name": "ARC",
+        "href": "https://clydegames.itch.io/arc",
+        "img": "/img/arc.png",
+        "desc": "A game made in 48 hours, where you use magnets to climb a shaft.",
+        "tools": "JavaScript, Phaser.io"
+    }
+]
