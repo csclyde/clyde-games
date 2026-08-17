@@ -1,5 +1,12 @@
 [
     {
+        "name": "Callisto",
+        "href": "https://clydegames.itch.io/callisto",
+        "img": "/img/callisto.png",
+        "desc": "A bitmap font renderer with raster, SDF, and MSDF rendering.",
+        "tools": "Zig, Dear ImGui"
+    },
+    {
         "name": "Packrat",
         "href": "https://clydegames.itch.io/packrat",
         "img": "/img/packrat.png",
@@ -44,7 +51,7 @@
     {
         "name": "hxdist",
         "href": "https://lib.haxe.org/p/hxdist/",
-        "img": "/img/hxdist.jpeg",
+        "img": "/img/hxdist.png",
         "desc": "A tool that builds distributable Haxe packages.",
         "tools": "Haxe"
     },
