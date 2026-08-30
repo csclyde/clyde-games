@@ -12,6 +12,8 @@ function requireEnv(name) {
 function readConfig() {
   return {
     discordToken: requireEnv("DISCORD_TOKEN"),
+    protectedDiscordUserId: process.env.PROTECTED_DISCORD_USER_ID || "",
+    protectedDiscordUsername: process.env.PROTECTED_DISCORD_USERNAME || "c_l_y_d_e_",
     feedbackApiUrl: process.env.FEEDBACK_API_URL || "http://localhost:9990/feedback",
     feedbackProject: process.env.FEEDBACK_PROJECT || "Discord",
     feedbackEnv: process.env.FEEDBACK_ENV || "production",

@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, Partials } = require("discord.js");
 const { readConfig } = require("./config");
 const { createFeedbackClient } = require("./feedbackClient");
 const { registerFeedbackReactionHandler } = require("./discordFeedback");
+const { registerGoodTimesModerationHandler } = require("./goodTimesModeration");
 
 let config;
 try {
@@ -26,5 +27,6 @@ client.once("ready", (readyClient) => {
 });
 
 registerFeedbackReactionHandler(client, createFeedbackClient(config), config);
+registerGoodTimesModerationHandler(client, config);
 
 client.login(config.discordToken);
