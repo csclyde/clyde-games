@@ -63,6 +63,20 @@ func SelectAllSavegames() ([]Savegame, error) {
 	return savegames, nil
 }
 
+func SelectAllSavegamesWithData(project string) ([]Savegame, error) {
+	var savegames []Savegame
+	query := AnalyticsDB.Where("feedback_id = ?", 0)
+	if project != "" {
+		query = query.Where("LOWER(project) = LOWER(?)", project)
+	}
+	result := query.Order("created_at desc").Find(&savegames)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return savegames, nil
+}
+
 func SelectSavegameBuilds() ([]SavegameBuild, error) {
 	var builds []SavegameBuild
 	result := AnalyticsDB.Model(&Savegame{}).

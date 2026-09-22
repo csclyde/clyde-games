@@ -1,12 +1,15 @@
 package endpoints
 
 import (
+	"archive/zip"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"io"
 	"mime"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -107,6 +110,40 @@ func DownloadSavegame(c *gin.Context) {
 
 	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	c.Data(http.StatusOK, contentType, savegame.Data)
+}
+
+func DownloadAllSavegames(c *gin.Context) {
+	savegames, err := models.SelectAllSavegamesWithData(c.Query("project"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var archive bytes.Buffer
+	zipWriter := zip.NewWriter(&archive)
+	for _, savegame := range savegames {
+		filename := path.Base(strings.ReplaceAll(strings.TrimSpace(savegame.Filename), "\\", "/"))
+		if filename == "." || filename == "/" || filename == "" {
+			filename = "test.sav"
+		}
+
+		file, err := zipWriter.Create("savegames/" + strconv.FormatUint(uint64(savegame.ID), 10) + "_" + filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if _, err := file.Write(savegame.Data); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	if err := zipWriter.Close(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": "savegames.zip"}))
+	c.Data(http.StatusOK, "application/zip", archive.Bytes())
 }
 
 func DeleteSavegame(c *gin.Context) {

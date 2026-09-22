@@ -52,6 +52,7 @@ func main() {
 	router.GET("/resolvecrash", endpoints.ResolveCrash)
 	router.POST("/crash", endpoints.AddCrash)
 	router.GET("/savegame", endpoints.GetSavegames)
+	router.GET("/savegame/download-all", endpoints.DownloadAllSavegames)
 	router.GET("/savegame/builds", endpoints.GetSavegameBuilds)
 	router.GET("/system/stats", endpoints.GetSystemStats)
 	router.GET("/packrat/version", endpoints.GetPackratVersion)

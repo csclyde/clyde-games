@@ -31,6 +31,7 @@
 	let loadingSavegames = true;
 	let savegameError = '';
 	let deletingSavegames = {};
+	let downloadingAll = false;
 
 	async function loadSavegames() {
 		loadingSavegames = true;
@@ -64,6 +65,18 @@
 		document.body.appendChild(link);
 		link.click();
 		link.remove();
+	}
+
+	function downloadAllSavegames() {
+		downloadingAll = true;
+		const link = document.createElement('a');
+		const projectParam = selectedProject === 'all' ? '' : `?project=${encodeURIComponent(selectedProject)}`;
+		link.href = `https://api.clyde.games/savegame/download-all${projectParam}`;
+		link.download = 'savegames.zip';
+		document.body.appendChild(link);
+		link.click();
+		link.remove();
+		window.setTimeout(() => downloadingAll = false, 1500);
 	}
 
 	function formatDate(value) {
@@ -132,6 +145,9 @@
 			<h2>Save Games</h2>
 			<p>{visibleSavegames.length} file{visibleSavegames.length === 1 ? '' : 's'}</p>
 		</div>
+		<button type="button" disabled={loadingSavegames || visibleSavegames.length === 0 || downloadingAll} on:click={downloadAllSavegames}>
+			{downloadingAll ? 'Preparing...' : 'Download all'}
+		</button>
 	</header>
 
 	{#if loadingSavegames}
@@ -198,7 +214,11 @@
 	}
 
 	.page-header {
+		align-items: center;
 		border-bottom: 1px solid var(--line);
+		display: flex;
+		gap: 12px;
+		justify-content: space-between;
 		margin-bottom: 14px;
 		padding-bottom: 12px;
 	}
