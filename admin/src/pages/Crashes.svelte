@@ -182,22 +182,59 @@
 		}
 	}
 
-	function getStack(crash) {
-		var stack = crash.Stack.split('FilePos');
+	const crashDetailsStart = /^\s*(?:GPU Model|GPU Memory|Tracked GPU Memory|Window|Render Surface|Scene|Level|Cursemark|ScaleGrid Guard|Physics Contact Guard)\s*:/im;
 
-		if(stack.length > 0 && stack[0] == '[') {
-			stack.shift();
+	function parseCrashLog(crash) {
+		const rawStack = (crash.Stack || '').replace(/\r\n/g, '\n');
+		const match = crashDetailsStart.exec(rawStack);
+		let stackText = rawStack;
+		let detailsText = '';
+
+		if (match) {
+			stackText = rawStack.slice(0, match.index).trim();
+			detailsText = rawStack.slice(match.index).trim();
+		} else {
+			const separator = rawStack.indexOf('\n\n');
+			if (separator >= 0) {
+				stackText = rawStack.slice(0, separator).trim();
+				detailsText = rawStack.slice(separator + 2).trim();
+			}
 		}
 
-		for(const i in stack) {
-			stack[i] = stack[i].replaceAll('[', '');
-			stack[i] = stack[i].replaceAll(']', '');
-			stack[i] = stack[i].replaceAll('(', ' ');
-			stack[i] = stack[i].replaceAll(')', ' ');
-			stack[i] = stack[i].replaceAll(',', '::');
+		let frames;
+		if (stackText.includes('FilePos(')) {
+			frames = stackText
+				.split(/,\s*(?=FilePos\()/)
+				.map(formatFilePosFrame)
+				.filter(Boolean);
+		} else {
+			frames = stackText
+				.split('\n')
+				.map(line => line.trim())
+				.filter(Boolean);
 		}
 
-		return stack;
+		const details = detailsText
+			.split('\n')
+			.map(line => line.trim())
+			.filter(Boolean)
+			.map(line => {
+				const separator = line.indexOf(':');
+				return separator < 0
+					? { label: 'Additional info', value: line }
+					: { label: line.slice(0, separator).trim(), value: line.slice(separator + 1).trim() };
+			});
+
+		return { frames, details };
+	}
+
+	function formatFilePosFrame(frame) {
+		const value = frame.replace(/^\[|\]$/g, '').trim();
+		const match = value.match(/^FilePos\(Method\((.*?),(.*?)\),([^,]+),(\d+),.*\)$/);
+		if (match) {
+			return `${match[1]}.${match[2]} — ${match[3]}:${match[4]}`;
+		}
+		return value.replace(/^FilePos\(/, '').replace(/\)$/, '').replaceAll(',', ' · ');
 	}
 
 	function isAccessViolation(crash) {
@@ -205,7 +242,7 @@
 	}
 
 	function getFirstStackLine(crash) {
-		const stack = getStack(crash);
+		const stack = parseCrashLog(crash).frames;
 		return stack.length > 0 && stack[0].trim() ? stack[0].trim() : 'Unknown location';
 	}
 
@@ -298,7 +335,7 @@
 	}
 
 	function getVisibleStack(crash) {
-		const stack = getStack(crash);
+		const stack = parseCrashLog(crash).frames;
 
 		if (crash.expanded) {
 			return stack;
@@ -308,13 +345,13 @@
 	}
 
 	function shouldShowExpand(crash) {
-		return !crash.expanded && getStack(crash).length > 6;
+		return parseCrashLog(crash).frames.length > 6;
 	}
 
-	function expandCrash(crash) {
+	function toggleCrashExpansion(crash) {
 		const crashKey = getCrashKey(crash);
 		crashes = crashes.map(item => getCrashKey(item) === crashKey
-			? { ...item, expanded: true }
+			? { ...item, expanded: !item.expanded }
 			: item);
 	}
 
@@ -396,7 +433,8 @@
 			`Last Seen: ${formatDate(crash.UpdatedAt)}`,
 			'',
 			'Stack:',
-			...getStack(crash)
+			...parseCrashLog(crash).frames,
+			...parseCrashLog(crash).details.map(detail => `${detail.label}: ${detail.value}`)
 		];
 
 		return details.join('\n');
@@ -545,9 +583,19 @@
 					<div class="comment-main">
 						<div class="stack">
 							<p class="message"><b>{crash.Message}</b></p>
-							{#each getVisibleStack(crash) as stackMessage}
-								<p class="message">{stackMessage}</p>
+							{#each getVisibleStack(crash) as stackMessage, index}
+								<p class="stack-frame"><span>{index + 1}</span>{stackMessage}</p>
 							{/each}
+							{#if parseCrashLog(crash).details.length > 0}
+								<section class="crash-details" aria-label="Crash runtime details">
+									<h4>Runtime details</h4>
+									<dl>
+										{#each parseCrashLog(crash).details as detail}
+											<div><dt>{detail.label}</dt><dd>{detail.value}</dd></div>
+										{/each}
+									</dl>
+								</section>
+							{/if}
 							{#if helperStatus[crash.Hash] && helperStatus[crash.Hash].status}
 								<small class="helper-status">{helperStatus[crash.Hash].status}</small>
 							{/if}
@@ -555,8 +603,8 @@
 								<small class="helper-error">{helperStatus[crash.Hash].error}</small>
 							{/if}
 							{#if shouldShowExpand(crash)}
-								<button class="expand-button" type="button" on:click={() => expandCrash(crash)}>
-									Expand...
+								<button class="expand-button" type="button" on:click={() => toggleCrashExpansion(crash)}>
+									{crash.expanded ? 'Show fewer frames' : `Show all ${parseCrashLog(crash).frames.length} frames`}
 								</button>
 							{/if}
 						</div>
@@ -840,6 +888,70 @@
 	.message:first-child {
 		font-size: 1rem;
 		margin-bottom: 8px;
+	}
+
+	.stack-frame {
+		align-items: baseline;
+		color: var(--text-muted);
+		display: grid;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-size: 0.78rem;
+		gap: 10px;
+		grid-template-columns: 24px minmax(0, 1fr);
+		line-height: 1.5;
+		overflow-wrap: anywhere;
+		padding: 2px 0;
+		text-align: left;
+	}
+
+	.stack-frame span {
+		color: var(--text-soft);
+		font-variant-numeric: tabular-nums;
+		text-align: left;
+	}
+
+	.crash-details {
+		background: var(--paper-warm);
+		border: 1px solid var(--line);
+		border-radius: 6px;
+		margin-top: 8px;
+		padding: 6px 8px;
+	}
+
+	.crash-details h4 {
+		color: var(--text-soft);
+		font-size: 0.62rem;
+		letter-spacing: 0.06em;
+		margin: 0 0 4px;
+		text-transform: uppercase;
+	}
+
+	.crash-details dl {
+		display: grid;
+		gap: 3px 10px;
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+		margin: 0;
+	}
+
+	.crash-details dl div {
+		align-items: baseline;
+		display: flex;
+		gap: 5px;
+		min-width: 0;
+	}
+
+	.crash-details dt {
+		color: var(--text-soft);
+		flex: 0 0 auto;
+		font-size: 0.62rem;
+		font-weight: 700;
+	}
+
+	.crash-details dd {
+		color: var(--charcoal);
+		font-size: 0.7rem;
+		margin: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.helper-status {

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"api.clyde.games/models"
@@ -88,6 +90,20 @@ func FNV32a(text string) string {
 	return fmt.Sprint(algorithm.Sum32())
 }
 
+var crashMachineInfoStart = regexp.MustCompile(`(?im)^\s*(computer|system|hardware|operating system|os|os version|processor|cpu|gpu( model| memory)?|tracked gpu memory|graphics card|video card|memory|ram|directx|display adapter|render surface|window|scene|level|cursemark|scalegrid guard|physics contact guard|machine|device)\s*(information|info|details)?\s*[:=]`)
+
+// crashFingerprint keeps the error and call stack as the crash identity while
+// excluding diagnostic machine details that may be appended to newer reports.
+// Truncating at the section boundary also preserves the legacy hash for reports
+// that contain only the original message and stack.
+func crashFingerprint(crash models.Crash) string {
+	stack := crash.Stack
+	if location := crashMachineInfoStart.FindStringIndex(stack); location != nil {
+		stack = strings.TrimRight(stack[:location[0]], " \t\r\n")
+	}
+	return FNV32a(crash.Message + stack)
+}
+
 func AddCrash(c *gin.Context) {
 	var crash models.Crash
 
@@ -98,7 +114,7 @@ func AddCrash(c *gin.Context) {
 		return
 	}
 
-	crash.Hash = FNV32a(crash.Message + crash.Stack)
+	crash.Hash = crashFingerprint(crash)
 
 	// open db connection
 	updatedCrash, err := models.AddCrash(crash)
