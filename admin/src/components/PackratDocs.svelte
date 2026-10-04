@@ -62,10 +62,13 @@
 
 		try {
 			const response = await fetch('/api/packrat/rebuild', { method: 'POST' });
+			if (!(response.headers.get('content-type') || '').includes('application/json')) {
+				throw new Error(`Documentation deployment returned HTTP ${response.status}. Check the admin API proxy.`);
+			}
 			const body = await response.json();
+			output = body.output || '';
 			if (!response.ok) throw new Error(body.error || 'Packrat documentation deployment failed');
 			message = body.message || 'Packrat documentation deployed';
-			output = body.output || '';
 		} catch (rebuildError) {
 			error = rebuildError.message || 'Packrat documentation deployment failed';
 		} finally {
