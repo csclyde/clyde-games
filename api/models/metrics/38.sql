@@ -1,0 +1,1 @@
+SELECT * FROM crashes WHERE project = 'cursemark' AND resolved = FALSE ORDER BY updated_at DESC LIMIT 1001

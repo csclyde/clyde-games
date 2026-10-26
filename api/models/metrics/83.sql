@@ -1,0 +1,1 @@
+SELECT level, COUNT(*) AS count FROM events GROUP BY level ORDER BY count ASC

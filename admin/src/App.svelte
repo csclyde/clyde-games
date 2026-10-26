@@ -5,13 +5,13 @@
 	let tab = 'admin';
 	let userID = '';
 
-	router('/', () => router.redirect('/metrics'));
+	router('/', () => router.redirect('/admin'));
 	router('/admin', () => tab = 'admin');
-	router('/metrics', () => tab = 'admin');
+	router('/metrics', () => tab = 'metrics');
 	router('/feedback', () => tab = 'feedback');
 	router('/crashes', () => tab = 'crashes');
-	router('/savegames', () => tab = 'savegames');
-	router('/save-games', () => router.redirect('/savegames'));
+	router('/savegames', () => router.redirect('/admin'));
+	router('/save-games', () => router.redirect('/admin'));
 	router('/tools', () => tab = 'tools');
 	router('/users', () => router.redirect('/admin'));
 	router('/user/:id', context => {

@@ -30,6 +30,8 @@ func main() {
 
 	router := gin.Default()
 	router.Use(CORSMiddleware())
+	router.GET("/metrics", endpoints.MetricsAuth, endpoints.GetMetrics)
+	router.GET("/metrics/:id", endpoints.MetricsAuth, endpoints.GetMetric)
 	router.GET("/feedback", endpoints.GetFeedback)
 	router.POST("/feedback", endpoints.AddFeedback)
 	router.PUT("/feedback/translation", endpoints.UpdateFeedbackTranslation)

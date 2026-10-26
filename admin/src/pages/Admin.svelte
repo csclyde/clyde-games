@@ -1,13 +1,13 @@
 <script>
 	import Feedback from './Feedback.svelte';
 	import Crashes from './Crashes.svelte';
-	import Savegames from './Savegames.svelte';
 	import Metrics from './Metrics.svelte';
 	import ServerStats from '../components/ServerStats.svelte';
 	import User from './User.svelte';
 	import Users from './Users.svelte';
 	import Projects from '../components/Projects.svelte';
 	import Tools from './Tools.svelte';
+	import MetricsDashboard from './MetricsDashboard.svelte';
 
 	export let tab = 'admin';
 	export let userID = '';
@@ -15,9 +15,9 @@
 	const defaultProject = 'all';
 	const tabs = [
 		{ id: 'admin', label: 'Admin', href: '/admin', component: Metrics },
+		{ id: 'metrics', label: 'Metrics', href: '/metrics', component: MetricsDashboard },
 		{ id: 'feedback', label: 'Feedback', href: '/feedback', component: Feedback },
 		{ id: 'crashes', label: 'Crashes', href: '/crashes', component: Crashes },
-		{ id: 'savegames', label: 'Save Games', href: '/savegames', component: Savegames },
 		{ id: 'tools', label: 'Tools', href: '/tools', component: Tools }
 	];
 

@@ -1,0 +1,478 @@
+[
+  {
+    "id": 88,
+    "name": "Average Minutes per Clear",
+    "description": "",
+    "display": "scalar",
+    "settings": {},
+    "section": "Levels",
+    "row": 0,
+    "col": 0,
+    "width": 6
+  },
+  {
+    "id": 117,
+    "name": "10% Bottleneck",
+    "description": "",
+    "display": "scalar",
+    "settings": {},
+    "section": "Levels",
+    "row": 0,
+    "col": 6,
+    "width": 6
+  },
+  {
+    "id": 130,
+    "name": "1% Bottleneck",
+    "description": "",
+    "display": "scalar",
+    "settings": {},
+    "section": "Levels",
+    "row": 0,
+    "col": 12,
+    "width": 6
+  },
+  {
+    "id": 131,
+    "name": "Average Run Depth",
+    "description": "",
+    "display": "scalar",
+    "settings": {
+      "scalar.field": "average_run_depth"
+    },
+    "section": "Levels",
+    "row": 0,
+    "col": 18,
+    "width": 6
+  },
+  {
+    "id": 104,
+    "name": "Total Clears",
+    "description": "",
+    "display": "bar",
+    "settings": {
+      "graph.dimensions": [
+        "cursemark"
+      ],
+      "graph.series_order_dimension": null,
+      "graph.series_order": null,
+      "graph.x_axis.scale": "linear",
+      "graph.metrics": [
+        "level_clears",
+        "player_deaths"
+      ],
+      "stackable.stack_type": null
+    },
+    "section": "Levels",
+    "row": 3,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 107,
+    "name": "Normalized Level Difficulty",
+    "description": "",
+    "display": "bar",
+    "settings": {
+      "graph.dimensions": [
+        "level"
+      ],
+      "graph.x_axis.scale": "ordinal",
+      "graph.metrics": [
+        "difficulty_score"
+      ]
+    },
+    "section": "Levels",
+    "row": 10,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 132,
+    "name": "Normalized Level Difficulty Table",
+    "description": "",
+    "display": "table",
+    "settings": {
+      "graph.dimensions": [
+        "level"
+      ],
+      "graph.x_axis.scale": "ordinal",
+      "graph.metrics": [
+        "difficulty_score"
+      ],
+      "table.row_index": true,
+      "table.cell_column": "difficulty_score"
+    },
+    "section": "Levels",
+    "row": 17,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 102,
+    "name": "Item Power Score",
+    "description": "",
+    "display": "table",
+    "settings": {
+      "table.cell_column": "uses",
+      "table.pivot_column": "slot",
+      "table.columns": [
+        {
+          "name": "slot",
+          "enabled": true
+        },
+        {
+          "name": "item",
+          "enabled": true
+        },
+        {
+          "name": "uses",
+          "enabled": true
+        },
+        {
+          "name": "total_score",
+          "enabled": false
+        },
+        {
+          "name": "avg_cursemark",
+          "enabled": true
+        },
+        {
+          "name": "max_cursemark",
+          "enabled": true
+        },
+        {
+          "name": "global_avg_cursemark",
+          "enabled": false
+        },
+        {
+          "name": "above_global_avg",
+          "enabled": true
+        }
+      ]
+    },
+    "section": "Skills",
+    "row": 0,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 121,
+    "name": "Weapon Usage per Player",
+    "description": "",
+    "display": "pie",
+    "settings": {
+      "pie.metric": "players",
+      "pie.dimension": [
+        "item"
+      ]
+    },
+    "section": "Skills",
+    "row": 12,
+    "col": 0,
+    "width": 6
+  },
+  {
+    "id": 122,
+    "name": "Spell Usage per Player",
+    "description": "",
+    "display": "pie",
+    "settings": {
+      "pie.metric": "players",
+      "pie.dimension": [
+        "item"
+      ]
+    },
+    "section": "Skills",
+    "row": 12,
+    "col": 6,
+    "width": 6
+  },
+  {
+    "id": 123,
+    "name": "Ward Usage per Player",
+    "description": "",
+    "display": "pie",
+    "settings": {
+      "pie.metric": "players",
+      "pie.dimension": [
+        "item"
+      ]
+    },
+    "section": "Skills",
+    "row": 12,
+    "col": 12,
+    "width": 6
+  },
+  {
+    "id": 124,
+    "name": "Ult Usage per Player - Modified",
+    "description": "",
+    "display": "pie",
+    "settings": {
+      "pie.metric": "players",
+      "pie.dimension": [
+        "item"
+      ]
+    },
+    "section": "Skills",
+    "row": 12,
+    "col": 18,
+    "width": 6
+  },
+  {
+    "id": 125,
+    "name": "Weapon Dropoff",
+    "description": "",
+    "display": "line",
+    "settings": {
+      "graph.dimensions": [
+        "cursemark",
+        "item"
+      ],
+      "graph.series_order_dimension": null,
+      "graph.series_order": null,
+      "graph.x_axis.scale": "linear",
+      "graph.metrics": [
+        "retention_percent"
+      ]
+    },
+    "section": "Skills",
+    "row": 23,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 126,
+    "name": "Spell Dropoff",
+    "description": "",
+    "display": "line",
+    "settings": {
+      "graph.dimensions": [
+        "cursemark",
+        "item"
+      ],
+      "graph.series_order_dimension": null,
+      "graph.series_order": null,
+      "graph.x_axis.scale": "linear",
+      "graph.metrics": [
+        "retention_percent"
+      ]
+    },
+    "section": "Skills",
+    "row": 29,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 127,
+    "name": "Ward Dropoff",
+    "description": "",
+    "display": "line",
+    "settings": {
+      "graph.dimensions": [
+        "cursemark",
+        "item"
+      ],
+      "graph.series_order_dimension": null,
+      "graph.series_order": null,
+      "graph.x_axis.scale": "linear",
+      "graph.metrics": [
+        "retention_percent"
+      ]
+    },
+    "section": "Skills",
+    "row": 35,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 128,
+    "name": "Ult Dropoff",
+    "description": "",
+    "display": "line",
+    "settings": {
+      "graph.dimensions": [
+        "cursemark",
+        "item"
+      ],
+      "graph.series_order_dimension": null,
+      "graph.series_order": null,
+      "graph.x_axis.scale": "linear",
+      "graph.metrics": [
+        "retention_percent"
+      ]
+    },
+    "section": "Skills",
+    "row": 41,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 38,
+    "name": "Cursemark Crashes",
+    "description": "",
+    "display": "table",
+    "settings": {
+      "table.columns": [
+        {
+          "name": "id",
+          "enabled": true
+        },
+        {
+          "name": "created_at",
+          "enabled": true
+        },
+        {
+          "name": "updated_at",
+          "enabled": true
+        },
+        {
+          "name": "deleted_at",
+          "enabled": false
+        },
+        {
+          "name": "p_id",
+          "enabled": true
+        },
+        {
+          "name": "project",
+          "enabled": true
+        },
+        {
+          "name": "message",
+          "enabled": true
+        },
+        {
+          "name": "env",
+          "enabled": true
+        },
+        {
+          "name": "platform",
+          "enabled": true
+        },
+        {
+          "name": "category",
+          "enabled": false
+        },
+        {
+          "name": "stack",
+          "enabled": true
+        },
+        {
+          "name": "build",
+          "enabled": true
+        },
+        {
+          "name": "commit",
+          "enabled": true
+        },
+        {
+          "name": "hash",
+          "enabled": true
+        },
+        {
+          "name": "count",
+          "enabled": true
+        },
+        {
+          "name": "resolved",
+          "enabled": true
+        }
+      ],
+      "table.pivot_column": "deleted_at",
+      "table.cell_column": "count"
+    },
+    "section": "Other questions",
+    "row": 38,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 39,
+    "name": "Feedback",
+    "description": "",
+    "display": "table",
+    "settings": {
+      "table.columns": [
+        {
+          "name": "id",
+          "enabled": false
+        },
+        {
+          "name": "created_at",
+          "enabled": true
+        },
+        {
+          "name": "updated_at",
+          "enabled": false
+        },
+        {
+          "name": "deleted_at",
+          "enabled": false
+        },
+        {
+          "name": "message",
+          "enabled": true
+        },
+        {
+          "name": "rating",
+          "enabled": true
+        },
+        {
+          "name": "env",
+          "enabled": true
+        },
+        {
+          "name": "category",
+          "enabled": false
+        },
+        {
+          "name": "platform",
+          "enabled": false
+        },
+        {
+          "name": "fps",
+          "enabled": true
+        },
+        {
+          "name": "p_id",
+          "enabled": true
+        },
+        {
+          "name": "project",
+          "enabled": true
+        },
+        {
+          "name": "resolved",
+          "enabled": true
+        }
+      ],
+      "table.pivot_column": "deleted_at",
+      "table.cell_column": "rating"
+    },
+    "section": "Other questions",
+    "row": 39,
+    "col": 0,
+    "width": 24
+  },
+  {
+    "id": 83,
+    "name": "Most played level in the game",
+    "description": "",
+    "display": "bar",
+    "settings": {
+      "graph.x_axis.scale": "ordinal",
+      "graph.dimensions": [
+        "level"
+      ],
+      "graph.metrics": [
+        "count"
+      ]
+    },
+    "section": "Other questions",
+    "row": 83,
+    "col": 0,
+    "width": 24
+  }
+]

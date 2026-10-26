@@ -1,5 +1,26 @@
 ### CLYDE GAMES website
 
+The admin **Metrics** tab queries MySQL directly and uses Chart.js for rendering.
+It includes the 19 active Clyde Games Metabase questions imported on 2026-10-26;
+archived questions and Metabase's sample e-commerce content are excluded. Levels
+and Skills retain the dashboard grouping. The three standalone questions remain
+in the API catalog but are hidden from the portal. SQL and visualization settings live in `api/models/metrics/`
+and are embedded in the API binary. No Metabase service is needed by this page.
+
+Metrics requests use the authenticated admin Nginx `/api/metrics` proxy, which
+injects the existing private token from `packrat-deploy-token.conf`. Deploy the
+updated Nginx configuration with the frontend and API. Results are cached for
+five minutes, with at most two concurrent queries and a 45 second timeout.
+Tables and CSV downloads are limited to 1,000 rows, explicitly indicated when
+truncated. All projects preserves the original SQL; selecting a project scopes
+every event reference, including baselines, to that project. The saved crash
+question additionally retains its original Cursemark/unresolved filters.
+
+Run `npm run build:admin` and `cd api && go test ./...` for verification.
+`METRICS_LIVE_TEST=1 go test ./models -run TestMetricsLiveParity -v` also checks
+the local MySQL results using SELECTs only. Its all-projects/Cursemark comparison
+assumes Cursemark is the sole project with event data, as at migration time.
+
 Packrat documentation deployment is available under **Admin → Tools → Rebuild Docs**.
 The admin calls `/api/packrat/rebuild`; `admin/nginx.conf` proxies it to the Go
 API on port 9990, behind the admin's HTTP basic authentication. Install that
