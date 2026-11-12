@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +19,6 @@ import (
 var steamReviewImportLock sync.Mutex
 
 type steamReviewsResponse struct {
-	Success      int                     `json:"success"`
 	Cursor       string                  `json:"cursor"`
 	QuerySummary steamReviewQuerySummary `json:"query_summary"`
 	Reviews      []steamReview           `json:"reviews"`
@@ -224,17 +224,10 @@ func ImportSteamReviewsSince(project models.Project, cutoff time.Time, now time.
 }
 
 func fetchSteamReviewsPage(client http.Client, appID string, cursor string, dayRange int) (steamReviewsResponse, error) {
-	values := url.Values{}
-	values.Set("json", "1")
-	values.Set("filter", "recent")
-	values.Set("language", "all")
-	values.Set("purchase_type", "all")
-	values.Set("num_per_page", "100")
-	values.Set("day_range", fmt.Sprintf("%d", dayRange))
-	values.Set("cursor", cursor)
-
-	requestURL := "https://store.steampowered.com/appreviews/" + url.PathEscape(appID) + "?" + values.Encode()
-	return fetchSteamReviews(requestURL, client)
+	return requestSteamReviews(client, appID, map[string]interface{}{
+		"filter": 1, "languages": []string{"all"}, "purchase_type": 1,
+		"num_per_page": 100, "cursor": cursor, "day_range": dayRange,
+	})
 }
 
 func FetchSteamReviewSummary(client http.Client, appID string) (models.SteamReviewStats, error) {
@@ -269,15 +262,28 @@ func FetchSteamReviewSummary(client http.Client, appID string) (models.SteamRevi
 }
 
 func fetchSteamReviewSummaryForPurchaseType(client http.Client, appID string, purchaseType string) (steamReviewsResponse, error) {
-	values := url.Values{}
-	values.Set("json", "1")
-	values.Set("filter", "summary")
-	values.Set("language", "all")
-	values.Set("purchase_type", purchaseType)
-	values.Set("num_per_page", "0")
+	purchase := 0 // Steam purchases only, for the displayed review score.
+	if purchaseType == "all" {
+		purchase = 1
+	}
+	return requestSteamReviews(client, appID, map[string]interface{}{
+		"filter": 1, "languages": []string{"all"}, "purchase_type": purchase,
+		"review_type": 0, "num_per_page": 1,
+	})
+}
 
-	requestURL := "https://store.steampowered.com/appreviews/" + url.PathEscape(appID) + "?" + values.Encode()
-	return fetchSteamReviews(requestURL, client)
+func requestSteamReviews(client http.Client, appID string, input map[string]interface{}) (steamReviewsResponse, error) {
+	id, err := strconv.ParseUint(appID, 10, 32)
+	if err != nil || id == 0 {
+		return steamReviewsResponse{}, fmt.Errorf("invalid Steam app ID %q", appID)
+	}
+	input["appid"] = id
+	encoded, err := json.Marshal(input)
+	if err != nil {
+		return steamReviewsResponse{}, err
+	}
+	query := url.Values{"input_json": {string(encoded)}}
+	return fetchSteamReviews("https://api.steampowered.com/IUserReviewsService/GetAppReviews/v1/?"+query.Encode(), client)
 }
 
 func fetchSteamReviews(requestURL string, client http.Client) (steamReviewsResponse, error) {
@@ -291,16 +297,18 @@ func fetchSteamReviews(requestURL string, client http.Client) (steamReviewsRespo
 		return steamReviewsResponse{}, fmt.Errorf("steam reviews returned %s", res.Status)
 	}
 
-	var response steamReviewsResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return steamReviewsResponse{}, err
+	var envelope struct {
+		Response *steamReviewsResponse `json:"response"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&envelope); err != nil {
+		return steamReviewsResponse{}, fmt.Errorf("steam reviews returned invalid JSON: %w", err)
 	}
 
-	if response.Success != 1 {
-		return steamReviewsResponse{}, fmt.Errorf("steam reviews response was not successful")
+	if envelope.Response == nil {
+		return steamReviewsResponse{}, fmt.Errorf("steam reviews response is missing review data")
 	}
 
-	return response, nil
+	return *envelope.Response, nil
 }
 
 func steamReviewDayRange(cutoff time.Time, now time.Time) int {

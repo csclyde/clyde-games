@@ -4,7 +4,6 @@
 	export let state = {};
 	export let retry = () => {};
 	let showData = false;
-	let page = 0;
 	let sortColumn = '';
 	let descending = false;
 	let search = '';
@@ -18,8 +17,6 @@
 		const comparison = av === null ? (bv === null ? 0 : -1) : bv === null ? 1 : av !== '' && bv !== '' && Number.isFinite(Number(av)) && Number.isFinite(Number(bv)) ? Number(av) - Number(bv) : String(av).localeCompare(String(bv));
 		return comparison * (descending ? -1 : 1);
 	}) : filtered;
-	$: pageCount = Math.max(1, Math.ceil(sorted.length / 25));
-	$: if (page >= pageCount) page = pageCount - 1;
 	$: scalarIndex = result ? Math.max(0, result.columns.indexOf(card.settings['scalar.field'])) : 0;
 	function format(value) {
 		if (value === null || value === undefined) return '—';
@@ -28,7 +25,6 @@
 	function sort(column) {
 		descending = sortColumn === column ? !descending : false;
 		sortColumn = column;
-		page = 0;
 	}
 	function download() {
 		const quote = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -58,15 +54,15 @@
 	{:else if !result.rows.length}
 		<p class="state">No data for this project.</p>
 	{:else if card.display === 'table' || showData}
-		<label class="search">Filter rows <input type="search" bind:value={search} on:input={() => page = 0} /></label>
+		<label class="search">Filter rows <input type="search" bind:value={search} /></label>
 		<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 		<div class="table-wrap" tabindex="0" role="region" aria-label={`${card.name} data`}>
 			<table>
 				<thead><tr>{#each columns as column}<th aria-sort={sortColumn === column ? descending ? 'descending' : 'ascending' : 'none'}><button on:click={() => sort(column)}>{label(column)}{sortColumn === column ? descending ? ' ↓' : ' ↑' : ''}</button></th>{/each}</tr></thead>
-				<tbody>{#each sorted.slice(page * 25, (page + 1) * 25) as row}<tr>{#each columns as column}<td>{format(row[result.columns.indexOf(column)])}</td>{/each}</tr>{/each}</tbody>
+				<tbody>{#each sorted as row}<tr>{#each columns as column}<td>{format(row[result.columns.indexOf(column)])}</td>{/each}</tr>{/each}</tbody>
 			</table>
 		</div>
-		<div class="pagination"><span>{filtered.length} rows{result.truncated ? ' (first 1,000)' : ''}</span><button disabled={page === 0} on:click={() => page--}>Previous</button><span>{page + 1} / {pageCount}</span><button disabled={page + 1 >= pageCount} on:click={() => page++}>Next</button></div>
+		<p class="row-count">{filtered.length} rows{result.truncated ? ' (first 1,000)' : ''}</p>
 	{:else if card.display === 'scalar'}
 		<div class="value">{format(result.rows[0][scalarIndex])}</div>
 		<p class="scalar-label">{label(result.columns[scalarIndex])}</p>
@@ -99,8 +95,7 @@
 	th { position: sticky; top: 0; background: var(--paper-warm); z-index: 1; }
 	th button { border: 0; font-weight: 700; }
 	td { border-bottom: 1px solid var(--line); padding: 8px; max-width: 420px; overflow-wrap: anywhere; white-space: pre-wrap; }
-	.pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .75rem; margin-top: 10px; }
-	.pagination span:first-child { margin-right: auto; }
+	.row-count { font-size: .75rem; margin: 10px 0 0; }
 	footer { color: var(--text-muted); font-size: .65rem; margin-top: 12px; }
 	@media (max-width: 1050px) { article { grid-column: span 24; } article.scalar { grid-column: span 12; } .chart.pie { height: 400px; } }
 	@media (max-width: 520px) { article.scalar { grid-column: span 24; } .chart { height: 340px; } }

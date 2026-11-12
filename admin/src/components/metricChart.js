@@ -15,6 +15,7 @@ export function chartConfig(card, result) {
 	const dimension = s['graph.dimensions'] || [];
 	const xName = card.display === 'pie' ? s['pie.dimension'][0] : dimension[0];
 	const metrics = card.display === 'pie' ? [s['pie.metric']] : s['graph.metrics'];
+	const separateDeaths = card.display !== 'pie' && metrics.includes('level_clears') && metrics.includes('player_deaths');
 	const xIndex = index(xName);
 	const splitIndex = dimension.length > 1 ? index(dimension[1]) : -1;
 	const numeric = s['graph.x_axis.scale'] === 'linear';
@@ -25,6 +26,7 @@ export function chartConfig(card, result) {
 		const values = new Map(rows.map(row => [row[xIndex], row[index(metric)]]));
 		return {
 			label: split === null ? label(metric) : String(split),
+			...(separateDeaths ? { yAxisID: metric === 'player_deaths' ? 'deaths' : 'y' } : {}),
 			data: numeric ? rows.map(row => ({ x: Number(row[xIndex]), y: row[index(metric)] === null ? null : Number(row[index(metric)]) }))
 				: labels.map(x => values.get(x) == null ? null : Number(values.get(x))),
 			borderWidth: card.display === 'line' ? 2 : 1,
@@ -47,7 +49,12 @@ export function chartConfig(card, result) {
 			},
 			...(card.display === 'pie' ? {} : { scales: {
 				x: { type: numeric ? 'linear' : 'category', title: { display: true, text: label(xName) }, ticks: { maxRotation: 60, autoSkip: true } },
-				y: { beginAtZero: true, title: { display: metrics.length === 1, text: label(metrics[0]) } }
+				y: { beginAtZero: true, position: 'left', title: { display: separateDeaths || metrics.length === 1, text: separateDeaths ? 'Level Clears' : label(metrics[0]) } },
+				...(separateDeaths ? { deaths: {
+					type: 'linear', position: 'right', beginAtZero: true,
+					title: { display: true, text: 'Player Deaths' },
+					grid: { drawOnChartArea: false }
+				} } : {})
 			} })
 		}
 	};
