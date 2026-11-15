@@ -12,7 +12,7 @@
 		loading = true;
 		error = '';
 		try {
-			const response = await fetch('https://api.clyde.games/projects', { cache: 'no-store' });
+			const response = await fetch('/api/projects', { cache: 'no-store' });
 			const body = await response.json();
 			if (!response.ok) throw new Error(body.error || 'Projects are unavailable');
 			projects = body;

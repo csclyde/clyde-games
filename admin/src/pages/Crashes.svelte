@@ -19,7 +19,7 @@
 	}
 
 	async function getCrashes() {
-		const res = await fetch(`https://api.clyde.games/crash`);
+		const res = await fetch(`/api/crash`);
 		const crashes = await res.json();
 
 		if (res.ok) {
@@ -34,7 +34,7 @@
 	}
 
 	async function getAccessViolations() {
-		const res = await fetch(`https://api.clyde.games/crash/accessviolations?days=${accessRangeDays}`);
+		const res = await fetch(`/api/crash/accessviolations?days=${accessRangeDays}`);
 		const crashes = await res.json();
 
 		if (res.ok) {
@@ -45,7 +45,7 @@
 	}
 
 	async function getCrashBuilds() {
-		const res = await fetch(`https://api.clyde.games/crash/builds`);
+		const res = await fetch(`/api/crash/builds`);
 		const builds = await parseResponse(res);
 
 		if (res.ok) {
@@ -56,7 +56,7 @@
 	}
 
 	async function getCrashSettings() {
-		const res = await fetch(`https://api.clyde.games/crash/settings`);
+		const res = await fetch(`/api/crash/settings`);
 		const settings = await parseResponse(res);
 
 		if (res.ok) {
@@ -162,7 +162,7 @@
 		crashSettingsError = '';
 
 		try {
-			const res = await fetch(`https://api.clyde.games/crash/settings`, {
+			const res = await fetch(`/api/crash/settings`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ OldestBuild: oldestCrashBuild })
@@ -391,8 +391,8 @@
 		resolvingCrashes = { ...resolvingCrashes, [hash]: true };
 
 		try {
-			const res = await fetch(`https://api.clyde.games/resolvecrash?hash=` + hash, {
-				method: 'GET'
+			const res = await fetch(`/api/resolvecrash?hash=` + hash, {
+				method: 'POST'
 			});
 
 			if (res.ok) {
@@ -456,8 +456,8 @@
 
 		try {
 			const crashesToResolve = visibleRegularCrashes;
-			await Promise.all(crashesToResolve.map(crash => fetch(`https://api.clyde.games/resolvecrash?hash=` + crash.Hash, {
-				method: 'GET'
+			await Promise.all(crashesToResolve.map(crash => fetch(`/api/resolvecrash?hash=` + crash.Hash, {
+				method: 'POST'
 			})));
 
 			crashes = crashes.filter(crash => !crashesToResolve.some(item => item.Hash === crash.Hash));

@@ -45,7 +45,7 @@
 		saving = true;
 		error = '';
 		try {
-			const response = await fetch(`https://api.clyde.games/projects/${encodeURIComponent(project.id)}`, {
+			const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({

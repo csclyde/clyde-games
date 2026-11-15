@@ -108,6 +108,7 @@ func GetMetric(c *gin.Context) {
 	metricCache.Unlock()
 	select {
 	case <-c.Request.Context().Done():
+		c.JSON(http.StatusGatewayTimeout, gin.H{"error": "Metric request canceled or timed out. Please retry."})
 		return
 	case <-entry.ready:
 	}

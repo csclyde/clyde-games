@@ -30,7 +30,7 @@
 
 		loadingPlanka = true;
 		try {
-			const res = await fetch('https://api.clyde.games/planka/hierarchy');
+			const res = await fetch('/api/planka/hierarchy');
 			const result = await res.json();
 			if (!res.ok) {
 				throw new Error(result.error || 'Unable to load Planka');
@@ -70,7 +70,7 @@
 		plankaError = '';
 
 		try {
-			const res = await fetch('https://api.clyde.games/planka/tickets', {
+			const res = await fetch('/api/planka/tickets', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({

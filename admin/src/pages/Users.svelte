@@ -14,7 +14,7 @@
 		loading = true;
 		error = '';
 		try {
-			const response = await fetch('https://api.clyde.games/users/blocked');
+			const response = await fetch('/api/users/blocked');
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.error || result);
 			users = result;
@@ -29,7 +29,7 @@
 		if (!confirm(`Remove the block for ${user.PID}?`)) return;
 		error = '';
 		try {
-			const response = await fetch(`https://api.clyde.games/users/blocked/${encodeURIComponent(user.PID)}`, { method: 'DELETE' });
+			const response = await fetch(`/api/users/blocked/${encodeURIComponent(user.PID)}`, { method: 'DELETE' });
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.error || result);
 			users = users.filter(item => item.PID !== user.PID);
@@ -61,7 +61,7 @@
 		adding = true;
 		addError = '';
 		try {
-			const response = await fetch(`https://api.clyde.games/user/${encodeURIComponent(id)}/block`, { method: 'POST' });
+			const response = await fetch(`/api/user/${encodeURIComponent(id)}/block`, { method: 'POST' });
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.error || result);
 			addModalOpen = false;

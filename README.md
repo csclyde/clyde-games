@@ -35,3 +35,11 @@ The server needs Git access to the Packrat remote, Node.js 22.12 or newer, npm,
 and write access to `/var/www/packrat`. Deployment pulls the checked out branch,
 builds VitePress, and publishes only after the build succeeds. The admin shows
 the command output on both success and failure.
+
+## Admin MCP
+
+The top-level [`mcp/`](mcp/README.md) Go module exposes a narrow authenticated
+feedback/crash work queue and metrics to MCP clients such as Codex. Run
+`npm run build:mcp` / `npm run test:mcp` with Go 1.25+ installed. Deployment is
+intentionally separate from the existing umbrella `deploy` command until the
+HTTPS endpoint and dedicated credentials are provisioned. Game ingestion is unchanged.

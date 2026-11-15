@@ -13,7 +13,7 @@
 		error = '';
 
 		try {
-			const response = await fetch(`https://api.clyde.games/user/${encodeURIComponent(id)}`);
+			const response = await fetch(`/api/user/${encodeURIComponent(id)}`);
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.error || result);
 			if (loadedUserID === id) history = result;
@@ -29,7 +29,7 @@
 		blocking = true;
 		error = '';
 		try {
-			const response = await fetch(`https://api.clyde.games/user/${encodeURIComponent(userID)}/block`, { method: 'POST' });
+			const response = await fetch(`/api/user/${encodeURIComponent(userID)}/block`, { method: 'POST' });
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.error || result);
 			history = { ...history, Blocked: true, Savegames: [], Events: [] };
@@ -81,7 +81,7 @@
 
 	function downloadSavegame(item) {
 		const link = document.createElement('a');
-		link.href = `https://api.clyde.games/savegame/download?id=${item.ID}`;
+		link.href = `/api/savegame/download?id=${item.ID}`;
 		link.download = item.Filename || 'test.sav';
 		document.body.appendChild(link);
 		link.click();

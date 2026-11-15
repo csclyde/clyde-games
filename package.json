@@ -12,6 +12,8 @@
     "build:site": "npm run build --workspace clyde-games",
     "build:admin": "npm run build --workspace clyde-games-admin",
     "deploy:site": "npm run deploy --workspace clyde-games",
-    "deploy:admin": "npm run deploy --workspace clyde-games-admin"
+    "deploy:admin": "npm run deploy --workspace clyde-games-admin",
+    "build:mcp": "make -C mcp build",
+    "test:mcp": "make -C mcp test"
   }
 }

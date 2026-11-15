@@ -24,7 +24,7 @@
 		loadingVersions = true;
 		versionError = '';
 		try {
-			const settings = await parseResponse(await fetch('https://api.clyde.games/packrat/version/settings'));
+			const settings = await parseResponse(await fetch('/api/packrat/version/settings'));
 			latestVersion = settings.LatestVersion || '0.1.0';
 			observedVersions = settings.ObservedVersions || [];
 		} catch (loadError) {
@@ -39,7 +39,7 @@
 		versionMessage = '';
 		versionError = '';
 		try {
-			const settings = await parseResponse(await fetch('https://api.clyde.games/packrat/version/settings', {
+			const settings = await parseResponse(await fetch('/api/packrat/version/settings', {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ LatestVersion: latestVersion })

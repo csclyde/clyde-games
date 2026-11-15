@@ -5,7 +5,7 @@
 	export let reportProjects = () => {};
 
 	async function getFeedback() {
-		const res = await fetch(`https://api.clyde.games/feedback`);
+		const res = await fetch(`/api/feedback`);
 		const feedback = await res.json();
 
 		if (res.ok) {
@@ -63,7 +63,7 @@
 		const projectQuery = selectedProject && selectedProject !== 'all'
 			? `?project=${encodeURIComponent(selectedProject)}`
 			: '';
-		const res = await fetch(`https://api.clyde.games/${endpoint}${projectQuery}`, { method: 'POST' });
+		const res = await fetch(`/api/${endpoint}${projectQuery}`, { method: 'POST' });
 		const result = await res.json();
 
 		if (!res.ok) {
@@ -101,8 +101,8 @@
 		resolvingFeedback = { ...resolvingFeedback, [id]: true };
 
 		try {
-			const res = await fetch(`https://api.clyde.games/resolvefeedback?id=` + id, {
-				method: 'GET'
+			const res = await fetch(`/api/resolvefeedback?id=` + id, {
+				method: 'POST'
 			});
 
 			if (res.ok) {
@@ -143,7 +143,7 @@
 			`Commit: ${valueOrUnknown(comment.Commit)}`,
 			`Player ID: ${valueOrUnknown(comment.PID)}`
 		];
-		if (comment.SavegameID) details.push(`Savegame: https://api.clyde.games/savegame/download?id=${comment.SavegameID}`);
+		if (comment.SavegameID) details.push(`Savegame: https://admin.clyde.games/api/savegame/download?id=${comment.SavegameID}`);
 		return details.join('\n');
 	}
 
@@ -164,7 +164,7 @@
 		}
 
 		const link = document.createElement('a');
-		link.href = `https://api.clyde.games/savegame/download?id=${comment.SavegameID}`;
+		link.href = `/api/savegame/download?id=${comment.SavegameID}`;
 		link.download = comment.SavegameFilename || 'test.sav';
 		link.click();
 	}
@@ -360,7 +360,7 @@
 			}
 
 			const translatedMessage = translatedText + messageParts.suffix;
-			const res = await fetch(`https://api.clyde.games/feedback/translation?id=${comment.ID}`, {
+			const res = await fetch(`/api/feedback/translation?id=${comment.ID}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ translated: translatedMessage })

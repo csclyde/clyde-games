@@ -17,7 +17,7 @@
 	}
 
 	async function getSavegames() {
-		const res = await fetch(`https://api.clyde.games/savegame`);
+		const res = await fetch(`/api/savegame`);
 		const savegames = await parseResponse(res);
 
 		if (res.ok) {
@@ -60,7 +60,7 @@
 	function downloadSavegame(id) {
 		const savegame = savegames.find(item => item.ID === id);
 		const link = document.createElement('a');
-		link.href = `https://api.clyde.games/savegame/download?id=${id}`;
+		link.href = `/api/savegame/download?id=${id}`;
 		link.download = savegame?.Filename || 'test.sav';
 		document.body.appendChild(link);
 		link.click();
@@ -71,7 +71,7 @@
 		downloadingAll = true;
 		const link = document.createElement('a');
 		const projectParam = selectedProject === 'all' ? '' : `?project=${encodeURIComponent(selectedProject)}`;
-		link.href = `https://api.clyde.games/savegame/download-all${projectParam}`;
+		link.href = `/api/savegame/download-all${projectParam}`;
 		link.download = 'savegames.zip';
 		document.body.appendChild(link);
 		link.click();
@@ -115,7 +115,7 @@
 		deletingSavegames = { ...deletingSavegames, [id]: true };
 
 		try {
-			const res = await fetch(`https://api.clyde.games/savegame?id=${id}`, {
+			const res = await fetch(`/api/savegame?id=${id}`, {
 				method: 'DELETE'
 			});
 

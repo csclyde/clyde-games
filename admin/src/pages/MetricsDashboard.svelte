@@ -47,7 +47,7 @@
 	}
 	onMount(() => {
 		initialize();
-		read('https://api.clyde.games/projects').then(projects => reportProjects('charts', projects.map(p => p.id))).catch(() => {});
+		read('/api/projects').then(projects => reportProjects('charts', projects.map(p => p.id))).catch(() => {});
 	});
 	onDestroy(() => controller.abort());
 </script>

@@ -1,0 +1,245 @@
+package endpoints
+
+import (
+	"context"
+	"crypto/subtle"
+	"errors"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"api.clyde.games/models"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+const mcpListLimit = 200
+
+// RegisterMCPRoutes is deliberately separate from the game's unauthenticated
+// ingestion endpoints. Never expose arbitrary API paths through this surface.
+func RegisterMCPRoutes(router *gin.Engine) {
+	g := router.Group("/internal/mcp", MCPAuth)
+	g.GET("/projects", mcpProjects)
+	g.GET("/feedback", mcpFeedbackList)
+	g.GET("/feedback/:id", mcpFeedbackDetail)
+	g.GET("/feedback/:id/save", mcpFeedbackSave)
+	g.POST("/feedback/:id/resolve", mcpResolveFeedback)
+	g.GET("/crashes", mcpCrashList)
+	g.GET("/crashes/:id", mcpCrashDetail)
+	g.POST("/crashes/:id/resolve", mcpResolveCrash)
+	g.GET("/metrics", GetMetrics)
+	g.GET("/metrics/:id", GetMetric)
+}
+
+func MCPAuth(c *gin.Context) {
+	token := os.Getenv("MCP_UPSTREAM_TOKEN")
+	supplied := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+	if len(token) < 32 || !strings.HasPrefix(c.GetHeader("Authorization"), "Bearer ") || subtle.ConstantTimeCompare([]byte(token), []byte(supplied)) != 1 {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	timeout := 15 * time.Second
+	if c.FullPath() == "/internal/mcp/metrics/:id" {
+		timeout = 55 * time.Second // Existing metric queries have a 45-second execution budget.
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+	defer cancel()
+	c.Request = c.Request.WithContext(ctx)
+	c.Next()
+}
+
+type mcpReport struct {
+	ID            uint      `json:"id"`
+	Project       string    `json:"project"`
+	Message       string    `json:"message"`
+	Translated    string    `json:"translated,omitempty"`
+	Stack         string    `json:"stack,omitempty"`
+	Rating        uint8     `json:"rating,omitempty"`
+	Category      string    `json:"category,omitempty"`
+	Platform      string    `json:"platform,omitempty"`
+	Build         string    `json:"build,omitempty"`
+	Commit        string    `json:"commit,omitempty"`
+	Count         uint      `json:"count,omitempty"`
+	Resolved      bool      `json:"resolved"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	TextTruncated bool      `json:"text_truncated" gorm:"-"`
+}
+
+func mcpBound(s string, n int) (string, bool) {
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n]), true
+	}
+	return s, false
+}
+func mcpBoundReport(r *mcpReport, detail bool) {
+	limit := 512
+	if detail {
+		limit = 16384
+	}
+	var truncated bool
+	for _, p := range []*string{&r.Message, &r.Translated, &r.Stack} {
+		*p, truncated = mcpBound(*p, limit)
+		r.TextTruncated = r.TextTruncated || truncated
+	}
+	for _, p := range []*string{&r.Project, &r.Category, &r.Platform, &r.Build, &r.Commit} {
+		*p, truncated = mcpBound(*p, 255)
+		r.TextTruncated = r.TextTruncated || truncated
+	}
+	// Raw player ID and Env fields are intentionally omitted. Free-form text remains untrusted.
+}
+func mcpDB(c *gin.Context) *gorm.DB { return models.AnalyticsDB.WithContext(c.Request.Context()) }
+func mcpDBError(c *gin.Context, err error) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(404, gin.H{"error": "report not found"})
+		return
+	}
+	c.JSON(500, gin.H{"error": "database operation failed"})
+}
+func mcpID(c *gin.Context) (uint64, bool) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || id == 0 {
+		c.JSON(400, gin.H{"error": "id must be a positive integer"})
+		return 0, false
+	}
+	return id, true
+}
+func mcpProjects(c *gin.Context) {
+	items := []models.Project{}
+	if err := mcpDB(c).Order("id ASC").Limit(mcpListLimit + 1).Find(&items).Error; err != nil {
+		mcpDBError(c, err)
+		return
+	}
+	truncated := len(items) > mcpListLimit
+	if truncated {
+		items = items[:mcpListLimit]
+	}
+	c.JSON(200, gin.H{"items": items, "truncated": truncated, "limit": mcpListLimit})
+}
+func mcpQuery(c *gin.Context, crash bool) *gorm.DB {
+	fields := []string{"id", "project", "message", "category", "platform", "build", "commit", "resolved", "created_at", "updated_at"}
+	table := "feedbacks"
+	if crash {
+		table = "crashes"
+		fields = append(fields, "stack", "count")
+	} else {
+		fields = append(fields, "translated", "rating")
+	}
+	return mcpDB(c).Table(table).Select(fields).Where("deleted_at IS NULL")
+}
+func mcpList(c *gin.Context, crash bool) {
+	// Return a complete compact work index even when only the first 200 reports
+	// fit as summaries. The caller can retrieve any later report directly by ID.
+	const maxActiveIDs = 100000
+	ids := []uint{}
+	if err := mcpQuery(c, crash).Select("id").Where("resolved = ?", false).Order("created_at ASC, id ASC").Limit(maxActiveIDs+1).Pluck("id", &ids).Error; err != nil {
+		mcpDBError(c, err)
+		return
+	}
+	if len(ids) > maxActiveIDs {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Active queue exceeds the complete-index safety limit; use the admin portal to review it. No partial index returned.", "limit": maxActiveIDs, "index_complete": false})
+		return
+	}
+	items := []mcpReport{}
+	summaryIDs := ids
+	truncated := len(ids) > mcpListLimit
+	if truncated {
+		summaryIDs = ids[:mcpListLimit]
+	}
+	if len(summaryIDs) > 0 {
+		if err := mcpQuery(c, crash).Where("id IN ?", summaryIDs).Order("created_at ASC, id ASC").Find(&items).Error; err != nil {
+			mcpDBError(c, err)
+			return
+		}
+	}
+	for i := range items {
+		mcpBoundReport(&items[i], false)
+		items[i].Stack = ""
+	}
+	c.JSON(200, gin.H{"items": items, "active_ids": ids, "active_count": len(ids), "index_complete": true, "truncated": truncated, "limit": mcpListLimit})
+}
+
+type mcpSaveMetadata struct {
+	ID          uint   `json:"id"`
+	Filename    string `json:"filename"`
+	Size        uint32 `json:"size"`
+	Hash        string `json:"hash"`
+	ContentType string `json:"content_type"`
+}
+
+func mcpDetail(c *gin.Context, crash bool) {
+	id, ok := mcpID(c)
+	if !ok {
+		return
+	}
+	var item mcpReport
+	if err := mcpQuery(c, crash).Where("id = ?", id).Take(&item).Error; err != nil {
+		mcpDBError(c, err)
+		return
+	}
+	mcpBoundReport(&item, true)
+	response := gin.H{"item": item}
+	if !crash {
+		var save mcpSaveMetadata
+		err := mcpDB(c).Table("savegames").Select([]string{"id", "filename", "size", "hash", "content_type"}).Where("feedback_id = ? AND deleted_at IS NULL", id).Order("created_at DESC, id DESC").Take(&save).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			mcpDBError(c, err)
+			return
+		}
+		if err == nil {
+			save.Filename, _ = mcpBound(save.Filename, 255)
+			save.Hash, _ = mcpBound(save.Hash, 64)
+			save.ContentType, _ = mcpBound(save.ContentType, 128)
+			response["save"] = save
+		}
+	}
+	c.JSON(200, response)
+}
+func mcpFeedbackList(c *gin.Context)   { mcpList(c, false) }
+func mcpCrashList(c *gin.Context)      { mcpList(c, true) }
+func mcpFeedbackDetail(c *gin.Context) { mcpDetail(c, false) }
+func mcpCrashDetail(c *gin.Context)    { mcpDetail(c, true) }
+func mcpResolveFeedback(c *gin.Context) {
+	id, ok := mcpID(c)
+	if !ok {
+		return
+	}
+	err := mcpDB(c).Transaction(func(tx *gorm.DB) error {
+		var item models.Feedback
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&item, id).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&item).Update("resolved", true).Error; err != nil {
+			return err
+		}
+		return tx.Where("feedback_id = ?", id).Delete(&models.Savegame{}).Error
+	})
+	if err != nil {
+		mcpDBError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id, "resolved": true, "savegames_soft_deleted": true})
+}
+func mcpResolveCrash(c *gin.Context) {
+	id, ok := mcpID(c)
+	if !ok {
+		return
+	}
+	err := mcpDB(c).Transaction(func(tx *gorm.DB) error {
+		var item models.Crash
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&item, id).Error; err != nil {
+			return err
+		}
+		return tx.Model(&item).Update("resolved", true).Error
+	})
+	if err != nil {
+		mcpDBError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id, "resolved": true})
+}

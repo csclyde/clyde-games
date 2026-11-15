@@ -17,7 +17,7 @@
 	}
 
 	async function getBuilds() {
-		const res = await fetch(`https://api.clyde.games/event/builds`);
+		const res = await fetch(`/api/event/builds`);
 		const builds = await parseResponse(res);
 
 		if (res.ok) {
@@ -28,7 +28,7 @@
 	}
 
 	async function getSavegameBuilds() {
-		const res = await fetch(`https://api.clyde.games/savegame/builds`);
+		const res = await fetch(`/api/savegame/builds`);
 		const builds = await parseResponse(res);
 
 		if (res.ok) {
@@ -39,7 +39,7 @@
 	}
 
 	async function getEventSettings() {
-		const res = await fetch(`https://api.clyde.games/event/settings`);
+		const res = await fetch(`/api/event/settings`);
 		const settings = await parseResponse(res);
 
 		if (res.ok) {
@@ -105,7 +105,7 @@
 		settingsError = '';
 
 		try {
-			const res = await fetch(`https://api.clyde.games/event/settings`, {
+			const res = await fetch(`/api/event/settings`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ OldestBuild: oldestBuild })
@@ -181,7 +181,7 @@
 
 		try {
 			const projectParam = project ? `&project=${encodeURIComponent(project)}` : '';
-			const res = await fetch(`https://api.clyde.games/event/build?build=${encodeURIComponent(build.Build)}${projectParam}`, {
+			const res = await fetch(`/api/event/build?build=${encodeURIComponent(build.Build)}${projectParam}`, {
 				method: 'DELETE'
 			});
 
@@ -212,7 +212,7 @@
 
 		try {
 			const projectParam = project ? `&project=${encodeURIComponent(project)}` : '';
-			const res = await fetch(`https://api.clyde.games/savegame/build?build=${encodeURIComponent(build.Build)}${projectParam}`, {
+			const res = await fetch(`/api/savegame/build?build=${encodeURIComponent(build.Build)}${projectParam}`, {
 				method: 'DELETE'
 			});
 

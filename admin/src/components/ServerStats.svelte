@@ -12,7 +12,7 @@
 		refreshing = true;
 		const started = performance.now();
 		try {
-			const response = await fetch('https://api.clyde.games/system/stats', { cache: 'no-store' });
+			const response = await fetch('/api/system/stats', { cache: 'no-store' });
 			const body = await response.json();
 			if (!response.ok) throw new Error(body.error || 'Server statistics are unavailable');
 			stats = body;
