@@ -10,11 +10,11 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "dotenv": "^17.4.2"
+  "engines": {
+    "node": ">=18.17.0"
   },
-  "overrides": {
-    "@discordjs/rest": "2.1.0"
+  "dependencies": {
+    "discord.js": "^14.28.1",
+    "dotenv": "^17.4.2"
   }
 }

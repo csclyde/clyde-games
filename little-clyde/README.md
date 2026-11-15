@@ -6,8 +6,11 @@ When someone reacts to a message with `:beetle:` / `:lady_beetle:`, LittleClyde 
 
 ## Setup
 
+Use Node.js 22 LTS (minimum supported version: 18.17). When deploying under a
+process manager, check its Node interpreter as well as the shell's Node version.
+
 ```sh
-npm install
+npm ci
 cp .env.example .env
 ```
 
