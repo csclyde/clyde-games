@@ -124,3 +124,61 @@ func (b bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.Header.Set("Authorization", "Bearer "+b.token)
 	return http.DefaultTransport.RoundTrip(r)
 }
+
+// Owner-directed closure must be available without asserting that a fix was tested.
+func TestOwnerDirectedResolution(t *testing.T) {
+	calls := map[string]int{}
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("resolution must POST: %s", r.Method)
+		}
+		if r.Header.Get("Authorization") != "Bearer "+strings.Repeat("u", 32) {
+			t.Error("missing upstream auth")
+		}
+		calls[r.URL.Path]++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":7,"resolved":true}`))
+	}))
+	defer up.Close()
+	b, _ := newBackend(up.URL, strings.Repeat("u", 32))
+	ctx := context.Background()
+	ct, st := mcp.NewInMemoryTransports()
+	ss, err := makeServer(b).Connect(ctx, st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "owner-test", Version: "1"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	init := cs.InitializeResult()
+	if init.ServerInfo.Version != "0.1.1" || !strings.Contains(init.Instructions, "owner's explicit instruction") {
+		t.Fatalf("owner closure policy missing: %+v", init)
+	}
+	listed, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, tool := range listed.Tools {
+		if tool.Name != "resolve_feedback" && tool.Name != "resolve_crash" {
+			continue
+		}
+		count++
+		if !strings.Contains(tool.Description, "explicit owner instruction") {
+			t.Errorf("missing owner path for %s", tool.Name)
+		}
+		if tool.Annotations.ReadOnlyHint || tool.Annotations.DestructiveHint == nil || !*tool.Annotations.DestructiveHint {
+			t.Errorf("incorrect mutation annotation for %s", tool.Name)
+		}
+		res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: tool.Name, Arguments: map[string]any{"id": 7}})
+		if err != nil || res.IsError {
+			t.Fatalf("owner closure call %s: %v %v", tool.Name, res, err)
+		}
+	}
+	if count != 2 || calls["/internal/mcp/feedback/7/resolve"] != 1 || calls["/internal/mcp/crashes/7/resolve"] != 1 {
+		t.Fatalf("wrong resolution calls: %v", calls)
+	}
+}
