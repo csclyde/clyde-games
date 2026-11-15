@@ -1,0 +1,21 @@
+[Unit]
+Description=Clyde Games authenticated admin MCP
+After=network.target goweb.service
+
+[Service]
+Type=simple
+DynamicUser=yes
+# Update this release path explicitly during a coordinated deployment.
+WorkingDirectory=/opt/clyde-games-mcp/releases/d3278eb
+ExecStart=/opt/clyde-games-mcp/releases/d3278eb/clyde-games-mcp
+EnvironmentFile=/etc/clyde-games/mcp.env
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
