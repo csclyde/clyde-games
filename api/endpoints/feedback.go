@@ -28,6 +28,7 @@ func GetFeedback(c *gin.Context) {
 
 		return
 	} else {
+		feedbackSteamPersonas.attach(c.Request.Context(), feedback)
 		c.IndentedJSON(http.StatusOK, feedback)
 	}
 }
@@ -74,7 +75,6 @@ func UpdateFeedbackTranslation(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Feedback not found"})
 		return
 	}
-
 	c.IndentedJSON(http.StatusOK, feedback)
 }
 
@@ -88,6 +88,5 @@ func ResolveFeedback(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Feedback not found"})
 		return
 	}
-
 	c.IndentedJSON(http.StatusOK, feedback)
 }

@@ -2,6 +2,7 @@ package endpoints
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -19,6 +20,7 @@ import (
 var steamReviewImportLock sync.Mutex
 
 type steamReviewsResponse struct {
+	Success      *int                    `json:"success"`
 	Cursor       string                  `json:"cursor"`
 	QuerySummary steamReviewQuerySummary `json:"query_summary"`
 	Reviews      []steamReview           `json:"reviews"`
@@ -45,29 +47,13 @@ type steamReviewAuthor struct {
 	SteamID string `json:"steamid"`
 }
 
-func StartSteamReviewImporter() {
-	go func() {
-		location, err := time.LoadLocation("America/Los_Angeles")
-		if err != nil {
-			log.Printf("steam importer could not load Pacific timezone: %v", err)
-			return
-		}
-
-		for {
-			nextRun := nextSteamImportTime(time.Now(), location)
-			log.Printf("next automatic steam import scheduled for %s", nextRun.Format(time.RFC3339))
-			timer := time.NewTimer(time.Until(nextRun))
-			<-timer.C
-			importAllSteamReviewsFromCheckpoints()
-		}
-	}()
-}
+func StartSteamReviewImporter() { startFeedbackSchedule("steam", importAllSteamReviewsFromCheckpoints) }
 
 func nextSteamImportTime(now time.Time, location *time.Location) time.Time {
 	localNow := now.In(location)
-	next := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 6, 0, 0, 0, location)
+	next := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 5, 0, 0, 0, location)
 	if !next.After(localNow) {
-		next = time.Date(localNow.Year(), localNow.Month(), localNow.Day()+1, 6, 0, 0, 0, location)
+		next = time.Date(localNow.Year(), localNow.Month(), localNow.Day()+1, 5, 0, 0, 0, location)
 	}
 	return next
 }
@@ -120,28 +106,9 @@ func ImportSteamReviewsFromCheckpoint(project models.Project) (int, int, time.Ti
 	steamReviewImportLock.Lock()
 	defer steamReviewImportLock.Unlock()
 
-	syncName := "steam_" + project.ID
-	state, err := models.GetSyncState(syncName)
-	if err != nil {
-		return 0, 0, time.Time{}, time.Time{}, err
-	}
-
-	to := time.Now()
-	from := to.Add(-24 * time.Hour)
-	if state != nil && !state.LastSuccessAt.IsZero() {
-		from = state.LastSuccessAt
-	}
-
-	imported, skipped, err := ImportSteamFeedbackSince(project, from, to)
-	if err != nil {
-		return imported, skipped, from, to, err
-	}
-
-	if _, err := models.SaveSyncSuccess(syncName, to); err != nil {
-		return imported, skipped, from, to, err
-	}
-
-	return imported, skipped, from, to, nil
+	ri, rs, from, to, re := runFeedbackSource(project, "steam_reviews", "steam_", func(from, to time.Time) (int, int, error) { return ImportSteamReviewsSince(project, from, to) })
+	di, ds, _, _, de := runFeedbackSource(project, "steam_discussions", "steam_", func(from, to time.Time) (int, int, error) { return ImportSteamDiscussionsSince(project, from, to) })
+	return ri + di, rs + ds, from, to, errors.Join(re, de)
 }
 
 func ImportSteamFeedbackSince(project models.Project, cutoff time.Time, now time.Time) (int, int, error) {
@@ -165,7 +132,8 @@ func ImportSteamReviewsSince(project models.Project, cutoff time.Time, now time.
 	imported := 0
 	skipped := 0
 
-	for page := 0; page < 20; page++ {
+	for page := 0; page < 100; page++ {
+
 		response, err := fetchSteamReviewsPage(client, project.SteamAppID, cursor, dayRange)
 		if err != nil {
 			return imported, skipped, err
@@ -178,21 +146,19 @@ func ImportSteamReviewsSince(project models.Project, cutoff time.Time, now time.
 		shouldContinue := false
 		for _, review := range response.Reviews {
 			createdAt := time.Unix(review.TimestampCreated, 0)
+			if review.RecommendationID == "" || createdAt.IsZero() || review.TimestampCreated <= 0 {
+				return imported, skipped, fmt.Errorf("steam review missing identity or timestamp")
+			}
+			if createdAt.After(now) {
+				shouldContinue = true
+				continue
+			}
 			if createdAt.Before(cutoff) {
 				continue
 			}
 
 			shouldContinue = true
 			reviewURL := steamReviewURL(review, project.SteamAppID)
-			exists, err := models.FeedbackMessageContains(reviewURL)
-			if err != nil {
-				return imported, skipped, err
-			}
-
-			if exists {
-				skipped += 1
-				continue
-			}
 
 			feedback := models.Feedback{
 				PID:      review.Author.SteamID,
@@ -205,29 +171,43 @@ func ImportSteamReviewsSince(project models.Project, cutoff time.Time, now time.
 			}
 			feedback.CreatedAt = createdAt
 
-			_, err = models.AddFeedback(feedback)
+			added, err := models.AddSourceFeedback(feedback, "steam_reviews", project.SteamAppID+":"+review.RecommendationID, reviewURL)
 			if err != nil {
 				return imported, skipped, err
 			}
 
-			imported += 1
+			if added {
+				imported++
+			} else {
+				skipped++
+			}
 		}
 
-		if !shouldContinue || response.Cursor == "" || response.Cursor == cursor {
+		if !shouldContinue {
 			return imported, skipped, nil
 		}
 
+		if response.Cursor == "" || response.Cursor == cursor {
+			return imported, skipped, fmt.Errorf("steam reviews cursor did not advance")
+		}
 		cursor = response.Cursor
 	}
 
-	return imported, skipped, nil
+	return imported, skipped, fmt.Errorf("steam reviews exceeded 100-page coverage limit")
 }
 
 func fetchSteamReviewsPage(client http.Client, appID string, cursor string, dayRange int) (steamReviewsResponse, error) {
-	return requestSteamReviews(client, appID, map[string]interface{}{
-		"filter": 1, "languages": []string{"all"}, "purchase_type": 1,
-		"num_per_page": 100, "cursor": cursor, "day_range": dayRange,
-	})
+	if _, err := strconv.ParseUint(appID, 10, 32); err != nil {
+		return steamReviewsResponse{}, fmt.Errorf("invalid Steam app ID")
+	}
+	q := url.Values{"json": {"1"}, "filter": {"recent"}, "language": {"all"}, "purchase_type": {"all"}, "review_type": {"all"}, "filter_offtopic_activity": {"0"}, "num_per_page": {"100"}, "cursor": {cursor}}
+	page, storeErr := fetchSteamReviews("https://store.steampowered.com/appreviews/"+appID+"?"+q.Encode(), client)
+	if storeErr == nil {
+		return page, nil
+	}
+	// The production host's store route currently redirects to Steam's homepage.
+	// Preserve the existing working Web API transport as a bounded fallback.
+	return requestSteamReviews(client, appID, map[string]interface{}{"filter": 1, "languages": []string{"all"}, "purchase_type": 1, "review_type": 0, "num_per_page": 100, "cursor": cursor, "day_range": dayRange})
 }
 
 func FetchSteamReviewSummary(client http.Client, appID string) (models.SteamReviewStats, error) {
@@ -287,7 +267,12 @@ func requestSteamReviews(client http.Client, appID string, input map[string]inte
 }
 
 func fetchSteamReviews(requestURL string, client http.Client) (steamReviewsResponse, error) {
-	res, err := client.Get(requestURL)
+	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return steamReviewsResponse{}, err
+	}
+	req.Header.Set("User-Agent", "clyde-games-feedback-sync/1.0")
+	res, err := feedbackGET(client, req)
 	if err != nil {
 		return steamReviewsResponse{}, err
 	}
@@ -299,11 +284,18 @@ func fetchSteamReviews(requestURL string, client http.Client) (steamReviewsRespo
 
 	var envelope struct {
 		Response *steamReviewsResponse `json:"response"`
+		steamReviewsResponse
 	}
 	if err := json.NewDecoder(res.Body).Decode(&envelope); err != nil {
 		return steamReviewsResponse{}, fmt.Errorf("steam reviews returned invalid JSON: %w", err)
 	}
 
+	if envelope.Response == nil && envelope.Success != nil {
+		envelope.Response = &envelope.steamReviewsResponse
+	}
+	if envelope.Response != nil && envelope.Response.Success != nil && *envelope.Response.Success != 1 {
+		return steamReviewsResponse{}, fmt.Errorf("steam reviews returned unsuccessful response")
+	}
 	if envelope.Response == nil {
 		return steamReviewsResponse{}, fmt.Errorf("steam reviews response is missing review data")
 	}
@@ -347,7 +339,7 @@ func steamProjectsForRequest(id string) ([]models.Project, error) {
 	if project == nil {
 		return nil, fmt.Errorf("project %q was not found", id)
 	}
-	if project.SteamAppID == "" {
+	if project.SteamAppID == "" || !project.SteamSyncEnabled {
 		return nil, fmt.Errorf("project %q has no Steam app ID", id)
 	}
 	return []models.Project{*project}, nil

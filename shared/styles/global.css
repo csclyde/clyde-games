@@ -123,3 +123,6 @@ select {
 ::selection {
 	background: rgba(211, 122, 53, 0.24);
 }
+
+/* Keep content width stable when async panels create a scrollbar. */
+html { scrollbar-gutter: stable; }

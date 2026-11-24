@@ -1,4 +1,5 @@
 <script>
+ import Panel from "./Panel.svelte";
 	import { metricChart, label } from './metricChart';
 	export let card;
 	export let state = {};
@@ -37,16 +38,12 @@
 </script>
 
 <article class:scalar={card.display === 'scalar'} style={`--span: ${card.width}`}>
-	<header>
-		<h3>{card.name}</h3>
-		{#if result}
-			<div class="actions">
-				{#if card.display !== 'table'}<button on:click={() => showData = !showData}>{showData ? 'Chart' : 'Data'}</button>{/if}
-				<button on:click={download} aria-label={`Download ${card.name} as CSV`}>CSV</button>
+	<Panel inset={false} title={card.name} subtitle={card.description || ""}>
+		<div slot="actions" class="actions" class:pending={!result}>
+				{#if card.display !== 'table'}<button disabled={!result} on:click={() => showData = !showData}>{showData ? 'Chart' : 'Data'}</button>{/if}
+				<button disabled={!result} on:click={download} aria-label={`Download ${card.name} as CSV`}>CSV</button>
 			</div>
-		{/if}
-	</header>
-	{#if card.description}<p>{card.description}</p>{/if}
+	<div class="result" class:pie={card.display === 'pie'} class:table={card.display === 'table'}>
 	{#if state.error}
 		<p class="error" role="alert">{state.error} <button on:click={retry}>Retry</button></p>
 	{:else if !result}
@@ -54,7 +51,7 @@
 	{:else if !result.rows.length}
 		<p class="state">No data for this project.</p>
 	{:else if card.display === 'table' || showData}
-		<label class="search">Filter rows <input type="search" bind:value={search} /></label>
+		<div class="search"><input aria-label="Filter rows" placeholder="Filter rows…" type="search" bind:value={search} /></div>
 		<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 		<div class="table-wrap" tabindex="0" role="region" aria-label={`${card.name} data`}>
 			<table>
@@ -70,18 +67,24 @@
 		<div class="chart" class:pie={card.display === 'pie'} role="img" aria-label={card.name}><canvas use:metricChart={{ card, result }} aria-label={card.name}>Use the Data button to view chart values.</canvas></div>
 		{#if result.truncated}<p class="error">Showing the first 1,000 rows. View Data for details.</p>{/if}
 	{/if}
-	{#if result}<footer>Updated {new Date(result.updatedAt).toLocaleTimeString()}</footer>{/if}
-</article>
+	</div>
+	<footer>{#if result}Updated {new Date(result.updatedAt).toLocaleTimeString()}{:else}Waiting for data...{/if}</footer>
+</Panel></article>
 
 <style>
-	article { grid-column: span var(--span); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; min-width: 0; }
-	header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
-	h3 { font-size: 1rem; margin: 0; text-align: left; }
+	article { grid-column: span var(--span); min-width:0; }
+
+
 	p { text-align: left; font-size: .85rem; color: var(--text-soft); }
 	.actions { display: flex; gap: 5px; }
 	button { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 4px; color: var(--text); padding: 5px 8px; cursor: pointer; font: inherit; font-size: .75rem; white-space: nowrap; }
 	button:hover:not(:disabled) { border-color: var(--forest); }
 	button:disabled { opacity: .5; cursor: default; }
+	.pending { visibility: hidden; }
+	.result { display: flow-root; min-height: 380px; }
+	.result.pie { min-height: 460px; }
+	.scalar .result { min-height: 110px; }
+	.result.table { min-height: 240px; }
 	.chart { position: relative; height: 380px; }
 	.chart.pie { height: 460px; }
 	.value { font-size: 2.5rem; font-weight: 800; color: var(--forest); padding: 14px 0 0; }
@@ -96,7 +99,7 @@
 	th button { border: 0; font-weight: 700; }
 	td { border-bottom: 1px solid var(--line); padding: 8px; max-width: 420px; overflow-wrap: anywhere; white-space: pre-wrap; }
 	.row-count { font-size: .75rem; margin: 10px 0 0; }
-	footer { color: var(--text-muted); font-size: .65rem; margin-top: 12px; }
-	@media (max-width: 1050px) { article { grid-column: span 24; } article.scalar { grid-column: span 12; } .chart.pie { height: 400px; } }
-	@media (max-width: 520px) { article.scalar { grid-column: span 24; } .chart { height: 340px; } }
+	footer { min-height: 16px; color: var(--text-muted); font-size: .65rem; margin-top: 12px; }
+	@media (max-width: 1050px) { article { grid-column: span 24; } article.scalar { grid-column: span 12; } .chart.pie { height: 400px; } .result.pie { min-height: 400px; } }
+	@media (max-width: 520px) { article.scalar { grid-column: span 24; } .chart { height: 340px; } .result:not(.pie):not(.table) { min-height: 340px; } .scalar .result { min-height: 110px; } }
 </style>

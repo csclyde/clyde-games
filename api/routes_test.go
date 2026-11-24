@@ -9,6 +9,7 @@ import (
 
 func TestAdminRoutesFailClosed(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	t.Setenv("PORTAL_AUTH_MODE", "legacy")
 	t.Setenv("ADMIN_API_TOKEN", "")
 	t.Setenv("MCP_UPSTREAM_TOKEN", "")
 	t.Setenv("PACKRAT_DEPLOY_TOKEN", "")
@@ -22,7 +23,7 @@ func TestAdminRoutesFailClosed(t *testing.T) {
 		path := strings.ReplaceAll(route.Path, ":id", "1")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, httptest.NewRequest(route.Method, path, nil))
-		if w.Code != 401 && w.Code != 403 {
+		if w.Code != 401 && w.Code != 403 && !(strings.HasPrefix(route.Path, "/auth/") && w.Code == 404) {
 			t.Errorf("unprotected %s %s: %d", route.Method, path, w.Code)
 		}
 	}

@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"sort"
@@ -13,7 +14,26 @@ import (
 
 func TestMetricScope(t *testing.T) {
 	for _, card := range MetricCatalog() {
-		original, args, err := metricSQL(card.ID, "all")
+		if card.Project != "" {
+			t.Run(card.Name, func(t *testing.T) {
+				scoped, args, err := metricSQL(card.ID, card.Project)
+				if err != nil || len(args) != 1 || args[0] != "necrovale" || !strings.Contains(scoped, "WHERE project = ?") {
+					t.Fatalf("Necrovale query must be scoped: %v", err)
+				}
+				all, allArgs, err := metricSQL(card.ID, "all")
+				if err != nil || all != scoped || !reflect.DeepEqual(args, allArgs) {
+					t.Fatalf("All-project request must retain Necrovale scope: %v", err)
+				}
+				if _, _, err := metricSQL(card.ID, "cursemark"); err == nil {
+					t.Fatal("Necrovale cards must reject requests for other projects")
+				}
+				if strings.Contains(scoped, "WITH RECURSIVE") && !strings.HasPrefix(scoped, "WITH RECURSIVE events AS") {
+					t.Fatal("Recursive keyword must precede all common table expressions")
+				}
+			})
+			continue
+		}
+		_, args, err := metricSQL(card.ID, "all")
 		if err != nil || len(args) != 0 {
 			t.Fatalf("metric %d: %v", card.ID, err)
 		}
@@ -21,7 +41,11 @@ func TestMetricScope(t *testing.T) {
 		if err != nil || len(args) != 1 || strings.Contains(scoped, "OR 1=1") || !strings.Contains(scoped, "WHERE project = ?") {
 			t.Fatalf("metric %d is not parameterized", card.ID)
 		}
-		if strings.Count(strings.ToUpper(original), "WITH ") > 0 && strings.HasPrefix(strings.TrimSpace(original), "WITH ") && !strings.Contains(scoped, ") , ") {
+		raw, err := metricFiles.ReadFile(fmt.Sprintf("metrics/%d.sql", card.ID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(string(raw))), "WITH ") && !strings.Contains(scoped, ") , ") {
 			t.Fatalf("metric %d has invalid CTE composition", card.ID)
 		}
 	}
@@ -48,6 +72,13 @@ func TestMetricsLiveParity(t *testing.T) {
 			all, err := RunMetric(ctx, card.ID, "all")
 			if err != nil {
 				t.Fatal(err)
+			}
+			if card.Project != "" {
+				matching, err := RunMetric(ctx, card.ID, card.Project)
+				if err != nil || !reflect.DeepEqual(canonicalRows(all.Rows), canonicalRows(matching.Rows)) {
+					t.Fatalf("scoped Necrovale query mismatch: %v", err)
+				}
+				return
 			}
 			matching, err := RunMetric(ctx, card.ID, "cursemark")
 			if err != nil {

@@ -1,14 +1,29 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Feedback struct {
 	gorm.Model
+	ParentFeedbackID *uint      `gorm:"index" json:"-"`
+	ThreadActivityAt *time.Time `json:",omitempty"`
+	Replies          []Feedback `gorm:"-" json:",omitempty"`
+	TriageState      string     `gorm:"type:varchar(16)"`
+	TriageNote       string     `gorm:"type:text"`
+	TriageAt         *time.Time
+	SourceKey        *string `gorm:"type:char(64);uniqueIndex" json:"-"`
+	Source           string  `gorm:"type:varchar(32)"`
+	SourceID         string  `gorm:"type:varchar(255)"`
+	SourceURL        string  `gorm:"type:varchar(1024)"`
+	IngestedAt       *time.Time
 	PID              string `gorm:"type:tinytext"`
 	Project          string `gorm:"type:tinytext"`
 	Message          string `gorm:"type:text"`
+	Markdown         string `gorm:"type:mediumtext" json:",omitempty"`
 	Translated       string `gorm:"type:text"`
 	Rating           uint8
 	Env              string `gorm:"type:tinytext"`
@@ -18,6 +33,7 @@ type Feedback struct {
 	Commit           string `gorm:"type:tinytext"`
 	Resolved         bool   `gorm:"type:boolean;default:false"`
 	SavegameID       uint   `gorm:"-"`
+	DisplayAuthor    string `gorm:"-" json:",omitempty"`
 	SavegameFilename string `gorm:"-"`
 }
 
@@ -41,7 +57,7 @@ func UpdateFeedbackTranslation(id string, translated string) (*Feedback, error) 
 
 func SelectAllFeedback() ([]Feedback, error) {
 	var allFeedback []Feedback
-	result := AnalyticsDB.Where("resolved != true").Order("created_at desc").Find(&allFeedback)
+	result := AnalyticsDB.Where("resolved != true AND parent_feedback_id IS NULL").Order("COALESCE(thread_activity_at, created_at) DESC, id DESC").Find(&allFeedback)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -51,10 +67,21 @@ func SelectAllFeedback() ([]Feedback, error) {
 		return nil, err
 	}
 
-	return allFeedback, nil
+	return allFeedback, attachFeedbackReplies(allFeedback)
 }
 
 func AddFeedback(fb Feedback) (*Feedback, error) {
+	fb.ParentFeedbackID, fb.ThreadActivityAt, fb.Replies = nil, nil, nil
+	fb.Markdown = ""
+	fb.DisplayAuthor = ""
+	fb.TriageState = ""
+	fb.TriageNote = ""
+	fb.TriageAt = nil
+	fb.SourceKey = nil
+	fb.Source = ""
+	fb.SourceID = ""
+	fb.SourceURL = ""
+	fb.IngestedAt = nil
 	fb.Project = NormalizeProjectName(fb.Project)
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
 		if err := ensureProject(tx, fb.Project); err != nil {
@@ -93,7 +120,7 @@ func SelectFeedback(id string) (*Feedback, error) {
 func ResolveFeedback(id string) (*Feedback, error) {
 	var existingFeedback Feedback
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
-		result := tx.Where("id = ?", id).First(&existingFeedback)
+		result := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&existingFeedback)
 		if result.Error != nil {
 			if result.Error == gorm.ErrRecordNotFound {
 				return nil
@@ -102,7 +129,7 @@ func ResolveFeedback(id string) (*Feedback, error) {
 		}
 
 		existingFeedback.Resolved = true
-		if err := tx.Save(&existingFeedback).Error; err != nil {
+		if err := tx.Model(&existingFeedback).Update("resolved", true).Error; err != nil {
 			return err
 		}
 

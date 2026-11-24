@@ -214,10 +214,11 @@ func readSavegame(c *gin.Context) (models.Savegame, error) {
 	}
 
 	hash := sha256.Sum256(savegame.Data)
-	savegame.FeedbackID = requestUintValue(c, "feedback_id")
-	if savegame.FeedbackID == 0 {
-		savegame.FeedbackID = requestUintValue(c, "feedbackId")
+	feedbackID, err := requestFeedbackID(c)
+	if err != nil {
+		return savegame, err
 	}
+	savegame.FeedbackID = feedbackID
 	savegame.PID = requestValue(c, "pid")
 	savegame.SID = requestValue(c, "sid")
 	savegame.Project = requestValue(c, "project")
@@ -243,18 +244,22 @@ func requestValue(c *gin.Context, name string) string {
 	return c.Query(name)
 }
 
-func requestUintValue(c *gin.Context, name string) uint {
-	value := requestValue(c, name)
-	if value == "" {
-		return 0
+// Both historical aliases remain supported, but invalid/conflicting IDs must
+// not silently turn a requested feedback attachment into an ordinary save.
+func requestFeedbackID(c *gin.Context) (uint, error) {
+	var id uint
+	for _, name := range []string{"feedback_id", "feedbackId"} {
+		value := requestValue(c, name)
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.ParseUint(value, 10, strconv.IntSize)
+		if err != nil || parsed == 0 || (id != 0 && id != uint(parsed)) {
+			return 0, models.ErrFeedbackSaveAssociation
+		}
+		id = uint(parsed)
 	}
-
-	parsed, err := strconv.ParseUint(value, 10, 0)
-	if err != nil {
-		return 0
-	}
-
-	return uint(parsed)
+	return id, nil
 }
 
 func savegameResponse(savegame models.Savegame) SavegameResponse {

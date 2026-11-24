@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, Partials } = require("discord.js");
 const { readConfig } = require("./config");
 const { createFeedbackClient } = require("./feedbackClient");
 const { registerFeedbackReactionHandler } = require("./discordFeedback");
+const { startFeedbackBridge } = require("./feedbackBridge");
 const { registerGoodTimesModerationHandler } = require("./goodTimesModeration");
 
 let config;
@@ -24,9 +25,11 @@ const client = new Client({
 
 client.once("ready", (readyClient) => {
   console.log(`LittleClyde is watching as ${readyClient.user.tag}`);
+  startFeedbackBridge(client, feedbackClient, config);
 });
 
-registerFeedbackReactionHandler(client, createFeedbackClient(config), config);
+const feedbackClient = createFeedbackClient(config);
+registerFeedbackReactionHandler(client, feedbackClient, config);
 registerGoodTimesModerationHandler(client, config);
 
 client.login(config.discordToken);

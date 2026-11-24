@@ -1,4 +1,6 @@
 <script>
+ import {canWrite} from "../portal-auth.mjs";
+ import Panel from '../components/Panel.svelte';
 	import { tick } from 'svelte';
 
 	let users = [];
@@ -87,18 +89,11 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<section class="blocked-users" aria-labelledby="blocked-users-heading">
-	<header>
-		<div>
-			<h2 id="blocked-users-heading">Blocked Users</h2>
-			<p class="summary">{loading ? 'Loading blocked users…' : `${users.length} blocked user${users.length === 1 ? '' : 's'}`}</p>
-			<p>Users whose metrics events and save games are rejected.</p>
-		</div>
-		<div class="header-actions">
-			<button class="add" type="button" on:click={openAddModal}>Add</button>
-			<button class="refresh" type="button" on:click={loadUsers} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
-		</div>
-	</header>
+<Panel class="blocked-users" title="Blocked Users" subtitle="Blocks player IDs across all projects.">
+ <div slot="actions" class="header-actions">
+  <button class="add" type="button" disabled={!$canWrite} on:click={openAddModal}>Add</button>
+  <button class="refresh" type="button" on:click={loadUsers} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
+ </div>
 
 	{#if loading}
 		<p class="state">loading...</p>
@@ -111,35 +106,35 @@
 			{#each users as user}
 				<article>
 					<div><a href={`/user/${encodeURIComponent(user.PID)}`}>{user.PID}</a><time>Blocked {formatDate(user.CreatedAt)}</time></div>
-					<button class="delete" type="button" on:click={() => unblock(user)}>Delete</button>
+					<button class="delete" type="button" disabled={!$canWrite} on:click={() => unblock(user)}>Delete</button>
 				</article>
 			{/each}
 		</div>
 	{/if}
-</section>
+</Panel>
 
 {#if addModalOpen}
 	<div class="modal-backdrop" role="presentation" on:click|self={closeAddModal}>
 		<form class="modal" role="dialog" aria-modal="true" aria-labelledby="add-user-heading" on:submit|preventDefault={addUser}>
 			<h3 id="add-user-heading">Add Blocked User</h3>
 			<label for="blocked-user-id">User ID</label>
-			<input id="blocked-user-id" bind:this={userIDInput} bind:value={newUserID} maxlength="64" autocomplete="off" disabled={adding} />
+			<input id="blocked-user-id" bind:this={userIDInput} bind:value={newUserID} maxlength="64" autocomplete="off" disabled={!$canWrite || adding} />
 			{#if addError}<p class="modal-error">{addError}</p>{/if}
 			<div class="modal-actions">
-				<button class="cancel" type="button" on:click={closeAddModal} disabled={adding}>Cancel</button>
-				<button class="ok" type="submit" disabled={adding}>{adding ? 'Adding…' : 'OK'}</button>
+				<button class="cancel" type="button" on:click={closeAddModal} disabled={!$canWrite || adding}>Cancel</button>
+				<button class="ok" type="submit" disabled={!$canWrite || adding}>{adding ? 'Adding…' : 'OK'}</button>
 			</div>
 		</form>
 	</div>
 {/if}
 
 <style>
-	.blocked-users { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); margin: 12px auto 32px; max-width: 1368px; padding: 14px; }
-	header { align-items: flex-start; border-bottom: 1px solid var(--line); display: flex; gap: 8px; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; }
-	h2, header p { margin: 0; }
-	h2 { font-size: 1.5rem; line-height: 1.15; text-align: left; }
-	header p { color: var(--text-muted); font-size: .82rem; margin-top: 3px; text-align: left; }
-	header p.summary { color: var(--text); font-weight: 800; margin-top: 5px; }
+
+
+
+
+
+
 	.header-actions { display: flex; gap: 8px; }
 	.users { display: flex; flex-direction: column; gap: 8px; }
 	.users.scrolling { max-height: 360px; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; }
@@ -167,5 +162,5 @@
 	.modal input:focus { border-color: var(--forest); outline: 2px solid var(--forest); outline-offset: 1px; }
 	.modal-error { color: var(--rust); font-size: .82rem; margin: 8px 0 0; }
 	.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
-	@media (max-width: 650px) { .blocked-users { margin: 10px 8px 24px; } }
+
 </style>

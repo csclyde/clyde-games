@@ -64,14 +64,11 @@ func TestFetchSteamReviewSummary(t *testing.T) {
 
 func TestFetchSteamReviewsPage(t *testing.T) {
 	client := http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-		var input map[string]interface{}
-		if err := json.Unmarshal([]byte(req.URL.Query().Get("input_json")), &input); err != nil {
-			t.Fatal(err)
+		q := req.URL.Query()
+		if req.URL.Host != "store.steampowered.com" || q.Get("cursor") != "next+/=" || q.Get("filter") != "recent" || q.Get("purchase_type") != "all" || q.Get("filter_offtopic_activity") != "0" {
+			t.Fatalf("unexpected ingestion query: %s", req.URL)
 		}
-		if input["cursor"] != "next+/=" || input["filter"] != float64(1) || input["purchase_type"] != float64(1) || input["num_per_page"] != float64(100) {
-			t.Fatalf("unexpected pagination/filter inputs: %#v", input)
-		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"response":{"cursor":"another+/=","reviews":[{"recommendationid":"123","author":{"steamid":"456"},"review":"Great","voted_up":true,"timestamp_created":1794356285}]}}`))}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"success":1,"cursor":"another+/=","reviews":[{"recommendationid":"123","author":{"steamid":"456"},"review":"Great","voted_up":true,"timestamp_created":1794356285}]}`))}, nil
 	})}
 	page, err := fetchSteamReviewsPage(client, "3219180", "next+/=", 1)
 	if err != nil {

@@ -1,8 +1,16 @@
 <script>
+ import {canWrite} from "../portal-auth.mjs";
+ import {parseCrashLog} from '../crash-runtime.mjs';
+ import CrashBuildChart from '../components/CrashBuildChart.svelte';
+ import CrashInvestigation from '../components/CrashInvestigation.svelte';
 	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
+	import Panel from '../components/Panel.svelte';
+ import CrashHealth from '../components/CrashHealth.svelte';
+	import { groupCrashList, crashResolutionIDs } from '../crash-groups.mjs';
 
 	export let selectedProject = 'all';
 	export let reportProjects = () => {};
+ export let reportCrashCounts = () => {};
 
 	async function parseResponse(res) {
 		const text = await res.text();
@@ -33,19 +41,9 @@
 		}
 	}
 
-	async function getAccessViolations() {
-		const res = await fetch(`/api/crash/accessviolations?days=${accessRangeDays}`);
-		const crashes = await res.json();
-
-		if (res.ok) {
-			return crashes;
-		} else {
-			throw new Error(crashes.error || crashes);
-		}
-	}
 
 	async function getCrashBuilds() {
-		const res = await fetch(`/api/crash/builds`);
+		const res = await fetch(`/api/crash/builds?project=${encodeURIComponent(selectedProject)}`);
 		const builds = await parseResponse(res);
 
 		if (res.ok) {
@@ -56,7 +54,7 @@
 	}
 
 	async function getCrashSettings() {
-		const res = await fetch(`/api/crash/settings`);
+		const res = await fetch(`/api/crash/settings?project=${encodeURIComponent(selectedProject)}`);
 		const settings = await parseResponse(res);
 
 		if (res.ok) {
@@ -66,16 +64,15 @@
 		}
 	}
 
-	let crashes = [];
-	let accessViolations = [];
+	let queueProject=null;
+ let health=null,healthRefresh=0,queueSearch='',queueView='all',queueSort='recent',buildFilter=null;
+ let crashes = [];
 	let crashBuilds = [];
 	let loadingCrashes = true;
-	let loadingAccessViolations = true;
-	let loadingCrashSettings = true;
+	let loadedCrashSettingsProject = null;
+ let loadingCrashSettings = true;
 	let crashError = '';
-	let accessViolationError = '';
 	let crashSettingsError = '';
-	let accessRangeDays = 30;
 	let resolvingCrashes = {};
 	let resolvingAllCrashes = false;
 	let helperStatus = {};
@@ -97,20 +94,10 @@
 		}
 	}
 
-	async function loadAccessViolations() {
-		loadingAccessViolations = true;
-		accessViolationError = '';
-
-		try {
-			accessViolations = await getAccessViolations();
-		} catch (error) {
-			accessViolationError = error.message;
-		} finally {
-			loadingAccessViolations = false;
-		}
-	}
 
 	async function loadCrashSettings() {
+ const scope=selectedProject;
+ if(scope==='all'){crashBuilds=[];oldestCrashBuild='';loadingCrashSettings=false;return}
 		loadingCrashSettings = true;
 		crashSettingsError = '';
 
@@ -119,7 +106,8 @@
 			getCrashSettings()
 		]);
 
-		if (buildItems.status === 'fulfilled') {
+		if(scope!==selectedProject)return;
+ if (buildItems.status === 'fulfilled') {
 			crashBuilds = buildItems.value;
 		} else {
 			crashSettingsError = buildItems.reason.message || String(buildItems.reason);
@@ -135,46 +123,44 @@
 	}
 
 	loadCrashes();
-	loadAccessViolations();
-	loadCrashSettings();
 
 	async function refreshCrashLists() {
 		try {
 			crashes = await getCrashes();
+ healthRefresh++;
 			crashError = '';
 		} catch (error) {
 			crashError = error.message;
 		}
 
-		try {
-			accessViolations = await getAccessViolations();
-			accessViolationError = '';
-		} catch (error) {
-			accessViolationError = error.message;
-		}
 	}
 
 	async function updateOldestCrashBuild(event) {
-		const previousBuild = oldestCrashBuild;
+		const scope=selectedProject;
+ if(scope==='all')return;
+ const previousBuild = oldestCrashBuild;
 		oldestCrashBuild = event.currentTarget.value;
 		savingOldestCrashBuild = true;
 		oldestCrashBuildSaved = false;
 		crashSettingsError = '';
 
 		try {
-			const res = await fetch(`/api/crash/settings`, {
+			const res = await fetch(`/api/crash/settings?project=${encodeURIComponent(scope)}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ OldestBuild: oldestCrashBuild })
 			});
 			const settings = await parseResponse(res);
+ if(scope!==selectedProject)return;
 			if (!res.ok) {
 				throw new Error(settings.error || settings);
 			}
-			oldestCrashBuild = settings.OldestBuild || '';
+			if(scope!==selectedProject)return;
+ oldestCrashBuild = settings.OldestBuild || '';
 			oldestCrashBuildSaved = true;
 		} catch (error) {
-			oldestCrashBuild = previousBuild;
+			if(scope!==selectedProject)return;
+ oldestCrashBuild = previousBuild;
 			oldestCrashBuildSaved = false;
 			crashSettingsError = error.message;
 		} finally {
@@ -182,160 +168,29 @@
 		}
 	}
 
-	const crashDetailsStart = /^\s*(?:GPU Model|GPU Memory|Tracked GPU Memory|Window|Render Surface|Scene|Level|Cursemark|ScaleGrid Guard|Physics Contact Guard)\s*:/im;
-
-	function parseCrashLog(crash) {
-		const rawStack = (crash.Stack || '').replace(/\r\n/g, '\n');
-		const match = crashDetailsStart.exec(rawStack);
-		let stackText = rawStack;
-		let detailsText = '';
-
-		if (match) {
-			stackText = rawStack.slice(0, match.index).trim();
-			detailsText = rawStack.slice(match.index).trim();
-		} else {
-			const separator = rawStack.indexOf('\n\n');
-			if (separator >= 0) {
-				stackText = rawStack.slice(0, separator).trim();
-				detailsText = rawStack.slice(separator + 2).trim();
-			}
-		}
-
-		let frames;
-		if (stackText.includes('FilePos(')) {
-			frames = stackText
-				.split(/,\s*(?=FilePos\()/)
-				.map(formatFilePosFrame)
-				.filter(Boolean);
-		} else {
-			frames = stackText
-				.split('\n')
-				.map(line => line.trim())
-				.filter(Boolean);
-		}
-
-		const details = detailsText
-			.split('\n')
-			.map(line => line.trim())
-			.filter(Boolean)
-			.map(line => {
-				const separator = line.indexOf(':');
-				return separator < 0
-					? { label: 'Additional info', value: line }
-					: { label: line.slice(0, separator).trim(), value: line.slice(separator + 1).trim() };
-			});
-
-		return { frames, details };
-	}
-
-	function formatFilePosFrame(frame) {
-		const value = frame.replace(/^\[|\]$/g, '').trim();
-		const match = value.match(/^FilePos\(Method\((.*?),(.*?)\),([^,]+),(\d+),.*\)$/);
-		if (match) {
-			return `${match[1]}.${match[2]} — ${match[3]}:${match[4]}`;
-		}
-		return value.replace(/^FilePos\(/, '').replace(/\)$/, '').replaceAll(',', ' · ');
-	}
-
-	function isAccessViolation(crash) {
-		return crash.Message && crash.Message.toLowerCase().includes('access violation');
-	}
 
 	function getFirstStackLine(crash) {
-		const stack = parseCrashLog(crash).frames;
+		const stack = crash.IsAccessViolationFamily ? [] : parseCrashLog(crash).frames;
 		return stack.length > 0 && stack[0].trim() ? stack[0].trim() : 'Unknown location';
 	}
 
-	function getAccessViolationSummary(crashes) {
-		const groups = {};
 
-		for(const crash of getRecentAccessViolations(crashes)) {
-			const firstLine = getFirstStackLine(crash);
-			if(!groups[firstLine]) {
-				groups[firstLine] = {
-					firstLine,
-					count: 0
-				};
-			}
 
-			groups[firstLine].count += 1;
-		}
 
-		return Object.values(groups).sort((a, b) => b.count - a.count);
-	}
 
-	function getAccessViolationTotal(crashes) {
-		return getRecentAccessViolations(crashes).length;
-	}
 
-	function getAccessViolationPlayerTotal(crashes) {
-		const players = new Set();
 
-		for(const crash of getRecentAccessViolations(crashes)) {
-			if(crash.PID) {
-				players.add(crash.PID);
-			}
-		}
-
-		return players.size;
-	}
-
-	function getRecentAccessViolations(crashes) {
-		const cutoff = new Date();
-		cutoff.setDate(cutoff.getDate() - accessRangeDays);
-
-		return crashes.filter(crash => {
-			const firstSeen = new Date(crash.CreatedAt);
-
-			return !isNaN(firstSeen.getTime()) && firstSeen >= cutoff;
-		});
-	}
-
-	function accessRangeLabel() {
-		return accessRangeDays === 30 ? 'last month' : `last ${accessRangeDays} days`;
-	}
-
-	function getAccessViolationTimeline(crashes) {
-		const bucketDays = accessRangeDays <= 31 ? 1 : 7;
-		const bucketCount = Math.ceil(accessRangeDays / bucketDays);
-		const now = new Date();
-		const start = new Date(now);
-		start.setHours(0, 0, 0, 0);
-		start.setDate(start.getDate() - (bucketCount * bucketDays) + 1);
-		const buckets = Array.from({ length: bucketCount }, (_, index) => {
-			const date = new Date(start);
-			date.setDate(date.getDate() + index * bucketDays);
-			return { date, count: 0 };
-		});
-
-		for (const crash of getRecentAccessViolations(crashes)) {
-			const firstSeen = new Date(crash.CreatedAt);
-			const index = Math.floor((firstSeen - start) / (bucketDays * 86400000));
-			if (index >= 0 && index < buckets.length) buckets[index].count += 1;
-		}
-
-		const max = Math.max(1, ...buckets.map(bucket => bucket.count));
-		return buckets.map(bucket => ({
-			...bucket,
-			height: bucket.count / max * 100,
-			label: bucket.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-		}));
-	}
-
-	async function changeAccessRange() {
-		await loadAccessViolations();
-	}
 
 	function getRegularCrashes(crashes) {
-		return crashes.filter(crash => !isAccessViolation(crash));
+		return groupCrashList(crashes);
 	}
 
 	function getCrashKey(crash) {
-		return crash.ID || crash.Hash || `${crash.Message || ''}:${crash.Stack || ''}`;
+		return crash.ListKey || crash.ID || crash.Hash || `${crash.Message || ''}:${crash.Stack || ''}`;
 	}
 
 	function getVisibleStack(crash) {
-		const stack = parseCrashLog(crash).frames;
+		const stack = crash.IsAccessViolationFamily ? [] : parseCrashLog(crash).frames;
 
 		if (crash.expanded) {
 			return stack;
@@ -345,7 +200,7 @@
 	}
 
 	function shouldShowExpand(crash) {
-		return parseCrashLog(crash).frames.length > 6;
+		return !crash.IsAccessViolationFamily && parseCrashLog(crash).frames.length > 6;
 	}
 
 	function toggleCrashExpansion(crash) {
@@ -356,6 +211,7 @@
 	}
 
 	function formatDate(value) {
+		if (!value) return '-';
 		const date = new Date(value);
 
 		if (isNaN(date.getTime())) {
@@ -383,25 +239,24 @@
 		return formatDate(value);
 	}
 
-	function matchesProject(item) {
-		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
+	function matchesProject(item, project) {
+		return project === 'all' || (item.Project || '').toLowerCase() === project.toLowerCase();
 	}
 
-	async function resolveCrash(hash) {
-		resolvingCrashes = { ...resolvingCrashes, [hash]: true };
+	async function resolveCrash(crash) {
+		const key = getCrashKey(crash);
+		resolvingCrashes = { ...resolvingCrashes, [key]: true };
 
 		try {
-			const res = await fetch(`/api/resolvecrash?hash=` + hash, {
-				method: 'POST'
-			});
-
-			if (res.ok) {
-				crashes = crashes.filter(crash => crash.Hash !== hash);
-				await refreshCrashLists();
-			}
+   const results = await Promise.all(crashResolutionIDs(crash).map(id => fetch(`/api/resolvecrash?id=${id}`, {method:'POST'})));
+   if (results.some(res => !res.ok)) throw new Error('Some reports could not be resolved. Remaining reports are shown below.');
+			await refreshCrashLists();
+		} catch (error) {
+   await refreshCrashLists();
+			crashError = error.message;
 		} finally {
 			const nextResolvingCrashes = { ...resolvingCrashes };
-			delete nextResolvingCrashes[hash];
+			delete nextResolvingCrashes[key];
 			resolvingCrashes = nextResolvingCrashes;
 		}
 	}
@@ -418,6 +273,8 @@
 
 	function ticketDescription(crash) {
 		const details = [
+			`Report IDs: ${(crash.Reports || [crash]).map(report => report.ID).join(', ')}`,
+			`Group: ${crash.GroupKey || 'unknown'}`,
 			crash.Message || '',
 			'',
 			'---',
@@ -428,15 +285,16 @@
 			`Category: ${metadataValue(crash.Category)}`,
 			`Build: ${metadataValue(crash.Build)}`,
 			`Commit: ${metadataValue(crash.Commit)}`,
-			`Player ID: ${metadataValue(crash.PID)}`,
+			`Client PID: ${metadataValue(crash.PID)}`,
 			`Count: ${metadataValue(crash.Count)}`,
-			`Last Seen: ${formatDate(crash.UpdatedAt)}`,
+			`Last ingested: ${formatDate(crash.LastIngestedAt || crash.IngestedAt)}`,
 			'',
 			'Stack:',
 			...parseCrashLog(crash).frames,
-			...parseCrashLog(crash).details.map(detail => `${detail.label}: ${detail.value}`)
+			...parseCrashLog(crash, {includeGuards:true}).details.map(detail => `${detail.label}: ${detail.value}`)
 		];
 
+		if (crash.IsAccessViolationFamily) details.push('Individual reports:', ...crash.Reports.map(r => `Report #${r.ID} | group ${r.GroupKey || 'legacy'} | build ${r.Build || 'unknown'} | player ${r.PID || 'unknown'}\n${r.Message}\n${r.Stack}`));
 		return details.join('\n');
 	}
 
@@ -446,49 +304,58 @@
 			return;
 		}
 
-		helperStatus = { ...helperStatus, [crash.Hash]: { status: 'Planka ticket created', error: '' } };
+		helperStatus = { ...helperStatus, [getCrashKey(crash)]: { status: 'Planka ticket created', error: '' } };
 		ticketCrash = null;
-		await resolveCrash(crash.Hash);
+		// Ticket creation retains all investigation material. Resolution is an
+		// explicit, separate action, consistent with the MCP workflow.
 	}
 
 	async function resolveAllCrashes() {
 		resolvingAllCrashes = true;
 
 		try {
-			const crashesToResolve = visibleRegularCrashes;
-			await Promise.all(crashesToResolve.map(crash => fetch(`/api/resolvecrash?hash=` + crash.Hash, {
-				method: 'POST'
-			})));
-
-			crashes = crashes.filter(crash => !crashesToResolve.some(item => item.Hash === crash.Hash));
+			const crashesToResolve = [...new Set(visibleRegularCrashes.flatMap(crashResolutionIDs))];
+			const results = await Promise.all(crashesToResolve.map(id => fetch(`/api/resolvecrash?id=${id}`, { method: 'POST' })));
+			if (results.some(result => !result.ok)) throw new Error('Some crash groups could not be resolved. Refresh to review remaining reports.');
 			await refreshCrashLists();
+		} catch (error) {
+			await refreshCrashLists();
+			crashError = error.message;
 		} finally {
 			resolvingAllCrashes = false;
 		}
 	}
 
-	$: visibleCrashes = crashes.filter(matchesProject);
-	$: visibleAccessViolations = accessViolations.filter(matchesProject);
-	$: accessViolationTimeline = getAccessViolationTimeline(visibleAccessViolations);
-	$: visibleRegularCrashes = getRegularCrashes(visibleCrashes);
+
+ function healthFor(crash,data){if(!data)return null;const raw=(crash.Project||'').trim();const project=raw.toLowerCase()==='cursemark'?'cursemark':raw;if(crash.IsAccessViolationFamily)return data.families.find(g=>g.project===project);return data.groups.find(g=>g.project===project&&(crash.GroupKey?g.group_key===crash.GroupKey:g.report_id===crash.ID))}
+ function filterIssueQueue(groups,query,view,sort,filter,data){const q=query.trim().toLowerCase();const out=groups.filter(g=>{const h=healthFor(g,data);if(q&&!g.Reports.some(r=>[r.Message,r.Stack,r.PID,r.Build].some(v=>(v||'').toLowerCase().includes(q))))return false;if(filter&&!g.Reports.some(r=>matchesProject(r,filter.project)&&r.Build===filter.build))return false;if(view==='returned'&&!h?.returned_open)return false;if(view==='detailed'&&!g.Reports.some(r=>r.OccurrenceVersion===1))return false;if(view==='legacy'&&g.Reports.some(r=>r.OccurrenceVersion===1))return false;return true});return out.sort((a,b)=>{const x=healthFor(a,data),y=healthFor(b,data);if(sort==='reports'&&(x?.reports||0)!==(y?.reports||0))return(y?.reports||0)-(x?.reports||0);if(sort==='ids'&&(x?.reporting_ids||0)!==(y?.reporting_ids||0))return(y?.reporting_ids||0)-(x?.reporting_ids||0);return (Date.parse(y?.last_received||b.LastIngestedAt)||0)-(Date.parse(x?.last_received||a.LastIngestedAt)||0)||b.ID-a.ID})}
+	$: if(selectedProject!==loadedCrashSettingsProject){loadedCrashSettingsProject=selectedProject;loadCrashSettings()}
+ $: visibleCrashes = crashes.filter(item => matchesProject(item, selectedProject));
+	$: allRegularCrashes = getRegularCrashes(visibleCrashes);
+ $: visibleRegularCrashes = filterIssueQueue(allRegularCrashes,queueSearch,queueView,queueSort,buildFilter,health);
+ $: if(selectedProject!==queueProject){queueProject=selectedProject;buildFilter=null;queueSearch=''}
 	$: crashBuildDates = [...new Set(crashBuilds.map(build => build.Build))].sort().reverse();
+	$: if(!loadingCrashes && !crashError) reportCrashCounts(crashes);
 	$: reportProjects('crashes', [
-		...crashes.map(crash => crash.Project),
-		...accessViolations.map(crash => crash.Project)
+		...crashes.map(crash => crash.Project)
 	]);
 </script>
 
 <main>
-	<header class="page-header">
-		<div>
-			<h2>Crash Reports</h2>
-			<p>{visibleRegularCrashes.length} open item{visibleRegularCrashes.length === 1 ? '' : 's'}</p>
-		</div>
-		<div class="header-actions">
+
+
+
+ <div class="queue-heading" id="crash-queue"></div>
+ <div class="incident-overview"><div><span>Open incidents</span><b>{loadingCrashes ? '…' : new Set(visibleCrashes.map(r=>`${r.Project}:${r.GroupKey||r.ID}`)).size}</b></div><div><span>Stored reports</span><b>{loadingCrashes ? '…' : visibleCrashes.length}</b></div><div><span>Returned incidents</span><b>{health?.returned_open_groups ?? '—'}</b></div></div>
+ <div class="queue-controls">
+  <label class="search-control"><span>Search issues</span><input aria-label="Search crash issues" bind:value={queueSearch} placeholder="Error, stack, build or client ID"/></label>
+  <label><span>Show</span><select aria-label="Crash issue view" bind:value={queueView}><option value="all">All open issues</option><option value="returned">Returned after resolution</option><option value="detailed">With detailed reports</option><option value="legacy">Legacy only</option></select></label>
+  <label><span>Sort</span><select aria-label="Crash issue sort" bind:value={queueSort}><option value="recent">Latest detailed receipt</option><option value="reports">Recent report count</option><option value="ids">Recent reporting IDs</option></select></label>
 			<label class="build-cutoff-control" for="oldest-crash-build">
 				<span>Oldest Build</span>
-				<select id="oldest-crash-build" value={oldestCrashBuild} disabled={loadingCrashSettings || savingOldestCrashBuild} on:change={updateOldestCrashBuild}>
+				<select id="oldest-crash-build" value={oldestCrashBuild} disabled={!$canWrite || selectedProject === 'all' || loadingCrashSettings || savingOldestCrashBuild} on:change={updateOldestCrashBuild}>
 					<option value="">Accept all builds</option>
+ {#if oldestCrashBuild && !crashBuildDates.includes(oldestCrashBuild)}<option value={oldestCrashBuild}>{formatBuildDate(oldestCrashBuild)}</option>{/if}
 					{#each crashBuildDates as build}
 						<option value={build}>{formatBuildDate(build)}</option>
 					{/each}
@@ -503,113 +370,65 @@
 					<span>Saved</span>
 				{/if}
 			</div>
-			<button type="button" disabled={resolvingAllCrashes || visibleRegularCrashes.length === 0} on:click={resolveAllCrashes}>
+			<button type="button" disabled={!$canWrite || resolvingAllCrashes || visibleRegularCrashes.length === 0} on:click={resolveAllCrashes}>
 				{resolvingAllCrashes ? 'Closing...' : 'Close All'}
 			</button>
-		</div>
-	</header>
-
+ </div>
+ {#if buildFilter}<p class="build-filter">Open issues with build <b>{buildFilter.build||'Unknown'}</b> in {buildFilter.project||'untagged clients'} <button on:click={()=>buildFilter=null}>Clear build filter</button></p>{/if}
 	{#if crashSettingsError}
 		<p class="state-message error">{crashSettingsError}</p>
 	{/if}
 
-	<section class="access-violations">
-		<div class="section-header">
-			<div>
-				<h3>Access Violations</h3>
-				{#if loadingAccessViolations}
-					<p>loading...</p>
-				{:else if accessViolationError}
-					<p>error</p>
-				{:else}
-					<p>{getAccessViolationTotal(visibleAccessViolations)} incident{getAccessViolationTotal(visibleAccessViolations) === 1 ? '' : 's'} / {getAccessViolationPlayerTotal(visibleAccessViolations)} player{getAccessViolationPlayerTotal(visibleAccessViolations) === 1 ? '' : 's'} {accessRangeLabel()}</p>
-				{/if}
-			</div>
-			<label class="range-control">
-				<span>Show</span>
-				<select bind:value={accessRangeDays} on:change={changeAccessRange} disabled={loadingAccessViolations}>
-					<option value={7}>Last 7 days</option>
-					<option value={30}>Last month</option>
-					<option value={90}>Last 3 months</option>
-					<option value={180}>Last 6 months</option>
-					<option value={365}>Last year</option>
-				</select>
-			</label>
-		</div>
-		{#if loadingAccessViolations}
-			<p class="empty-state">Loading access violations…</p>
-		{:else if accessViolationError}
-			<p class="empty-state">{accessViolationError}</p>
-		{:else}
-			{#if getAccessViolationTotal(visibleAccessViolations) > 0}
-				<div class="incident-chart" aria-label={`Access violation incidents ${accessRangeLabel()}`}>
-					<div class="chart-bars">
-						{#each accessViolationTimeline as bucket, index}
-							<div class="chart-column" title={`${bucket.label}: ${bucket.count} incident${bucket.count === 1 ? '' : 's'}`}>
-								<span class="chart-value">{bucket.count || ''}</span>
-								<div class="chart-bar" style={`height: ${bucket.height}%`}></div>
-								{#if index === 0 || index === accessViolationTimeline.length - 1 || index % Math.ceil(accessViolationTimeline.length / 5) === 0}
-									<span class="chart-label">{bucket.label}</span>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</div>
-				<div class="access-list">
-					{#each getAccessViolationSummary(visibleAccessViolations) as group}
-						<div class="access-row">
-							<strong>{group.count}</strong>
-							<p>{group.firstLine}</p>
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<p class="empty-state">No Access Violations {accessRangeLabel()}.</p>
-			{/if}
-		{/if}
-	</section>
 
+	{#if crashError}<p class="state-message error" role="alert">{crashError}</p>{/if}
 	{#if loadingCrashes}
 		<p class="state-message">loading...</p>
-	{:else if crashError}
-		<p class="state-message error">{crashError}</p>
+	{:else if queueView==='returned'&&!health}<p class="state-message">Complete returned-issue data is unavailable. Choose all open issues to review the queue.</p>
 	{:else if visibleRegularCrashes.length === 0}
-		<p class="state-message">No open crashes.</p>
+		<p class="state-message">{allRegularCrashes.length ? 'No open issues match these filters.' : 'No open crashes.'}</p>
 	{:else}
 		<div class="comment-list">
 		{#each visibleRegularCrashes as crash (getCrashKey(crash))}
-			<div class:resolving={resolvingCrashes[crash.Hash] || resolvingAllCrashes} class="comment">
+			<Panel inset={false} class={resolvingCrashes[getCrashKey(crash)] || resolvingAllCrashes ? "comment resolving" : "comment"}>
 				<div class="comment-body">
 					<div class="comment-main">
 						<div class="stack">
-							<p class="message"><b>{crash.Message}</b></p>
-							{#each getVisibleStack(crash) as stackMessage, index}
+							{#if crash.LegacyReportCount}<div class="issue-state"><span class="legacy-badge">Legacy history</span></div>{/if}
+ <h3 class="message">{crash.Message}</h3>
+ {#each getVisibleStack(crash) as stackMessage, index}
 								<p class="stack-frame"><span>{index + 1}</span>{stackMessage}</p>
 							{/each}
-							{#if parseCrashLog(crash).details.length > 0}
-								<section class="crash-details" aria-label="Crash runtime details">
-									<h4>Runtime details</h4>
-									<dl>
-										{#each parseCrashLog(crash).details as detail}
-											<div><dt>{detail.label}</dt><dd>{detail.value}</dd></div>
-										{/each}
-									</dl>
-								</section>
-							{/if}
-							{#if helperStatus[crash.Hash] && helperStatus[crash.Hash].status}
-								<small class="helper-status">{helperStatus[crash.Hash].status}</small>
-							{/if}
-							{#if helperStatus[crash.Hash] && helperStatus[crash.Hash].error}
-								<small class="helper-error">{helperStatus[crash.Hash].error}</small>
-							{/if}
 							{#if shouldShowExpand(crash)}
 								<button class="expand-button" type="button" on:click={() => toggleCrashExpansion(crash)}>
-									{crash.expanded ? 'Show fewer frames' : `Show all ${parseCrashLog(crash).frames.length} frames`}
+									{crash.expanded ? 'Collapse stack trace' : 'Expand stack trace'}
 								</button>
 							{/if}
+
+       <CrashBuildChart reports={crash.Reports}/>
+       <section class="crash-details" aria-label="Crash runtime and incident details">
+        <dl>
+         {#if !crash.IsAccessViolationFamily}
+          {#each parseCrashLog(crash).details as detail}<div><dt>{detail.label}</dt><dd>{detail.value}</dd></div>{/each}
+          <div><dt>Build</dt><dd>{formatBuildDate(crash.Build)}</dd></div>
+         {/if}
+         <div><dt>Recent reports</dt><dd title={`Detailed receipts in the selected ${health?.days || 30}-day analysis window`}>{healthFor(crash,health)?.reports ?? 'Unavailable'}</dd></div>
+         <div><dt>Reporting IDs</dt><dd title="Distinct installation identifiers in the selected analysis window; not verified people">{healthFor(crash,health)?.reporting_ids ?? 'Unavailable'}</dd></div>
+         <div><dt>First received</dt><dd title="Earliest retained detailed receipt, across all time; legacy timestamps are unknown">{healthFor(crash,health)?.first_received ? formatDate(healthFor(crash,health).first_received) : (!health ? 'Unavailable' : 'Unknown / legacy')}</dd></div>
+         {#if healthFor(crash,health)?.last_resolution}<div><dt>Recorded resolution</dt><dd>{formatDate(healthFor(crash,health).last_resolution)}</dd></div>{/if}
+         <div><dt>Open occurrences</dt><dd title="Includes aggregate counts from legacy reports">{crash.Count}</dd></div>
+        </dl>
+       </section>
+       <CrashInvestigation id={crash.ID} project={crash.Project} family={crash.IsAccessViolationFamily ? 'access_violations' : ''}/>
+
+							{#if helperStatus[getCrashKey(crash)] && helperStatus[getCrashKey(crash)].status}
+								<small class="helper-status">{helperStatus[getCrashKey(crash)].status}</small>
+							{/if}
+							{#if helperStatus[getCrashKey(crash)] && helperStatus[getCrashKey(crash)].error}
+								<small class="helper-error">{helperStatus[getCrashKey(crash)].error}</small>
+							{/if}
 						</div>
-						<div class="meta-list">
-							{#if crash.Project}<span class="project-tag">project: {crash.Project}</span>{/if}
+						{#if !crash.IsAccessViolationFamily}<div class="meta-list">
+							{#if selectedProject === 'all' && crash.Project}<span class="project-tag">project: {crash.Project}</span>{/if}
 							{#if crash.Env}<span>env: {crash.Env}</span>{/if}
 							{#if crash.Platform}<span>platform: {crash.Platform}</span>{/if}
 							{#if crash.Category}<span>category: {crash.Category}</span>{/if}
@@ -622,28 +441,27 @@
 							{#if crash.Hash}
 								<span>hash: {crash.Hash}</span>
 							{/if}
-						</div>
+						</div>{/if}
 					</div>
 					<div class="comment-side">
-						<div class="stats">
-							<p><span>Last Seen</span>{formatDate(crash.UpdatedAt)}</p>
-							<p><span>Build</span>{formatBuildDate(crash.Build)}</p>
-							<p><span>Total</span>{crash.Count}</p>
-						</div>
+      <div class="stats primary-stats"><p><span>Reports</span>{crash.Reports.length}</p><p><span>Last received</span>{healthFor(crash,health)?.last_received || crash.LastIngestedAt ? formatDate(healthFor(crash,health)?.last_received || crash.LastIngestedAt) : 'Legacy: unknown'}</p></div>
+
 						<div class="actions">
-							<button type="button" disabled={resolvingCrashes[crash.Hash] || resolvingAllCrashes} on:click={() => openTicketModal(crash)}>
+							<button type="button" disabled={!$canWrite || resolvingCrashes[getCrashKey(crash)] || resolvingAllCrashes} on:click={() => openTicketModal(crash)}>
 								Make Ticket
 							</button>
-							<button type="button" disabled={resolvingCrashes[crash.Hash] || resolvingAllCrashes} on:click={() => resolveCrash(crash.Hash)}>
-								{resolvingCrashes[crash.Hash] ? 'Resolving...' : 'Resolve'}
+							<button type="button" disabled={!$canWrite || resolvingCrashes[getCrashKey(crash)] || resolvingAllCrashes} on:click={() => resolveCrash(crash)}>
+								{resolvingCrashes[getCrashKey(crash)] ? 'Resolving...' : 'Resolve group'}
 							</button>
 						</div>
 					</div>
 				</div>
-			</div>
+			</Panel>
 		{/each}
 		</div>
 	{/if}
+ <CrashHealth {selectedProject} refreshToken={healthRefresh} on:loaded={e=>health=e.detail} on:filter={e=>{buildFilter=e.detail;document.getElementById('crash-queue')?.scrollIntoView({block:'start'})}}/>
+
 </main>
 
 <PlankaTicketModal
@@ -655,45 +473,15 @@
 />
 
 <style>
+ .incident-overview{display:flex;flex-wrap:wrap;gap:24px;padding:10px 0 18px}.incident-overview div{display:flex;align-items:baseline;gap:9px}.incident-overview span{font-size:.75rem;color:var(--text-soft)}.incident-overview b{font:700 1.15rem var(--font-mono);color:var(--forest)}.stats.primary-stats{grid-template-columns:repeat(2,minmax(90px,max-content))}.queue-heading{scroll-margin-top:60px}
+
+ .queue-controls{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin-bottom:16px}.queue-controls label{display:flex;flex-direction:column;gap:5px;font-size:.7rem;font-weight:700;color:var(--text-soft);min-width:0}.queue-controls select{min-width:0}.queue-controls .search-control{flex:1;min-width:190px}.search-control input{box-sizing:border-box;width:100%;padding:7px 9px;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface);color:var(--text);font:inherit;font-size:.82rem}.issue-state{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.legacy-badge,.build-filter{font-size:.76rem;text-align:left;overflow-wrap:anywhere}.build-filter button{font-size:.74rem;margin-left:8px}@media(max-width:550px){.queue-controls label{width:100%}.queue-controls select{width:100%}}
+
 	main {
 		color: var(--text);
 		max-width: 1400px;
 		margin: 0 auto;
 		padding: 12px 16px 32px;
-	}
-
-	.page-header {
-		align-items: flex-end;
-		border-bottom: 1px solid var(--line);
-		display: flex;
-		gap: 16px;
-		justify-content: space-between;
-		margin-bottom: 14px;
-		padding-bottom: 12px;
-	}
-
-	.page-header h2 {
-		font-size: 2.5rem;
-		line-height: 1;
-		text-align: left;
-	}
-
-	.page-header p {
-		color: var(--olive);
-		font-size: 0.85rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		margin: 6px 0 0;
-		text-align: left;
-		text-transform: uppercase;
-	}
-
-	.header-actions {
-		align-items: flex-end;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		justify-content: flex-end;
 	}
 
 	.build-cutoff-control {
@@ -761,17 +549,9 @@
 		gap: 10px;
 	}
 
-	.comment {
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-left: 4px solid var(--forest);
-		border-radius: var(--radius);
-		box-sizing: border-box;
-		padding: 14px 16px;
-		transition: opacity 120ms ease, background-color 120ms ease;
-	}
 
-	.comment.resolving {
+
+	:global(.comment.resolving) {
 		opacity: 0.45;
 		pointer-events: none;
 	}
@@ -780,7 +560,7 @@
 		align-items: stretch;
 		display: grid;
 		gap: 18px;
-		grid-template-columns: minmax(0, 1fr) minmax(320px, auto);
+		grid-template-columns: minmax(0, 1fr) minmax(210px, auto);
 	}
 
 	.comment-main {
@@ -803,7 +583,7 @@
 		min-width: 0;
 	}
 
-	.comment p {
+	:global(.comment) p {
 		margin: 0;
 	}
 
@@ -877,18 +657,14 @@
 	}
 
 	.message {
-		color: var(--charcoal);
-		flex-grow: 1;
-		font-size: 0.9rem;
-		line-height: 1.35;
-		overflow-wrap: anywhere;
-		text-align: left;
-	}
-
-	.message:first-child {
-		font-size: 1rem;
-		margin-bottom: 8px;
-	}
+  color: var(--charcoal);
+  font-size: clamp(1.25rem, 1.5vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+  text-align: left;
+ }
 
 	.stack-frame {
 		align-items: baseline;
@@ -918,18 +694,10 @@
 		padding: 6px 8px;
 	}
 
-	.crash-details h4 {
-		color: var(--text-soft);
-		font-size: 0.62rem;
-		letter-spacing: 0.06em;
-		margin: 0 0 4px;
-		text-transform: uppercase;
-	}
-
 	.crash-details dl {
 		display: grid;
 		gap: 3px 10px;
-		grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 205px), 1fr));
 		margin: 0;
 	}
 
@@ -942,14 +710,14 @@
 
 	.crash-details dt {
 		color: var(--text-soft);
-		flex: 0 0 auto;
-		font-size: 0.62rem;
+		flex: 0 1 auto;
+		font-size: 0.68rem;
 		font-weight: 700;
 	}
 
 	.crash-details dd {
 		color: var(--charcoal);
-		font-size: 0.7rem;
+		font-size: 0.74rem;
 		margin: 0;
 		overflow-wrap: anywhere;
 	}
@@ -1017,141 +785,39 @@
 		color: var(--rust);
 	}
 
-	.access-violations {
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-left: 4px solid var(--safety);
-		border-radius: var(--radius);
-		box-sizing: border-box;
-		margin-bottom: 12px;
-		padding: 14px 16px;
-	}
 
-	.section-header {
-		align-items: center;
-		border-bottom: 1px solid var(--line);
-		display: flex;
-		gap: 16px;
-		justify-content: space-between;
-		padding-bottom: 10px;
-	}
 
-	.section-header h3 {
-		font-size: 1rem;
-		margin: 0;
-		text-align: left;
-	}
 
-	.section-header p {
-		color: var(--olive);
-		font-size: 0.8rem;
-		font-weight: 700;
-		margin: 3px 0 0;
-		text-align: left;
-	}
 
-	.range-control {
-		align-items: center;
-		display: flex;
-		gap: 8px;
-	}
 
-	.range-control span {
-		color: var(--text-soft);
-		font-size: .7rem;
-		font-weight: 800;
-		letter-spacing: .05em;
-		text-transform: uppercase;
-	}
 
-	.range-control select {
-		background: var(--surface);
-		border: 1px solid var(--line-strong);
-		border-radius: 4px;
-		color: var(--text);
-		font: inherit;
-		font-size: .82rem;
-		font-weight: 700;
-		padding: 6px 9px;
-	}
 
-	.incident-chart {
-		border-bottom: 1px solid var(--line);
-		padding: 14px 0 10px;
-	}
 
-	.chart-bars {
-		align-items: flex-end;
-		display: flex;
-		gap: 3px;
-		height: 150px;
-		margin-bottom: 18px;
-	}
 
-	.chart-column {
-		align-items: center;
-		display: flex;
-		flex: 1 1 0;
-		flex-direction: column;
-		height: 100%;
-		justify-content: flex-end;
-		min-width: 2px;
-		position: relative;
-	}
 
-	.chart-bar {
-		background: var(--safety);
-		border-radius: 2px 2px 0 0;
-		max-width: 28px;
-		width: 72%;
-	}
 
-	.chart-value {
-		color: var(--text-muted);
-		font-size: .65rem;
-		font-weight: 800;
-		line-height: 1;
-		margin-bottom: 3px;
-	}
 
-	.chart-label {
-		bottom: -18px;
-		color: var(--text-soft);
-		font-size: .62rem;
-		position: absolute;
-		white-space: nowrap;
-	}
 
-	.access-list {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		max-height: 180px;
-		margin-top: 8px;
-		overflow-y: auto;
-	}
 
-	.access-row {
-		display: grid;
-		grid-template-columns: 56px 1fr;
-		align-items: center;
-		gap: 8px;
-		border-top: 1px solid var(--line);
-		padding: 7px 0;
-		text-align: left;
-	}
 
-	.access-row p {
-		margin: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
 
-	.empty-state {
-		margin: 8px 0 0;
-		text-align: left;
-	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	small {
 		font-size: 0.68rem;
@@ -1175,48 +841,23 @@
 			padding: 8px 4px 24px;
 		}
 
-		.page-header {
-			align-items: flex-start;
-			flex-direction: column;
-		}
-
-		.header-actions {
-			justify-content: flex-start;
-			width: 100%;
-		}
-
 		.build-cutoff-control,
 		.build-cutoff-control select {
 			width: 100%;
 		}
 
-		.page-header h2 {
-			font-size: 2rem;
-		}
 
-		.section-header {
-			align-items: stretch;
-			flex-direction: column;
-			gap: 8px;
-		}
 
-		.range-control {
-			justify-content: space-between;
-		}
+
+
+
 
 		.comment-list {
 			gap: 12px;
 		}
 
-		.comment,
-		.access-violations {
-			border: 1px solid var(--line-strong);
-			border-top: 4px solid var(--forest);
-			border-left-width: 1px;
-			border-radius: 6px;
-			padding: 12px;
-			width: 100%;
-		}
+
+
 
 		.comment-body {
 			grid-template-columns: 1fr;
@@ -1246,14 +887,9 @@
 			width: 100%;
 		}
 
-		.access-row {
-			grid-template-columns: 44px 1fr;
-		}
 
-		.access-row p {
-			overflow-wrap: anywhere;
-			white-space: normal;
-		}
+
+
 	}
 
 	@media (max-width: 480px) {
@@ -1261,15 +897,8 @@
 			grid-template-columns: 1fr;
 		}
 
-		.section-header {
-			align-items: flex-start;
-			flex-direction: column;
-			gap: 4px;
-		}
 
-		.section-header p {
-			margin-left: 0;
-			text-align: left;
-		}
+
+
 	}
 </style>

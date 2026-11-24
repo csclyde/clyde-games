@@ -17,19 +17,19 @@ func TestNextSteamImportTime(t *testing.T) {
 		want time.Time
 	}{
 		{
-			name: "before six schedules today",
-			now:  time.Date(2026, time.January, 10, 5, 30, 0, 0, location),
-			want: time.Date(2026, time.January, 10, 6, 0, 0, 0, location),
+			name: "before five schedules today",
+			now:  time.Date(2026, time.January, 10, 4, 30, 0, 0, location),
+			want: time.Date(2026, time.January, 10, 5, 0, 0, 0, location),
 		},
 		{
-			name: "at six schedules tomorrow",
-			now:  time.Date(2026, time.January, 10, 6, 0, 0, 0, location),
-			want: time.Date(2026, time.January, 11, 6, 0, 0, 0, location),
+			name: "at five schedules tomorrow",
+			now:  time.Date(2026, time.January, 10, 5, 0, 0, 0, location),
+			want: time.Date(2026, time.January, 11, 5, 0, 0, 0, location),
 		},
 		{
-			name: "after six schedules tomorrow across daylight saving",
+			name: "after five schedules tomorrow across daylight saving",
 			now:  time.Date(2026, time.March, 7, 7, 0, 0, 0, location),
-			want: time.Date(2026, time.March, 8, 6, 0, 0, 0, location),
+			want: time.Date(2026, time.March, 8, 5, 0, 0, 0, location),
 		},
 	}
 

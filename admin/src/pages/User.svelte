@@ -1,5 +1,7 @@
 <script>
+ import {canWrite} from "../portal-auth.mjs";
 	export let userID = '';
+ export let selectedProject = 'cursemark';
 
 	let loadedUserID = '';
 	let loading = false;
@@ -25,14 +27,14 @@
 	}
 
 	async function blockUser() {
-		if (!confirm(`Block ${userID}? Their metrics events and save games will be permanently deleted.`)) return;
+		if (!confirm(`Block ${userID}? Their metrics events and ordinary save games will be permanently deleted. Feedback attachments will be retained.`)) return;
 		blocking = true;
 		error = '';
 		try {
 			const response = await fetch(`/api/user/${encodeURIComponent(userID)}/block`, { method: 'POST' });
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.error || result);
-			history = { ...history, Blocked: true, Savegames: [], Events: [] };
+			history = { ...history, Blocked: true, Savegames: history.Savegames.filter(item => item.FeedbackID > 0), Events: [] };
 		} catch (blockError) {
 			error = blockError.message;
 		} finally {
@@ -58,7 +60,9 @@
 			...(data.Crashes || []).map(item => ({ kind: 'Crash', item })),
 			...(data.Savegames || []).map(item => ({ kind: 'Save game', item })),
 			...(data.Events || []).map(item => ({ kind: 'Event', item }))
-		].sort((a, b) => new Date(eventDate(a.item)) - new Date(eventDate(b.item)));
+		].sort((a, b) => new Date(eventDate(b.item)) - new Date(eventDate(a.item))
+			|| Number(b.item.ID || 0) - Number(a.item.ID || 0)
+			|| a.kind.localeCompare(b.kind));
 
 		return entries.reduce((timeline, entry) => {
 			const previous = timeline[timeline.length - 1];
@@ -89,8 +93,9 @@
 	}
 
 	$: if (userID && userID !== loadedUserID) loadUser(userID);
-	$: timeline = makeTimeline(history);
-	$: itemCount = historyItemCount(history);
+	$: scopedHistory = Object.fromEntries(Object.entries(history).map(([k,v]) => [k, Array.isArray(v) ? v.filter(i => selectedProject === 'all' || (i.Project || '').toLowerCase() === selectedProject.toLowerCase()) : v]));
+	$: timeline = makeTimeline(scopedHistory);
+	$: itemCount = historyItemCount(scopedHistory);
 </script>
 
 <main>
@@ -98,12 +103,12 @@
 		<div>
 			<p class="eyebrow">User history</p>
 			<h2>{userID}</h2>
-			<p>{itemCount} item{itemCount === 1 ? '' : 's'} · {timeline.length} shown · oldest to newest</p>
+			<p>{itemCount} item{itemCount === 1 ? '' : 's'} · {timeline.length} shown · newest to oldest</p>
 		</div>
 		{#if history.Blocked}
 			<span class="blocked-badge">Blocked</span>
 		{:else}
-			<button class="danger" type="button" disabled={loading || blocking} on:click={blockUser}>{blocking ? 'Blocking…' : 'Block User'}</button>
+			<button class="danger" type="button" disabled={!$canWrite || loading || blocking} on:click={blockUser}>{blocking ? 'Blocking…' : 'Block user across all projects'}</button>
 		{/if}
 	</header>
 

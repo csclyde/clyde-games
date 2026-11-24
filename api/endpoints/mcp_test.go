@@ -117,7 +117,7 @@ func TestMCPRequestTimeoutBudget(t *testing.T) {
 
 func TestCanceledMetricReturnsExplicitJSONError(t *testing.T) {
 	id := strconv.Itoa(models.MetricCatalog()[0].ID)
-	key := id + ":mcp-canceled-test"
+	key := id + ":cursemark"
 	// An unfinished cache entry prevents starting a database query. Cancellation
 	// should return an explicit failure immediately, not an empty successful body.
 	metricCache.Lock()
@@ -128,7 +128,7 @@ func TestCanceledMetricReturnsExplicitJSONError(t *testing.T) {
 	r.GET("/metrics/:id", GetMetric)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	req := httptest.NewRequest("GET", "/metrics/"+id+"?project=mcp-canceled-test", nil).WithContext(ctx)
+	req := httptest.NewRequest("GET", "/metrics/"+id+"?project=cursemark", nil).WithContext(ctx)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusGatewayTimeout || !strings.Contains(w.Header().Get("Content-Type"), "application/json") || !strings.Contains(w.Body.String(), `"error"`) {

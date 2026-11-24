@@ -1,8 +1,10 @@
 package models
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -20,17 +22,23 @@ var ErrBuildTooOld = errors.New("build is older than the oldest accepted build")
 
 type Event struct {
 	gorm.Model
-	PID       string         `gorm:"type:varchar(32)"`
-	SID       string         `gorm:"type:varchar(32)"`
-	Env       string         `gorm:"type:varchar(32)"`
-	Build     string         `gorm:"type:varchar(32)"`
-	Project   string         `gorm:"type:varchar(32)"`
-	Type      string         `gorm:"not null;type:varchar(32)"`
-	Level     string         `gorm:"type:varchar(32)"`
-	Cursemark int            `gorm:"type:tinyint"`
-	Resources EventResources `gorm:"embedded;embeddedPrefix:resource_"`
-	Actions   EventActions   `gorm:"embedded;embeddedPrefix:action_"`
-	Items     []EventItem    `gorm:"foreignKey:EventID"`
+	PID        string `gorm:"type:varchar(32)"`
+	SID        string `gorm:"type:varchar(32)"`
+	Env        string `gorm:"type:varchar(32)"`
+	Build      string `gorm:"type:varchar(32)"`
+	Project    string `gorm:"type:varchar(32)"`
+	Type       string `gorm:"not null;type:varchar(32)"`
+	Level      string `gorm:"type:varchar(128)"`
+	Area       string `gorm:"type:varchar(128)"`
+	Mode       string `gorm:"type:varchar(24)"`
+	Difficulty *float64
+	RunStep    *int
+	Commit     string         `gorm:"type:varchar(64)"`
+	Platform   string         `gorm:"type:varchar(32)"`
+	Cursemark  int            `gorm:"type:tinyint"`
+	Resources  EventResources `gorm:"embedded;embeddedPrefix:resource_"`
+	Actions    EventActions   `gorm:"embedded;embeddedPrefix:action_"`
+	Items      []EventItem    `gorm:"foreignKey:EventID"`
 }
 
 type EventResources struct {
@@ -47,11 +55,13 @@ type EventActions struct {
 }
 
 type EventItem struct {
-	EventID uint   `gorm:"not null;index"`
-	Item    string `gorm:"type:char(16);not null"`
-	Slot    string `gorm:"type:char(16)"`
-	Level   uint8  `gorm:"type:tinyint unsigned;not null"`
-	Parent  string `gorm:"type:char(16);"`
+	EventID   uint   `gorm:"not null;index"`
+	Item      string `gorm:"type:varchar(128);not null"`
+	Slot      string `gorm:"type:char(16)"`
+	Level     int    `gorm:"type:int;not null"`
+	Parent    string `gorm:"type:varchar(128)"`
+	SlotIndex *int
+	MeldPath  string `gorm:"type:varchar(128)"`
 }
 
 type EventBuild struct {
@@ -96,9 +106,10 @@ func SelectEventBuilds() ([]EventBuild, error) {
 	return builds, nil
 }
 
-func GetEventSettings() (*EventSettings, error) {
+func GetEventSettings(projects ...string) (*EventSettings, error) {
+	project := settingsProject(projects)
 	var setting EventSetting
-	result := AnalyticsDB.Where("`key` = ?", oldestBuildSetting).First(&setting)
+	result := AnalyticsDB.Where("`key` = ?", projectBuildSettingKey(project)).First(&setting)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return &EventSettings{}, nil
 	}
@@ -109,18 +120,26 @@ func GetEventSettings() (*EventSettings, error) {
 	return &EventSettings{OldestBuild: setting.Value}, nil
 }
 
-func SaveOldestEventBuild(build string) (*EventSettings, error) {
+func SaveOldestEventBuild(build string, projects ...string) (*EventSettings, error) {
+	project := settingsProject(projects)
+	existing, err := SelectProject(project)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errors.New("unknown project")
+	}
 	if build != "" {
 		if _, err := parseBuildDate(build); err != nil {
 			return nil, fmt.Errorf("oldest build is not a valid date: %w", err)
 		}
 
 		var eventCount int64
-		if err := AnalyticsDB.Model(&Event{}).Where("build = ?", build).Count(&eventCount).Error; err != nil {
+		if err := AnalyticsDB.Model(&Event{}).Where("build = ? AND project = ?", build, project).Count(&eventCount).Error; err != nil {
 			return nil, err
 		}
 		var savegameCount int64
-		if err := AnalyticsDB.Model(&Savegame{}).Where("build = ?", build).Count(&savegameCount).Error; err != nil {
+		if err := AnalyticsDB.Model(&Savegame{}).Where("build = ? AND project = ?", build, project).Count(&savegameCount).Error; err != nil {
 			return nil, err
 		}
 		if eventCount+savegameCount == 0 {
@@ -128,8 +147,8 @@ func SaveOldestEventBuild(build string) (*EventSettings, error) {
 		}
 	}
 
-	setting := EventSetting{Key: oldestBuildSetting}
-	result := AnalyticsDB.Where("`key` = ?", oldestBuildSetting).FirstOrCreate(&setting)
+	setting := EventSetting{Key: projectBuildSettingKey(project)}
+	result := AnalyticsDB.Where("`key` = ?", setting.Key).FirstOrCreate(&setting)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -169,8 +188,26 @@ func buildIsBefore(build string, oldestBuild string) (bool, error) {
 	return buildDate.Before(oldestDate), nil
 }
 
-func rejectBuildBeforeOldest(tx *gorm.DB, build string, subject string) error {
-	return rejectBuildBeforeSetting(tx, oldestBuildSetting, build, subject)
+func rejectBuildBeforeOldest(tx *gorm.DB, build string, subject string, projects ...string) error {
+	project := ""
+	if len(projects) > 0 {
+		project = projects[0]
+	}
+	return rejectBuildBeforeSetting(tx, projectBuildSettingKey(project), build, subject)
+}
+func settingsProject(projects []string) string {
+	if len(projects) == 0 || strings.TrimSpace(projects[0]) == "" {
+		return "cursemark"
+	}
+	return NormalizeProjectID(projects[0])
+}
+func projectBuildSettingKey(project string) string {
+	project = NormalizeProjectID(project)
+	if project == "" {
+		return oldestBuildSetting
+	} // Legacy clients without a Project retain the original cutoff.
+	hash := sha256.Sum256([]byte(strings.ToLower(project)))
+	return fmt.Sprintf("oldest_build:%x", hash[:20])
 }
 
 func rejectBuildBeforeSetting(tx *gorm.DB, settingKey string, build string, subject string) error {
@@ -219,7 +256,7 @@ func AddEvent(event Event) (*Event, error) {
 		if err := rejectBlockedUser(tx, event.PID); err != nil {
 			return err
 		}
-		if err := rejectBuildBeforeOldest(tx, event.Build, "event"); err != nil {
+		if err := rejectBuildBeforeOldest(tx, event.Build, "event", event.Project); err != nil {
 			return err
 		}
 

@@ -40,19 +40,19 @@ func SelectUserHistory(pid string) (*UserHistory, error) {
 	}
 	history.Blocked = blockedCount > 0
 
-	if err := AnalyticsDB.Model(&Feedback{}).Where(&Feedback{PID: pid}).Order("created_at asc").Find(&history.Feedback).Error; err != nil {
+	if err := AnalyticsDB.Model(&Feedback{}).Where(&Feedback{PID: pid}).Order("created_at DESC, id DESC").Find(&history.Feedback).Error; err != nil {
 		return nil, fmt.Errorf("select user feedback: %w", err)
 	}
 	if err := attachSavegameMetadata(history.Feedback); err != nil {
 		return nil, fmt.Errorf("attach user savegame metadata: %w", err)
 	}
-	if err := AnalyticsDB.Model(&Crash{}).Where(&Crash{PID: pid}).Order("created_at asc").Find(&history.Crashes).Error; err != nil {
+	if err := AnalyticsDB.Model(&Crash{}).Where(&Crash{PID: pid}).Order("created_at DESC, id DESC").Find(&history.Crashes).Error; err != nil {
 		return nil, fmt.Errorf("select user crashes: %w", err)
 	}
-	if err := AnalyticsDB.Model(&Savegame{}).Omit("Data").Where(&Savegame{PID: pid}).Order("created_at asc").Find(&history.Savegames).Error; err != nil {
+	if err := AnalyticsDB.Model(&Savegame{}).Omit("Data").Where(&Savegame{PID: pid}).Order("created_at DESC, id DESC").Find(&history.Savegames).Error; err != nil {
 		return nil, fmt.Errorf("select user savegames: %w", err)
 	}
-	if err := AnalyticsDB.Model(&Event{}).Preload("Items").Where(&Event{PID: pid}).Order("created_at asc").Find(&history.Events).Error; err != nil {
+	if err := AnalyticsDB.Model(&Event{}).Preload("Items").Where(&Event{PID: pid}).Order("created_at DESC, id DESC").Find(&history.Events).Error; err != nil {
 		return nil, fmt.Errorf("select user events: %w", err)
 	}
 
@@ -91,7 +91,9 @@ func BlockUser(pid string) error {
 		if err := tx.Unscoped().Where("p_id = ?", pid).Delete(&Event{}).Error; err != nil {
 			return err
 		}
-		return tx.Unscoped().Where("p_id = ?", pid).Delete(&Savegame{}).Error
+		// Feedback attachments are diagnostic evidence, even for blocked players.
+		// Ordinary telemetry saves are still removed when a player is blocked.
+		return tx.Unscoped().Where("p_id = ? AND (feedback_id IS NULL OR feedback_id = ?)", pid, 0).Delete(&Savegame{}).Error
 	})
 }
 

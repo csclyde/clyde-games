@@ -1,4 +1,6 @@
 <script>
+ import {canWrite} from "../portal-auth.mjs";
+ import Panel from './Panel.svelte';
 	let rebuilding = false;
 	let message = '';
 	let error = '';
@@ -79,31 +81,25 @@
 	loadVersionSettings();
 </script>
 
-<section class="packrat-docs" aria-labelledby="packrat-docs-heading">
-	<header>
-		<div>
-			<h2 id="packrat-docs-heading">Packrat</h2>
-			<p>Pull the latest docs, build VitePress, and publish them to packrat.clyde.games.</p>
-		</div>
-		<button type="button" on:click={rebuildDocs} disabled={rebuilding}>
-			{rebuilding ? 'Rebuilding…' : 'Rebuild Docs'}
-		</button>
-	</header>
+<Panel class="packrat-docs" title="Docs">
+ <button slot="actions" type="button" on:click={rebuildDocs} disabled={!$canWrite || rebuilding}>{rebuilding ? 'Rebuilding…' : 'Rebuild Docs'}</button>
 
 	{#if message}<p class="message success">{message}</p>{/if}
 	{#if error}<p class="message error">{error}</p>{/if}
 	{#if output}<pre>{output}</pre>{/if}
 
+</Panel>
+<Panel class="packrat-docs" title="App Version">
 	<div class="version-settings">
 		<div>
 			<label for="packrat-latest-version">Latest app version</label>
-			<p>Packrat users on older versions will see the update notice on startup.</p>
+
 		</div>
 		<div class="version-control">
 			<select
 				id="packrat-latest-version"
 				bind:value={latestVersion}
-				disabled={loadingVersions || savingVersion}
+				disabled={!$canWrite || loadingVersions || savingVersion}
 				on:change={updateLatestVersion}
 			>
 				{#if observedVersions.length === 0}
@@ -126,13 +122,13 @@
 		</div>
 	</div>
 	{#if versionError}<p class="message error">{versionError}</p>{/if}
-</section>
+</Panel>
 
 <style>
-	.packrat-docs { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin: 12px auto; max-width: 1368px; padding: 14px; }
-	header { align-items: flex-start; border-bottom: 1px solid var(--line); display: flex; gap: 16px; justify-content: space-between; padding-bottom: 10px; }
-	h2 { font-size: 1.5rem; line-height: 1.15; margin: 0; text-align: left; }
-	header p { color: var(--text-muted); font-size: .82rem; margin: 3px 0 0; text-align: left; }
+
+
+
+
 	button { background: var(--charcoal); border: 1px solid var(--charcoal); border-radius: 4px; color: var(--surface); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 800; padding: 8px 11px; white-space: nowrap; }
 	button:hover { background: var(--olive); border-color: var(--olive); }
 	button:disabled { cursor: wait; opacity: .6; }
@@ -140,11 +136,11 @@
 	.success { color: var(--olive); }
 	.error { color: #a13c34; }
 	pre { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 3px; color: var(--text-muted); font-size: .72rem; margin: 10px 0 0; max-height: 260px; overflow: auto; padding: 10px; white-space: pre-wrap; }
-	.version-settings { align-items: center; border-top: 1px solid var(--line); display: flex; gap: 16px; justify-content: space-between; margin-top: 12px; padding-top: 12px; }
+	.version-settings { align-items: center; display: flex; gap: 16px; justify-content: space-between; margin-top: 12px; padding-top: 12px; }
 	.version-settings label { display: block; font-size: .78rem; font-weight: 800; margin-bottom: 3px; text-transform: uppercase; }
-	.version-settings p { color: var(--text-muted); font-size: .82rem; margin: 0; }
+
 	.version-control { align-items: center; display: flex; gap: 10px; }
 	select { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; color: var(--text); font: inherit; min-width: 150px; padding: 8px 10px; }
 	.save-status { color: var(--text-muted); font-size: .78rem; min-width: 56px; }
-	@media (max-width: 650px) { .packrat-docs { margin: 10px 8px; } header, .version-settings { align-items: stretch; flex-direction: column; } button { align-self: flex-start; } .version-control { align-items: stretch; flex-direction: column; } }
+	@media (max-width: 650px) { .version-settings { align-items: stretch; flex-direction: column; } button { align-self: flex-start; } .version-control { align-items: stretch; flex-direction: column; } }
 </style>

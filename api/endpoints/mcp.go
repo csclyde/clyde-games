@@ -21,8 +21,20 @@ const mcpListLimit = 200
 // RegisterMCPRoutes is deliberately separate from the game's unauthenticated
 // ingestion endpoints. Never expose arbitrary API paths through this surface.
 func RegisterMCPRoutes(router *gin.Engine) {
+	bot := router.Group("/internal/discord", DiscordBotAuth)
+	bot.POST("/manual", mcpDiscordManual)
+	bot.GET("/sources", botSyncSources)
+	bot.POST("/messages/:id/mark-result", botMarkResult)
+	bot.GET("/messages/:id/status", mcpDiscordIntakeStatus)
 	g := router.Group("/internal/mcp", MCPAuth)
+	registerReportNoteRoutes(g)
+	registerCrashWorkRoutes(g)
+	g.POST("/crash-investigation/:id/claim", claimCrashInvestigation)
 	g.GET("/projects", mcpProjects)
+	g.GET("/feedback-ingestion", mcpFeedbackIngestionStatus)
+	g.POST("/feedback/:id/triage", mcpTriageFeedback)
+	registerMCPDiscord(g)
+	registerMCPPlanka(g)
 	g.GET("/feedback", mcpFeedbackList)
 	g.GET("/feedback/:id", mcpFeedbackDetail)
 	g.GET("/feedback/:id/save", mcpFeedbackSave)
@@ -30,6 +42,8 @@ func RegisterMCPRoutes(router *gin.Engine) {
 	g.GET("/crashes", mcpCrashList)
 	g.GET("/crashes/:id", mcpCrashDetail)
 	g.POST("/crashes/:id/resolve", mcpResolveCrash)
+	g.GET("/metric-query/:id", mcpFilteredMetric)
+	g.GET("/crash-health", mcpCrashHealth)
 	g.GET("/metrics", GetMetrics)
 	g.GET("/metrics/:id", GetMetric)
 }
@@ -43,7 +57,7 @@ func MCPAuth(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	timeout := 15 * time.Second
-	if c.FullPath() == "/internal/mcp/metrics/:id" {
+	if c.FullPath() == "/internal/mcp/metric-query/:id" || c.FullPath() == "/internal/mcp/metrics/:id" || c.FullPath() == "/internal/mcp/discord/messages/:id/intake" {
 		timeout = 55 * time.Second // Existing metric queries have a 45-second execution budget.
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
@@ -53,21 +67,32 @@ func MCPAuth(c *gin.Context) {
 }
 
 type mcpReport struct {
-	ID            uint      `json:"id"`
-	Project       string    `json:"project"`
-	Message       string    `json:"message"`
-	Translated    string    `json:"translated,omitempty"`
-	Stack         string    `json:"stack,omitempty"`
-	Rating        uint8     `json:"rating,omitempty"`
-	Category      string    `json:"category,omitempty"`
-	Platform      string    `json:"platform,omitempty"`
-	Build         string    `json:"build,omitempty"`
-	Commit        string    `json:"commit,omitempty"`
-	Count         uint      `json:"count,omitempty"`
-	Resolved      bool      `json:"resolved"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-	TextTruncated bool      `json:"text_truncated" gorm:"-"`
+	TriageState       string     `json:"triage_state,omitempty"`
+	TriageNote        string     `json:"triage_note,omitempty"`
+	TriageAt          *time.Time `json:"triage_at,omitempty"`
+	Source            string     `json:"source,omitempty"`
+	SourceID          string     `json:"source_id,omitempty"`
+	SourceURL         string     `json:"source_url,omitempty"`
+	ID                uint       `json:"id"`
+	Project           string     `json:"project"`
+	Message           string     `json:"message"`
+	Translated        string     `json:"translated,omitempty"`
+	Stack             string     `json:"stack,omitempty"`
+	Rating            uint8      `json:"rating,omitempty"`
+	Category          string     `json:"category,omitempty"`
+	Platform          string     `json:"platform,omitempty"`
+	Build             string     `json:"build,omitempty"`
+	Commit            string     `json:"commit,omitempty"`
+	Count             uint       `json:"count,omitempty"`
+	Resolved          bool       `json:"resolved"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	TextTruncated     bool       `json:"text_truncated" gorm:"-"`
+	GroupKey          string     `json:"group_key,omitempty"`
+	GroupIdentity     string     `json:"group_identity,omitempty"`
+	OccurrenceVersion uint       `json:"occurrence_version"`
+	IngestedAt        *time.Time `json:"ingested_at,omitempty"`
+	ResolvedAt        *time.Time `json:"resolved_at,omitempty"`
 }
 
 func mcpBound(s string, n int) (string, bool) {
@@ -83,7 +108,7 @@ func mcpBoundReport(r *mcpReport, detail bool) {
 		limit = 16384
 	}
 	var truncated bool
-	for _, p := range []*string{&r.Message, &r.Translated, &r.Stack} {
+	for _, p := range []*string{&r.Message, &r.Translated, &r.Stack, &r.GroupIdentity, &r.TriageNote} {
 		*p, truncated = mcpBound(*p, limit)
 		r.TextTruncated = r.TextTruncated || truncated
 	}
@@ -126,9 +151,9 @@ func mcpQuery(c *gin.Context, crash bool) *gorm.DB {
 	table := "feedbacks"
 	if crash {
 		table = "crashes"
-		fields = append(fields, "stack", "count")
+		fields = append(fields, "stack", "count", "group_key", "group_identity", "occurrence_version", "ingested_at", "resolved_at")
 	} else {
-		fields = append(fields, "translated", "rating")
+		fields = append(fields, "translated", "rating", "source", "source_id", "source_url", "ingested_at", "triage_state", "triage_note", "triage_at")
 	}
 	return mcpDB(c).Table(table).Select(fields).Where("deleted_at IS NULL")
 }
@@ -137,7 +162,11 @@ func mcpList(c *gin.Context, crash bool) {
 	// fit as summaries. The caller can retrieve any later report directly by ID.
 	const maxActiveIDs = 100000
 	ids := []uint{}
-	if err := mcpQuery(c, crash).Select("id").Where("resolved = ?", false).Order("created_at ASC, id ASC").Limit(maxActiveIDs+1).Pluck("id", &ids).Error; err != nil {
+	queue := mcpQuery(c, crash)
+	if !crash {
+		queue = queue.Where("parent_feedback_id IS NULL")
+	}
+	if err := queue.Select("id").Where("resolved = ?", false).Order("created_at ASC, id ASC").Limit(maxActiveIDs+1).Pluck("id", &ids).Error; err != nil {
 		mcpDBError(c, err)
 		return
 	}
@@ -160,6 +189,7 @@ func mcpList(c *gin.Context, crash bool) {
 	for i := range items {
 		mcpBoundReport(&items[i], false)
 		items[i].Stack = ""
+		items[i].GroupIdentity = ""
 	}
 	c.JSON(200, gin.H{"items": items, "active_ids": ids, "active_count": len(ids), "index_complete": true, "truncated": truncated, "limit": mcpListLimit})
 }
@@ -184,6 +214,42 @@ func mcpDetail(c *gin.Context, crash bool) {
 	}
 	mcpBoundReport(&item, true)
 	response := gin.H{"item": item}
+	if crash {
+		// Return a bounded, complete membership index; inspect any report ID
+		// independently. Never embed an unbounded collection of stacks.
+		ids := []uint{}
+		if item.GroupKey != "" {
+			if err := mcpDB(c).Model(&models.Crash{}).Where("group_key = ?", item.GroupKey).Order("id ASC").Limit(100001).Pluck("id", &ids).Error; err != nil {
+				mcpDBError(c, err)
+				return
+			}
+			if len(ids) > 100000 {
+				c.JSON(413, gin.H{"error": "crash group exceeds membership index limit", "index_complete": false})
+				return
+			}
+		}
+		response["group_report_ids"] = ids
+		response["group_index_complete"] = true
+	}
+	if !crash && (item.Source == "steam_discussions" || item.Category == "Steam Discussion" || item.Category == "Steam Announcement Discussion") {
+		var replies []mcpReport
+		const limit = 50
+		if err := mcpQuery(c, false).Where("parent_feedback_id = ?", id).Order("created_at DESC, id DESC").Limit(limit + 1).Find(&replies).Error; err != nil {
+			mcpDBError(c, err)
+			return
+		}
+		response["replies_truncated"] = len(replies) > limit
+		if len(replies) > limit {
+			replies = replies[:limit]
+		}
+		for i, j := 0, len(replies)-1; i < j; i, j = i+1, j-1 {
+			replies[i], replies[j] = replies[j], replies[i]
+		}
+		for i := range replies {
+			mcpBoundReport(&replies[i], false)
+		}
+		response["replies"] = replies
+	}
 	if !crash {
 		var save mcpSaveMetadata
 		err := mcpDB(c).Table("savegames").Select([]string{"id", "filename", "size", "hash", "content_type"}).Where("feedback_id = ? AND deleted_at IS NULL", id).Order("created_at DESC, id DESC").Take(&save).Error
@@ -201,7 +267,7 @@ func mcpDetail(c *gin.Context, crash bool) {
 	c.JSON(200, response)
 }
 func mcpFeedbackList(c *gin.Context)   { mcpList(c, false) }
-func mcpCrashList(c *gin.Context)      { mcpList(c, true) }
+func mcpCrashList(c *gin.Context)      { listCrashInvestigations(c) }
 func mcpFeedbackDetail(c *gin.Context) { mcpDetail(c, false) }
 func mcpCrashDetail(c *gin.Context)    { mcpDetail(c, true) }
 func mcpResolveFeedback(c *gin.Context) {
@@ -230,16 +296,10 @@ func mcpResolveCrash(c *gin.Context) {
 	if !ok {
 		return
 	}
-	err := mcpDB(c).Transaction(func(tx *gorm.DB) error {
-		var item models.Crash
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&item, id).Error; err != nil {
-			return err
-		}
-		return tx.Model(&item).Update("resolved", true).Error
-	})
+	item, err := models.ResolveCrashID(mcpDB(c), id)
 	if err != nil {
 		mcpDBError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"id": id, "resolved": true})
+	c.JSON(200, gin.H{"id": id, "group_key": item.GroupKey, "resolved": true})
 }

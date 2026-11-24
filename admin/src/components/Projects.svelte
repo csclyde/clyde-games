@@ -1,7 +1,12 @@
 <script>
+ import {canWrite} from "../portal-auth.mjs";
+ import Panel from './Panel.svelte';
 	import ProjectEditModal from './ProjectEditModal.svelte';
 
 	export let reportProjects = () => {};
+ export let selectedProject = 'cursemark';
+ export let compact = false;
+ $: visibleProjects = projects.filter(p => selectedProject === 'all' || p.id.toLowerCase() === selectedProject.toLowerCase());
 
 	let projects = [];
 	let loading = true;
@@ -52,12 +57,10 @@
 	loadProjects();
 </script>
 
-<section class="projects" aria-labelledby="projects-heading">
-	<header>
-		<div><h2 id="projects-heading">Projects</h2><p>Project IDs are supplied by clients; display names can be edited here.</p></div>
-		<button type="button" on:click={loadProjects} disabled={loading}>Refresh</button>
-	</header>
+<Panel class={compact ? "projects compact" : "projects"} title="Summary">
+ <div slot="actions">{#if compact && visibleProjects.length === 1}<button type="button" disabled={!$canWrite} on:click={() => editingProject = visibleProjects[0]}>Edit</button>{/if}</div>
 
+	<div class="project-content" aria-busy={loading}>
 	{#if loading && !projects.length}
 		<p class="message">Loading projects…</p>
 	{:else if error && !projects.length}
@@ -66,12 +69,12 @@
 		<p class="message">No projects have reported data yet.</p>
 	{:else}
 		<div class="project-grid">
-			{#each projects as project}
+			{#each visibleProjects as project}
 				<article>
-					<div class="project-heading">
-						<div><h3>{project.name}</h3><p class="project-id">{project.id}</p></div>
-						<button type="button" on:click={() => editingProject = project}>Edit</button>
-					</div>
+					{#if !compact}<div class="project-heading">
+						{#if !compact}<div><h3>{project.name}</h3><p class="project-id">{project.id}</p></div>{/if}
+						<button type="button" disabled={!$canWrite} on:click={() => editingProject = project}>Edit</button>
+					</div>{/if}
 					<dl>
 						<div><dt>Crashes</dt><dd>{project.crashes}</dd></div>
 						<div><dt>Feedback</dt><dd>{project.feedback}</dd></div>
@@ -92,17 +95,26 @@
 		</div>
 		{#if error}<p class="message error">{error}</p>{/if}
 	{/if}
-</section>
+	</div>
+</Panel>
 
 <ProjectEditModal project={editingProject} on:close={() => editingProject = null} on:saved={projectSaved} />
 
 <style>
-	.projects { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin: 12px auto 0; max-width: 1368px; padding: 14px; }
-	header { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
-	header { align-items: flex-start; border-bottom: 1px solid var(--line); margin-bottom: 12px; padding-bottom: 10px; }
-	h2, h3, p { margin: 0; }
-	h2 { font-size: 1.5rem; line-height: 1.15; text-align: left; }
-	header p { color: var(--text-muted); font-size: .82rem; margin-top: 3px; text-align: left; }
+ :global(.compact) .project-content { min-height: 0; }
+ :global(.compact) article { background: transparent; border: 0; padding: 0; }
+ :global(.compact) .project-grid { display: block; }
+ :global(.compact) dl div { background: transparent; border: 0; border-right: 1px solid var(--line); border-radius: 0; }
+ :global(.compact) dl div:last-child { border-right: 0; }
+ :global(.compact) .steam-reviews { background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 12px 0 0; }
+
+
+
+
+	h3, p { margin: 0; }
+
+
+	.project-content { min-height: 230px; }
 	.project-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 	article { background: var(--paper-warm); border-left: 3px solid var(--olive); border-radius: 3px; padding: 10px; }
 	.project-heading { align-items: flex-start; display: flex; gap: 10px; justify-content: space-between; }
@@ -122,5 +134,5 @@
 	button:disabled { cursor: default; opacity: .6; }
 	.message { color: var(--text-muted); padding: 16px 0 0; }
 	.message.error { color: var(--red, #9b2c2c); }
-	@media (max-width: 650px) { .projects { margin: 10px 8px 0; } dl { grid-template-columns: repeat(2, 1fr); } .steam-reviews { align-items: flex-start; flex-direction: column; } .steam-reviews p { text-align: left; } }
+	@media (max-width: 650px) {  dl { grid-template-columns: repeat(2, 1fr); } .steam-reviews { align-items: flex-start; flex-direction: column; } .steam-reviews p { text-align: left; } }
 </style>

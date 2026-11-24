@@ -2,6 +2,7 @@ package endpoints
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -32,6 +33,7 @@ type steamDiscussionPost struct {
 	ID        string
 	Author    string
 	Body      string
+	Markdown  string
 	URL       string
 	CreatedAt time.Time
 	IsTopic   bool
@@ -60,7 +62,7 @@ func ImportSteamDiscussionsSince(project models.Project, cutoff time.Time, now t
 		}
 
 		for _, topic := range topics {
-			postImported, postSkipped, err := importSteamDiscussionTopic(client, project.ID, topic, cutoff)
+			postImported, postSkipped, err := importSteamDiscussionTopic(client, project.ID, topic, cutoff, now)
 			if err != nil {
 				return imported + postImported, skipped + postSkipped, err
 			}
@@ -84,12 +86,18 @@ func fetchSteamDiscussionTopicsSince(client http.Client, forum steamDiscussionFo
 
 		pageTopics := parseSteamDiscussionTopics(doc, forum)
 		if len(pageTopics) == 0 {
+			if firstDescendant(doc, "div", "forum_topics_container") == nil && firstDescendant(doc, "div", "forum_topics") == nil {
+				return topics, fmt.Errorf("steam discussion listing markup unrecognized")
+			}
 			return topics, nil
 		}
 
 		recentOnPage := false
 		for _, topic := range pageTopics {
-			if topic.LastPost.IsZero() || topic.LastPost.Before(cutoff) {
+			if topic.LastPost.IsZero() {
+				return topics, fmt.Errorf("steam discussion topic missing timestamp")
+			}
+			if topic.LastPost.Before(cutoff) {
 				continue
 			}
 
@@ -102,65 +110,64 @@ func fetchSteamDiscussionTopicsSince(client http.Client, forum steamDiscussionFo
 		}
 	}
 
-	return topics, nil
+	return topics, fmt.Errorf("steam discussion listing exceeded 20-page coverage limit")
 }
 
-func importSteamDiscussionTopic(client http.Client, projectID string, topic steamDiscussionTopic, cutoff time.Time) (int, int, error) {
-	imported := 0
-	skipped := 0
+func importSteamDiscussionTopic(client http.Client, projectID string, topic steamDiscussionTopic, cutoff time.Time, now time.Time) (int, int, error) {
+	var root models.Feedback
+	var replies, previous []models.Feedback
 	totalPages := 1
-
+	makeFeedback := func(post steamDiscussionPost) models.Feedback {
+		feedback := models.Feedback{PID: post.Author, Project: projectID, Message: steamDiscussionFeedbackMessage(topic, post), SourceURL: post.URL, Markdown: steamDiscussionMarkdownMessage(topic, post), Rating: 3, Env: "production", Category: topic.ForumName, Platform: "Steam"}
+		feedback.CreatedAt = post.CreatedAt
+		return feedback
+	}
 	for page := 1; page <= totalPages && page <= 20; page++ {
 		doc, err := fetchSteamHTML(client, pagedSteamTopicURL(topic.URL, page))
 		if err != nil {
-			return imported, skipped, err
+			return 0, 0, err
 		}
-
 		if page == 1 {
 			totalPages = steamTopicCommentPages(doc)
+			if totalPages > 20 {
+				return 0, 0, fmt.Errorf("steam topic exceeds 20-page coverage limit")
+			}
 		}
-
 		posts := parseSteamDiscussionPosts(doc, topic)
+		if len(posts) == 0 {
+			return 0, 0, fmt.Errorf("steam discussion post markup unrecognized")
+		}
 		for _, post := range posts {
-			if post.CreatedAt.IsZero() || post.CreatedAt.Before(cutoff) {
+			if post.CreatedAt.IsZero() {
+				return 0, 0, fmt.Errorf("steam post missing timestamp")
+			}
+			if post.CreatedAt.After(now) {
 				continue
 			}
-
+			if post.IsTopic {
+				if root.Message == "" {
+					root = makeFeedback(post)
+				}
+				continue
+			}
 			if strings.TrimSpace(post.Body) == "" {
 				continue
 			}
-
-			exists, err := models.FeedbackMessageContains(post.URL)
-			if err != nil {
-				return imported, skipped, err
-			}
-
-			if exists {
-				skipped += 1
+			if post.CreatedAt.Before(cutoff) {
+				previous = append(previous, makeFeedback(post))
 				continue
 			}
-
-			feedback := models.Feedback{
-				PID:      post.Author,
-				Project:  projectID,
-				Message:  steamDiscussionFeedbackMessage(topic, post),
-				Rating:   3,
-				Env:      "production",
-				Category: topic.ForumName,
-				Platform: "Steam",
-			}
-			feedback.CreatedAt = post.CreatedAt
-
-			_, err = models.AddFeedback(feedback)
-			if err != nil {
-				return imported, skipped, err
-			}
-
-			imported += 1
+			replies = append(replies, makeFeedback(post))
 		}
 	}
-
-	return imported, skipped, nil
+	includeRoot := !root.CreatedAt.IsZero() && !root.CreatedAt.Before(cutoff)
+	if !includeRoot && len(replies) == 0 {
+		return 0, 0, nil
+	}
+	if root.Message == "" {
+		root = makeFeedback(steamDiscussionPost{Author: topic.Author, URL: topic.URL, IsTopic: true, CreatedAt: topic.LastPost})
+	}
+	return models.ImportSteamFeedbackThread(root, replies, includeRoot, previous...)
 }
 
 func fetchSteamHTML(client http.Client, requestURL string) (*html.Node, error) {
@@ -170,7 +177,7 @@ func fetchSteamHTML(client http.Client, requestURL string) (*html.Node, error) {
 	}
 	req.Header.Set("User-Agent", "clyde-games-feedback-sync/1.0")
 
-	res, err := client.Do(req)
+	res, err := feedbackGET(client, req)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +187,7 @@ func fetchSteamHTML(client http.Client, requestURL string) (*html.Node, error) {
 		return nil, fmt.Errorf("steam discussions returned %s for %s", res.Status, requestURL)
 	}
 
-	return html.Parse(res.Body)
+	return html.Parse(io.LimitReader(res.Body, 8<<20))
 }
 
 func parseSteamDiscussionTopics(doc *html.Node, forum steamDiscussionForum) []steamDiscussionTopic {
@@ -218,6 +225,7 @@ func parseSteamDiscussionPosts(doc *html.Node, topic steamDiscussionTopic) []ste
 			ID:        topic.ID,
 			Author:    cleanText(textContent(firstDescendant(op, "a", "forum_op_author"))),
 			Body:      cleanText(textWithBreaks(firstDescendant(op, "div", "content"))),
+			Markdown:  steamMarkdown(firstDescendant(op, "div", "content"), topic.URL),
 			URL:       topic.URL,
 			CreatedAt: unixTime(attr(firstTimestamp(op, "commentthread_comment_timestamp"), "data-timestamp")),
 			IsTopic:   true,
@@ -233,6 +241,7 @@ func parseSteamDiscussionPosts(doc *html.Node, topic steamDiscussionTopic) []ste
 			ID:        commentID,
 			Author:    cleanText(textContent(firstDescendant(comment, "a", "commentthread_author_link"))),
 			Body:      cleanText(textWithBreaks(firstDescendant(comment, "div", "commentthread_comment_text"))),
+			Markdown:  steamMarkdown(firstDescendant(comment, "div", "commentthread_comment_text"), topic.URL),
 			URL:       strings.TrimRight(topic.URL, "/") + "/#c" + commentID,
 			CreatedAt: unixTime(attr(firstTimestamp(comment, "commentthread_comment_timestamp"), "data-timestamp")),
 		})
@@ -271,6 +280,17 @@ func steamDiscussionFeedbackMessage(topic steamDiscussionTopic, post steamDiscus
 	}
 
 	return prefix + "\n\n" + post.Body + "\n" + post.URL
+}
+
+func steamDiscussionMarkdownMessage(topic steamDiscussionTopic, post steamDiscussionPost) string {
+	if post.Markdown == "" {
+		return ""
+	}
+	prefix := "Steam discussion: " + steamMarkdownEscape.Replace(topic.Title)
+	if !post.IsTopic {
+		prefix += " (comment)"
+	}
+	return prefix + "\n\n" + post.Markdown + "\n\n" + post.URL
 }
 
 func pagedSteamForumURL(baseURL string, page int) string {

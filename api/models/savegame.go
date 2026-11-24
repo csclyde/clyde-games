@@ -1,6 +1,14 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"errors"
+	"strings"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+var ErrFeedbackSaveAssociation = errors.New("invalid feedback save association")
 
 type Savegame struct {
 	gorm.Model
@@ -33,10 +41,14 @@ func AddSavegame(savegame Savegame) (*Savegame, error) {
 		if err := ensureProject(tx, savegame.Project); err != nil {
 			return err
 		}
-		if err := rejectBlockedUser(tx, savegame.PID); err != nil {
+		if savegame.FeedbackID != 0 {
+			if err := validateFeedbackSaveAssociation(tx, savegame); err != nil {
+				return err
+			}
+		} else if err := rejectBlockedUser(tx, savegame.PID); err != nil {
 			return err
 		}
-		if err := rejectBuildBeforeOldest(tx, savegame.Build, "savegame"); err != nil {
+		if err := rejectBuildBeforeOldest(tx, savegame.Build, "savegame", savegame.Project); err != nil {
 			return err
 		}
 
@@ -47,6 +59,28 @@ func AddSavegame(savegame Savegame) (*Savegame, error) {
 	}
 
 	return &savegame, nil
+}
+
+// A feedback ID alone (or a caller-supplied reason) cannot bypass a player
+// block. Validate the existing, open in-game report and its exact installation
+// and project before storing any attachment. Lock against concurrent manual
+// resolution so a late attachment cannot survive the report's cleanup.
+func validateFeedbackSaveAssociation(tx *gorm.DB, savegame Savegame) error {
+	if strings.TrimSpace(savegame.PID) == "" || strings.EqualFold(strings.TrimSpace(savegame.PID), "unknown") || savegame.Project == "" {
+		return ErrFeedbackSaveAssociation
+	}
+	var feedback Feedback
+	if err := tx.Select("id", "p_id", "project", "source", "resolved").
+		Clauses(clause.Locking{Strength: "UPDATE"}).First(&feedback, savegame.FeedbackID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrFeedbackSaveAssociation
+		}
+		return err
+	}
+	if feedback.PID != savegame.PID || NormalizeProjectName(feedback.Project) != savegame.Project || feedback.Source != "" || feedback.Resolved {
+		return ErrFeedbackSaveAssociation
+	}
+	return nil
 }
 
 func SelectAllSavegames() ([]Savegame, error) {

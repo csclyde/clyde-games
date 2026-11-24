@@ -19,6 +19,7 @@ type MetricDefinition struct {
 	Description string                 `json:"description"`
 	Display     string                 `json:"display"`
 	Settings    map[string]interface{} `json:"settings"`
+	Project     string `json:"project,omitempty"`
 	Section     string                 `json:"section"`
 	Row         int                    `json:"row"`
 	Col         int                    `json:"col"`
@@ -45,40 +46,40 @@ func MetricCatalog() []MetricDefinition {
 }
 
 func metricSQL(id int, project string) (string, []interface{}, error) {
-	known := false
+	var definition *MetricDefinition
 	for _, card := range MetricCatalog() {
-		if card.ID == id {
-			known = true
-			break
+		if card.ID == id { definition = &card; break }
+	}
+	if definition == nil { return "", nil, fmt.Errorf("unknown metric") }
+	data, err := metricFiles.ReadFile(fmt.Sprintf("metrics/%d.sql", id))
+	if err != nil { return "", nil, err }
+	query := metricQueryBody(string(data))
+	all := project == "" || project == "all"
+	if definition.Project != "" {
+		if !all && !strings.EqualFold(project, definition.Project) { return "", nil, fmt.Errorf("metric does not belong to project") }
+		project, all = definition.Project, false
+	}
+	table := "events"
+	if id == 38 { table = "crashes" }
+	if id == 39 { table = "feedbacks" }
+	var prefix string
+	var args []interface{}
+	if all {
+		if table != "events" { return query, nil, nil }
+		prefix = "WITH events AS (SELECT * FROM analytics.events WHERE project IS NULL OR LOWER(project) <> 'necrovale') "
+	} else {
+		args = []interface{}{project}
+		prefix = fmt.Sprintf("WITH %s AS (SELECT * FROM analytics.%s WHERE project = ?) ", table, table)
+		if table == "events" && definition.Project == "" {
+			prefix = "WITH events AS (SELECT * FROM analytics.events WHERE project = ? AND LOWER(project) <> 'necrovale') "
 		}
 	}
-	if !known {
-		return "", nil, fmt.Errorf("unknown metric")
-	}
-	data, err := metricFiles.ReadFile(fmt.Sprintf("metrics/%d.sql", id))
-	if err != nil {
-		return "", nil, err
-	}
-	query := strings.TrimSpace(string(data))
-	if project == "" || project == "all" {
-		return query, nil, nil
-	}
-	// A CTE shadows the physical table, so every reference in the original SQL
-	// (including baselines and nested CTEs) uses the same project scope.
-	table := "events"
-	if id == 38 {
-		table = "crashes"
-	}
-	if id == 39 {
-		table = "feedbacks"
-	}
-	prefix := fmt.Sprintf("WITH %s AS (SELECT * FROM analytics.%s WHERE project = ?) ", table, table)
-	if strings.HasPrefix(strings.ToUpper(query), "WITH ") {
+	if strings.HasPrefix(strings.ToUpper(query), "WITH RECURSIVE") {
+		query = "WITH RECURSIVE " + strings.TrimPrefix(prefix, "WITH ") + ", " + strings.TrimSpace(query[len("WITH RECURSIVE"):])
+	} else if strings.HasPrefix(strings.ToUpper(query), "WITH ") {
 		query = prefix + ", " + query[5:]
-	} else {
-		query = prefix + query
-	}
-	return query, []interface{}{project}, nil
+	} else { query = prefix + query }
+	return query, args, nil
 }
 
 func RunMetric(ctx context.Context, id int, project string) (*MetricResult, error) {
@@ -86,6 +87,10 @@ func RunMetric(ctx context.Context, id int, project string) (*MetricResult, erro
 	if err != nil {
 		return nil, err
 	}
+	return runMetricQuery(ctx, query, args)
+}
+
+func runMetricQuery(ctx context.Context, query string, args []interface{}) (*MetricResult, error) {
 	db, err := AnalyticsDB.DB()
 	if err != nil {
 		return nil, err

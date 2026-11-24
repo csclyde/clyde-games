@@ -56,7 +56,7 @@ func TestMCPDatabaseListsAndDetail(t *testing.T) {
 	for i := 1; i <= 201; i++ {
 		ids.AddRow(i)
 	}
-	mock.ExpectQuery("SELECT .*id.* FROM `feedbacks` WHERE deleted_at IS NULL AND resolved = \\? ORDER BY created_at ASC, id ASC LIMIT 100001").WithArgs(false).WillReturnRows(ids)
+	mock.ExpectQuery("SELECT .*id.* FROM `feedbacks` WHERE deleted_at IS NULL AND parent_feedback_id IS NULL AND resolved = \\? ORDER BY created_at ASC, id ASC LIMIT 100001").WithArgs(false).WillReturnRows(ids)
 	query := "SELECT .*`commit`.* FROM `feedbacks` WHERE deleted_at IS NULL AND id IN .* ORDER BY created_at ASC, id ASC"
 	rows := sqlmock.NewRows([]string{"id", "project", "message", "commit", "created_at"})
 	for i := 1; i <= 200; i++ {
@@ -94,7 +94,7 @@ func TestMCPDatabaseListsAndDetail(t *testing.T) {
 }
 func TestMCPDatabaseEmptyList(t *testing.T) {
 	r, mock := mcpMockDB(t)
-	mock.ExpectQuery("SELECT .* FROM `crashes`").WithArgs(false).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectQuery("SELECT .* FROM `crashes`").WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	w := mcpRequest(r, "GET", "crashes")
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"items":[]`) || !strings.Contains(w.Body.String(), `"truncated":false`) {
 		t.Fatalf("empty list: %d %s", w.Code, w.Body)
@@ -133,7 +133,7 @@ func TestMCPResolveRollbackOnSaveFailure(t *testing.T) {
 func TestMCPResolveMissingRollsBack(t *testing.T) {
 	r, mock := mcpMockDB(t)
 	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT .* FROM `crashes`.*FOR UPDATE").WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectQuery("SELECT .* FROM `crashes`.*LIMIT 1").WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectRollback()
 	w := mcpRequest(r, "POST", "crashes/7/resolve")
 	if w.Code != 404 {
@@ -143,12 +143,27 @@ func TestMCPResolveMissingRollsBack(t *testing.T) {
 func TestMCPResolveCrashByID(t *testing.T) {
 	r, mock := mcpMockDB(t)
 	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT .* FROM `crashes`.*FOR UPDATE").WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id", "resolved"}).AddRow(7, false))
-	mock.ExpectExec("UPDATE `crashes` SET `resolved`=\\?,`updated_at`=\\? WHERE `crashes`.`deleted_at` IS NULL AND `id` = \\?").WithArgs(true, sqlmock.AnyArg(), 7).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("SELECT .* FROM `crashes`.*LIMIT 1$").WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id", "group_key", "resolved"}).AddRow(7, "group", false))
+	mock.ExpectExec("INSERT INTO `crash_groups`").WithArgs("group").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("SELECT .* FROM `crash_groups`.*FOR UPDATE").WithArgs("group").WillReturnRows(sqlmock.NewRows([]string{"key"}).AddRow("group"))
+	mock.ExpectExec("UPDATE `crashes` SET `resolved`=\\?,`resolved_at`=\\? WHERE \\(group_key = \\? AND resolved = \\?\\) AND `crashes`.`deleted_at` IS NULL").WithArgs(true, sqlmock.AnyArg(), "group", false).WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectQuery("SELECT .* FROM `crashes`.*FOR UPDATE").WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id", "group_key", "resolved"}).AddRow(7, "group", true))
 	mock.ExpectCommit()
 	w := mcpRequest(r, "POST", "crashes/7/resolve")
 	if w.Code != 200 {
 		t.Fatalf("resolve: %d %s", w.Code, w.Body)
+	}
+}
+
+func TestMCPCrashDetailExposesGroupMembershipAndLegacyProvenance(t *testing.T) {
+	r, mock := mcpMockDB(t)
+	mock.ExpectQuery("SELECT .* FROM `crashes` WHERE deleted_at IS NULL AND id = \\? LIMIT 1").WithArgs(9).WillReturnRows(sqlmock.NewRows([]string{"id", "message", "stack", "count", "group_key", "group_identity", "occurrence_version"}).AddRow(9, "failure", "original stack with GPU data", 42, "group", "canonical identity", 0))
+	mock.ExpectQuery("SELECT `id` FROM `crashes` WHERE group_key = \\? AND `crashes`.`deleted_at` IS NULL ORDER BY id ASC LIMIT 100001").WithArgs("group").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(9).AddRow(10).AddRow(11))
+	w := mcpRequest(r, "GET", "crashes/9")
+	for _, expected := range []string{`"group_report_ids":[9,10,11]`, `"group_index_complete":true`, `"occurrence_version":0`, `"count":42`, `"group_identity":"canonical identity"`, `original stack with GPU data`} {
+		if w.Code != 200 || !strings.Contains(w.Body.String(), expected) {
+			t.Fatalf("missing %s: %d %s", expected, w.Code, w.Body)
+		}
 	}
 }
 
@@ -158,7 +173,7 @@ func TestMCPDatabaseIndexOverflowFailsExplicitly(t *testing.T) {
 	for i := 1; i <= 100001; i++ {
 		rows.AddRow(i)
 	}
-	mock.ExpectQuery("SELECT .*id.* FROM `crashes`.*LIMIT 100001").WithArgs(false).WillReturnRows(rows)
+	mock.ExpectQuery("SELECT .*id.* FROM `crashes`.*LIMIT 100001").WillReturnRows(rows)
 	w := mcpRequest(r, "GET", "crashes")
 	if w.Code != 413 || !strings.Contains(w.Body.String(), `"index_complete":false`) || strings.Contains(w.Body.String(), `"active_ids"`) {
 		t.Fatalf("overflow: %d %s", w.Code, w.Body)

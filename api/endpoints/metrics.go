@@ -18,6 +18,15 @@ import (
 // Nginx authenticates the admin and injects the token. Direct public API calls
 // cannot obtain analytics by bypassing the portal's HTTP basic authentication.
 func MetricsAuth(c *gin.Context) {
+	if PortalAuthMode() == "invalid" {
+		c.AbortWithStatusJSON(503, gin.H{"error": "authentication configuration unavailable"})
+		return
+	}
+	if PortalAuthMode() == "session" && isPortalBrowser(c) {
+		AdminAuth(c)
+		return
+	}
+
 	token := os.Getenv("PACKRAT_DEPLOY_TOKEN")
 	if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(c.GetHeader("X-Packrat-Deploy-Token"))) != 1 {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
@@ -27,7 +36,15 @@ func MetricsAuth(c *gin.Context) {
 	c.Next()
 }
 
-func GetMetrics(c *gin.Context) { c.JSON(http.StatusOK, models.MetricCatalog()) }
+func GetMetrics(c *gin.Context) {
+	project := strings.ToLower(strings.TrimSpace(c.Query("project")))
+	if project == "" { project = "cursemark" }
+	cards := make([]models.MetricDefinition, 0)
+	for _, card := range models.MetricCatalog() {
+		if card.Project == project || (card.Project == "" && project == "cursemark") { cards = append(cards, card) }
+	}
+	c.JSON(http.StatusOK, cards)
+}
 
 type metricCacheEntry struct {
 	ready   chan struct{}
@@ -44,20 +61,24 @@ var metricSlots = make(chan struct{}, 2)
 
 func GetMetric(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
-	valid := false
+	var definition *models.MetricDefinition
 	for _, card := range models.MetricCatalog() {
 		if card.ID == id {
-			valid = true
+			definition = &card
 			break
 		}
 	}
-	if err != nil || !valid {
+	if err != nil || definition == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "unknown metric"})
 		return
 	}
 	project := strings.ToLower(strings.TrimSpace(c.Query("project")))
-	if project == "all" {
-		project = ""
+	if project == "" {
+		project = "cursemark"
+	}
+	if (definition.Project == "" && project != "cursemark") || (definition.Project != "" && project != definition.Project) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No gameplay metrics are configured for this project"})
+		return
 	}
 	if len(project) > 128 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project"})

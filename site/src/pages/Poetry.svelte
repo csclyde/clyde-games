@@ -1,434 +1,121 @@
 <script>
-	import SubpageHeader from '../components/SubpageHeader.svelte';
+ const poems = [
+  {
+    "title": "Untitled",
+    "text": "Too many people live\nWith too little poetry.\nAfter all, if our lives\nAre stories, what makes you think\nThat one not worth telling\nCould be one worth living?",
+    "id": "poem-1"
+  },
+  {
+    "title": "The Verge of a Hill",
+    "text": "I don't see any berries,\nbut I can smell them\nup ahead, over that next hill.\n\nAnd the hill beyond that?\nI keep my mind from running\ntoo far beyond my body.\n\nFor flavor on the way down\nwill never be as sweet\nas the scent on the way up.\n\nCoffee, incense, and wood\nare the only scents\nwaiting for me below.",
+    "id": "poem-2"
+  },
+  {
+    "title": "Minus Something",
+    "text": "Try to balance the equation,\nAnd it seems to transform.\nThe completeness slips away.\nIt's minus something.\n\nThe one loose thread\nThat splits and twists\nInto a whole new sweater.\nIt's minus something.\n\nA riddle whose answer\nIs a question whose answer\nIs a riddle once again.\nIt's minus something.\n\nThe poem that knows itself,\nIn the empty theater \nOf the reader's mind.\nIt's minus something.",
+    "id": "poem-3"
+  },
+  {
+    "title": "Oldening",
+    "text": "Where has my poetry gone?\nIt used to echo through\nThe empty halls of my mind\nFor days on end.\nNow it's all full with\nCinder blocks of information,\nDoors I've closed,\nAnd wisdom like damp mold.",
+    "id": "poem-4"
+  },
+  {
+    "title": "Worriers Refrain",
+    "text": "Victory, I do not ride for thee.\nToo many hopeful dead\nAre gathered at your feet.\n\nLoss, I do not fear thee,\nAny more than I fear the shadow\nStretching out from my boot heels.\n\nI hope only for the fate of a tree,\nWhose roots find loam,\nWhose leaves find sun.",
+    "id": "poem-5"
+  },
+  {
+    "title": "Dick & Sally",
+    "text": "Seventy six million years have gone\nAnd seventy six million more will come.\nYou only had seventy six years together.\n\nIt's less than we hoped, but more than we deserve.\n\nIt's enough time to feel joy.\nAnd enough time to feel sad.\nAnd enough time to grow tired.\n\nIt's less than we hoped, but more than we deserve.\n\nIn your wake are the people you knew,\nWith all their bitterness and petty feuds,\nTheir battles and little wins.\n\nIt's less than we hoped, but more than we deserve.",
+    "id": "poem-6"
+  },
+  {
+    "title": "The Inverted Man",
+    "text": "The man who lived upside down,\nNever knew which way to climb.\nTo solid ground above him?\nOr to the open sky below?\n\nGravity never took to him well,\nSaid he wasn't much to hold onto.\nOr maybe a distant star, too distant to see,\nHad fixed its pull on this inverted man.\n\nBecause even with the Queens mattress \nBelow him, he couldn't seem to fall into bed.\nWhen November comes again, the stone in his shoe\nAnd the trick up his sleeve won't be enough.\n\nSo grab a fistful of carpet and hold on,\nOr tie yourself to the porch. \nWhen the house shakes it will probably\nShake him loose.",
+    "id": "poem-7"
+  },
+  {
+    "title": "A Strange Day",
+    "text": "When the eye of God fixates on you,\nFor a moment. And then looks away.\nWhen you're just a mortal man.\nYour world becomes small\nAnd you see the tip of it rushing towards you.\nLike an arrow you noticed too late\nTo avoid, or bargain with.\nThe shadow of his gaze stretches out\nFar in front of you, until\nEvery step you take is in shadow.\n\t\t",
+    "id": "poem-8"
+  },
+  {
+    "title": "Love Path",
+    "text": "I welcome bad luck,\nbecause good news makes me nervous.\nAnd I got the worst of it today, that\nLove is like being buried alive.\nOr drowning in different versions\nof yourself.\nOr seeing yourself in a movie\nyou didn't write.\nOr walking on a trail\nWith no beginning or end.",
+    "id": "poem-9"
+  },
+  {
+    "title": "Never Knew",
+    "text": "In the parking lots of our lives, \nUnder the overpass, \nThe asphalt is illuminated\nWith the ideas of those we \nNever knew. \n\nIn the gridlock of our minds, \nCaught by air traffic, \nOur thoughts are coursed\nAlong the paths of those we\nNever knew. \n\nIn the videos of our childhood, \nRecorded in streaked static, \nOur fears are projected\nOnto the younger selves we\nNever knew. \n\t\t",
+    "id": "poem-10"
+  },
+  {
+    "title": "Day After A Good Day",
+    "text": "I left flower tomes for you in the sky,\nradiant abysma.\nThe universe no longer speaks to me\nin feathered ellipses.\nAnd the forest no longer welcomes me\nto its dark cornered caves. \nAnd silver songs no longer gather\nand drip from above.\nThe goddess is wet with sunlight \nand stretching herself out into the morning. \nEmpty dawn, hypnotic lofty ephemera. ",
+    "id": "poem-11"
+  },
+  {
+    "title": "Thoughts on a Goodlife",
+    "text": "i want to speak in\nraw shimmering dream tones\nsee the future that is\ndark and immense\nlet the darklight drip\ninto my minds eye\nbathe in the pouring water\nfrom the open palms of\na dying goddess in heat\nsail through the emberhot \nnetwork ideawire\ntear down into threads\nthe twine that i was\nsewn up into before i\nwas a child\ntaste the slippery \neffervescent thoughtstuff\nand die in the silk\nsheet web of bliss\t",
+    "id": "poem-12"
+  },
+  {
+    "title": "Poem for Chiara",
+    "text": "You\nare morning,\nand like the brightening edge of the world\ndo illuminate\nwhat was once dusted in darkness.\n\nYou\nare an ocean,\nand as the warm wind carries a bird\ndo hold me\nlike a wild beast and a baby.\n\nYou\nare the tide,\nand as the moon circles the earth,\ndo pull me in",
+    "id": "poem-13"
+  },
+  {
+    "title": "One Day",
+    "text": "One day\nWe will all\nbe destroyed\nAnd integrated back\nInto the sky--\nThe endless equation\nfrom which we derived.",
+    "id": "poem-14"
+  },
+  {
+    "title": "Dear Gwen",
+    "text": "Today was a dark day\nand to it I say:\n\tGood Riddance.\nNo more waiting for tomorrow\nor its brass beams of light.\nDear Gwen, thanks for the thoughts\nbut I'll be alright.\n\nWe wandered through \nthe empty halls of our\nneighborhood at night,\nand you told me that time \nis a fire that left us\nsifting through ash.\n\t\t...did you mean that?\n\nThese lonely days I think \nof you to say:\n\tGoodbye.\nSomeday in the light maybe \nour minds will meet.\nDear Gwen, are you still out there\nin the rivers and streets?\n\nWe sat on the watertower \nand watched as the wind \ncut through the trees below,\nand you said it would \ncarry us above the damp\nsoil and into the sky.\n\t...that dream was truly a lie.\n\nI’ll be waiting for a lighter day\nto hear you say:\n\tWelcome.\nTomorrow is coming and no-\nbody will be spared.\nDear Gwen, you go ahead\nand I will meet you there.\t",
+    "id": "poem-15"
+  },
+  {
+    "title": "Mallory",
+    "text": "The Mallard is a bird\nyou can only find once.\nIn the rubble around you it\nflies and if you\nflay it or stay with it\nit’s all that you get.\nNotice the colors\nand cream and the back\nof its arc.\nYou are now living\nin the age of the lark.",
+    "id": "poem-16"
+  },
+  {
+    "title": "Caught My Reflecton",
+    "text": "im a clear clever private pervert\nin the night and im known\nas something other than what i am\nthat is more me than ill ever be.\ni have a crazy dream where\nim more than i was before\nand my crooked teeth would\nsit straight in my crooked jaw.\ni climbed up a wave that\nwhittled away at the world\nas it slipped slowly by\nso i could see the passing of time.\nAfter assessing all ills \nI knew that despite all that is \nbroken, everythings fine.",
+    "id": "poem-17"
+  }
+];
 </script>
 
-<SubpageHeader label="Poetry" />
+<svelte:head><title>Poetry — Casey Clyde</title><meta name="description" content="Poems by Casey Clyde." /></svelte:head>
 
-<main>
-	<h3>The Waiting Room</h3>
-	<p>
-Our lives were never our own.
-It just felt that way sometimes.
-We borrowed them from the world,
-And must soon return them.
-Look around and see for yourself,
-People are coming and going
-From this place all the time.
-So when it's my time to live,
-I'll give it what I can.
-And when it's my time to die,
-I won't complain too much.
-I saw when I was young
-That being alive was strange,
-And it's a lot easier to be gone
-Than it is to be here.
-	</p>
-
-	<h3>The Inverted Man</h3>
-	<p>
-The man who lived upside down,
-Never knew which way to climb.
-To solid ground above him?
-Or to the open sky below?
-
-Gravity never took to him well,
-Said he wasn't much to hold onto.
-Or maybe a distant star, too distant to see,
-Had fixed its pull on this inverted man.
-
-Because even with the Queens mattress 
-Below him, he couldn't seem to fall into bed.
-When November comes again, the stone in his shoe
-And the trick up his sleeve won't be enough.
-
-So grab a fistful of carpet and hold on,
-Or tie yourself to the porch. 
-When the house shakes it will probably
-Shake him loose.
-	</p>
-
-	<h3>A Strange Day</h3>
-	<p>
-When the eye of God fixates on you,
-For a moment. And then looks away.
-When you're just a mortal man.
-Your world becomes small
-And you see the tip of it rushing towards you.
-Like an arrow you noticed too late
-To avoid, or bargain with.
-The shadow of his gaze stretches out
-Far in front of you, until
-Every step you take is in shadow.
-		
-	</p>
-
-	<h3>Love Path</h3>
-	<p>
-I welcome bad luck,
-because good news makes me nervous.
-And I got the worst of it today, that
-Love is like being buried alive.
-Or drowning in different versions
-of yourself.
-Or seeing yourself in a movie
-you didn't write.
-Or walking on a trail
-With no beginning or end.
-	</p>
-
-	<h3>Never Knew</h3>
-	<p>
-In the parking lots of our lives, 
-Under the overpass, 
-The asphalt is illuminated
-With the ideas of those we 
-Never knew. 
-
-In the gridlock of our minds, 
-Caught by air traffic, 
-Our thoughts are coursed
-Along the paths of those we
-Never knew. 
-
-In the videos of our childhood, 
-Recorded in streaked static, 
-Our fears are projected
-Onto the younger selves we
-Never knew. 
-		
-	</p>
-
-	<h3>Day After A Good Day</h3>
-	<p>
-I left flower tomes for you in the sky,
-radiant abysma.
-The universe no longer speaks to me
-in feathered ellipses.
-And the forest no longer welcomes me
-to its dark cornered caves. 
-And silver songs no longer gather
-and drip from above.
-The goddess is wet with sunlight 
-and stretching herself out into the morning. 
-Empty dawn, hypnotic lofty ephemera. 
-	</p>
-
-	<h3>Thoughts on a Goodlife</h3>
-	<p>
-i want to speak in
-raw shimmering dream tones
-see the future that is
-dark and immense
-let the darklight drip
-into my minds eye
-bathe in the pouring water
-from the open palms of
-a dying goddess in heat
-sail through the emberhot 
-network ideawire
-tear down into threads
-the twine that i was
-sewn up into before i
-was a child
-taste the slippery 
-effervescent thoughtstuff
-and die in the silk
-sheet web of bliss	
-	</p>
-
-	<h3>Poem for Chiara</h3>
-	<p>
-You
-are morning,
-and like the brightening edge of the world
-do illuminate
-what was once dusted in darkness.
-
-You
-are an ocean,
-and as the warm wind carries a bird
-do hold me
-like a wild beast and a baby.
-
-You
-are the tide,
-and as the moon circles the earth,
-do pull me in
-	</p>
-
-	<h3>The Sewer is a Network of Rot</h3>
-	<p>
-Dormant in the hearts of men
-are dead dogs waiting
-to be cast up again
-through the rot and foam
-and sent forth from the sewers.
-
-Wild packs will roam the streets
-to feed on thick young flesh.
-Hollow strays will tear through
-the alleys and arteries
-and pour out of the storm drains.
-
-Those left will be lean and full 
-of sinew and sour wine.
-Their bones a different density
-and their shoulders squared off.
-The struggle will make you strong.
-	</p>
-
-	<h3>One Day</h3>
-	<p>
-One day
-We will all
-be destroyed
-And integrated back
-Into the sky--
-The endless equation
-from which we derived.
-	</p>
-
-	<h3>Dear Gwen</h3>
-	<p>
-Today was a dark day
-and to it I say:
-	Good Riddance.
-No more waiting for tomorrow
-or its brass beams of light.
-Dear Gwen, thanks for the thoughts
-but I'll be alright.
-
-We wandered through 
-the empty halls of our
-neighborhood at night,
-and you told me that time 
-is a fire that left us
-sifting through ash.
-		...did you mean that?
-
-These lonely days I think 
-of you to say:
-	Goodbye.
-Someday in the light maybe 
-our minds will meet.
-Dear Gwen, are you still out there
-in the rivers and streets?
-
-We sat on the watertower 
-and watched as the wind 
-cut through the trees below,
-and you said it would 
-carry us above the damp
-soil and into the sky.
-	...that dream was truly a lie.
-
-I’ll be waiting for a lighter day
-to hear you say:
-	Welcome.
-Tomorrow is coming and no-
-body will be spared.
-Dear Gwen, you go ahead
-and I will meet you there.	
-	</p>
-
-	<h3>Mallory</h3>
-	<p>
-The Mallard is a bird
-you can only find once.
-In the rubble around you it
-flies and if you
-flay it or stay with it
-it’s all that you get.
-Notice the colors
-and cream and the back
-of its arc.
-You are now living
-in the age of the lark.
-	</p>
-
-	<h3>4:30AM</h3>
-	<p>
-The world is spinning now, concentric 
-The sun will rise soon 
-And you're spreading out into the universe 
-Listen to the morning birds song 
-Waking, living in a continuum 
-Familiar things are away now 
-They will return 
-	</p>
-
-	<h3>Various</h3>
-	<p>
-With outstretched arms we worshiped the rising sun 
-Imagined it's permanence in our own bodies 
-We stood in the sand and welcomed each wave 
-Watched until it receded and was integrated 
-back into the ocean 
-A lightness then formed within us 
-Our disregard for time and gravity lifting us
-
-- 
-
-These thoughts and hopes are sent upward 
-Into the empty void of the universe 
-Released from us, given away 
-But nothing is given back 
-The outward flow will empty you 
-For receiving nothing means you have nothing 
-So clutch those drifting atoms of value 
-And hold them close, for soon they will pass 
-Once again left blank
-
-- 
-
-Someone died tonight 
-But I wish they hadn't 
-Someone lost something tonight 
-And I understood that loss 
-I channeled it into myself 
-And thus lost something too 
-We charted the track of the sun 
-Found in its course a renewal 
-Renewal of life, of lightness 
-A beacon of movement and change 
-When it fell beneath the earth 
-We too were pulled down by gravity 
-With a promise of revival 
-Though now an imperfect restoration 
-For I lost something more tonight
-
-- 
-
-We're moving so quickly now 
-That the clouds all bend 
-They point us in a direction 
-And we went; twisting, retching 
-Screaming at the sky 
-Into the fire we threw all things 
-Watched as they were consumed 
-And returned to what they once were 
-All things must burn! 
-Rising up and up they disappeared 
-We spun recklessly, carelessly around 
-Then we too entered the flames 
-And were thus renewed 
-The sky was stretching out now, the clouds parting 
-Making way for our ascending bodies
-
-- 
-
-I remember walking through the rain 
-Gliding under the clouds 
-Moving along hills and through trees 
-I remember the feeling of grass under my feet 
-Of crossing the creek and tasting the honeysuckle 
-In our dugout we fortified ourselves 
-And looked up at the trees 
-How long had they been there? 
-How long would they remain? 
-We craned our necks back and spun 
-And could then understand the spin of the world 
-We could understand the sunlight and water 
-Why it moves, and why it must move 
-We saw the true size of the sky 
-And could then understand our own size 
-And the size of others too
-
-- 
-
-I dreamed that you floated in 
-Through my open window 
-A primal ghost-like creature 
-Basic in nature 
-An expression of the porous being 
-An absorptive force 
-And a protective one too 
-You were born in water 
-Raised in the wind 
-That unidirectional guide 
-It carried all salt, all rain 
-And it carried you too
-
-- 
-
-Today I saw
-The saddest thing I've ever seen
-Our hands touched
-And our eyes looked up
-As we sunk into the murky depths
-Your porcelain face told me
-Of every event that had occured
-A wild canvas of pain hope and wonder
-A record of our life
-	</p>
-
-	<h3>Caught My Reflecton</h3>
-	<p>
-im a clear clever private pervert
-in the night and im known
-as something other than what i am
-that is more me than ill ever be.
-i have a crazy dream where
-im more than i was before
-and my crooked teeth would
-sit straight in my crooked jaw.
-i climbed up a wave that
-whittled away at the world
-as it slipped slowly by
-so i could see the passing of time.
-After assessing all ills 
-I knew that despite all that is 
-broken, everythings fine.
-	</p>
-
-	<h3>A New Way of Seeing It</h3>
-	<p>
-into the endless
-channels of the sky
-where we all will be torn
-down into the threads that compose us
-and taught what it means
-to be truly alive
-	</p>
-
-	<p>
-
-
--		
-	</p>
-</main>
-
+<div class="poetry-page" id="top">
+ <header class="masthead"><a href="/">Home</a><h1>Poetry</h1><a href="/about">About</a></header>
+ <main id="collection">
+  <div class="poems">
+   {#each poems as poem}
+    <article id={poem.id} aria-label={poem.title === 'Untitled' ? poem.text.split('\n')[0] : poem.title}>
+     {#if poem.title !== 'Untitled'}<h2>{poem.title}</h2>{/if}
+     <p class="verse">{poem.text}</p>
+    </article>
+   {/each}
+  </div>
+ </main>
+</div>
 <style>
-	main {
-		margin: 0 auto;
-		max-width: 780px;
-		padding: 42px 24px 24px;
-	}
-
-	h3 {
-		color: var(--charcoal);
-		margin: 28px 0 0;
-		padding: 24px 24px 0;
-		text-align: center;
-	}
-
-	p {
-		color: var(--text-muted);
-		line-height: 1.65;
-		margin: 0;
-		padding: 0 24px 24px;
-		white-space: pre-wrap;
-		font-size: small;
-		text-align: center;
-	}
-
-	h3:nth-of-type(odd),
-	h3:nth-of-type(odd) + p {
-		background: var(--surface);
-	}
-
-	h3:nth-of-type(even),
-	h3:nth-of-type(even) + p {
-		background: var(--paper-warm);
-	}
+ .poetry-page{background:#f5f1e7;color:#253d34;min-height:100vh}
+ .masthead{height:66px;max-width:820px;margin:auto;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #d1cbbb}
+ .masthead a{font:12px var(--font-mono);color:inherit;text-decoration:none}
+ h1{font:normal 26px Georgia,serif;color:#253d34;margin:0;text-align:left}
+ main{max-width:640px;margin:0 auto;padding:70px 0 24px}
+ article{padding:0 0 54px;margin:0 0 54px;border-bottom:1px solid #d1cbbb}
+ article:first-child .verse{font-size:clamp(22px,2.4vw,29px);line-height:1.65}
+ article:last-child{border:0;margin-bottom:0}
+ h2{font:normal clamp(29px,3vw,36px)/1.2 Georgia,'Times New Roman',serif;letter-spacing:-.5px;color:#253d34;margin:0 0 28px;text-align:left}
+ .verse{white-space:pre-wrap;font:19px/1.8 Georgia,'Times New Roman',serif;color:#323b31;margin:0;overflow-wrap:break-word;text-align:left}
+ a:focus-visible{outline:2px solid #a85439;outline-offset:5px}
+ @media(max-width:900px){.masthead{margin:0 28px}main{margin:0 auto;padding:48px 28px 24px}}
+ @media(max-width:600px){.verse{font-size:17px}article{margin-bottom:40px;padding-bottom:40px}h2{font-size:30px}}
+ @media(max-width:380px){main{padding-left:20px;padding-right:20px}.verse{font-size:16px}}
 </style>

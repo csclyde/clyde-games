@@ -40,7 +40,7 @@ func GetEventBuilds(c *gin.Context) {
 }
 
 func GetEventSettings(c *gin.Context) {
-	settings, err := models.GetEventSettings()
+	settings, err := models.GetEventSettings(c.Query("project"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -56,7 +56,7 @@ func UpdateEventSettings(c *gin.Context) {
 		return
 	}
 
-	updated, err := models.SaveOldestEventBuild(settings.OldestBuild)
+	updated, err := models.SaveOldestEventBuild(settings.OldestBuild, c.Query("project"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

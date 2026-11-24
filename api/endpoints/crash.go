@@ -48,7 +48,7 @@ func GetAccessViolationCrashes(c *gin.Context) {
 }
 
 func GetCrashBuilds(c *gin.Context) {
-	builds, err := models.SelectCrashBuilds()
+	builds, err := models.SelectCrashBuilds(models.NormalizeProjectID(c.Query("project")))
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -59,7 +59,11 @@ func GetCrashBuilds(c *gin.Context) {
 }
 
 func GetCrashSettings(c *gin.Context) {
-	settings, err := models.GetCrashSettings()
+	if c.Query("project") == "all" {
+		c.JSON(400, gin.H{"error": "choose one project"})
+		return
+	}
+	settings, err := models.GetCrashSettings(c.Query("project"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -75,7 +79,7 @@ func UpdateCrashSettings(c *gin.Context) {
 		return
 	}
 
-	updated, err := models.SaveOldestCrashBuild(settings.OldestBuild)
+	updated, err := models.SaveOldestCrashBuild(settings.OldestBuild, c.Query("project"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -92,10 +96,11 @@ func FNV32a(text string) string {
 
 var crashMachineInfoStart = regexp.MustCompile(`(?im)^\s*(computer|system|hardware|operating system|os|os version|processor|cpu|gpu( model| memory)?|tracked gpu memory|graphics card|video card|memory|ram|directx|display adapter|render surface|window|scene|level|cursemark|scalegrid guard|physics contact guard|machine|device)\s*(information|info|details)?\s*[:=]`)
 
-// crashFingerprint keeps the error and call stack as the crash identity while
+// crashFingerprint preserves the legacy compatibility hash while
 // excluding diagnostic machine details that may be appended to newer reports.
 // Truncating at the section boundary also preserves the legacy hash for reports
-// that contain only the original message and stack.
+// that contain only the original message and stack. Grouping uses the separate,
+// project-scoped versioned identity in models.CrashIdentityV1.
 func crashFingerprint(crash models.Crash) string {
 	stack := crash.Stack
 	if location := crashMachineInfoStart.FindStringIndex(stack); location != nil {
@@ -139,7 +144,22 @@ func ResolveCrash(c *gin.Context) {
 		return
 	}
 
-	crash, err := models.ResolveCrash(c.Query("hash"))
+	var crash *models.Crash
+	var err error
+	if rawID := c.Query("id"); rawID != "" {
+		id, parseErr := strconv.ParseUint(rawID, 10, 32)
+		if parseErr != nil || id == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report id"})
+			return
+		}
+		crash, err = models.ResolveCrashID(models.AnalyticsDB.WithContext(c.Request.Context()), id)
+	} else {
+		if c.Query("hash") == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "report id or hash required"})
+			return
+		}
+		crash, err = models.ResolveCrash(c.Query("hash"), c.Query("project"))
+	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

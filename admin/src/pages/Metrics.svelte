@@ -1,5 +1,8 @@
 <script>
+ import {canWrite} from "../portal-auth.mjs";
+ import Panel from '../components/Panel.svelte';
 	export let selectedProject = 'all';
+ export let showGlobalSettings = false;
 	export let reportProjects = () => {};
 
 	async function parseResponse(res) {
@@ -39,7 +42,7 @@
 	}
 
 	async function getEventSettings() {
-		const res = await fetch(`/api/event/settings`);
+		const res = await fetch(`/api/event/settings?project=${encodeURIComponent(selectedProject)}`);
 		const settings = await parseResponse(res);
 
 		if (res.ok) {
@@ -105,7 +108,7 @@
 		settingsError = '';
 
 		try {
-			const res = await fetch(`/api/event/settings`, {
+			const res = await fetch(`/api/event/settings?project=${encodeURIComponent(selectedProject)}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ OldestBuild: oldestBuild })
@@ -161,8 +164,8 @@
 		});
 	}
 
-	function matchesProject(item) {
-		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
+	function matchesProject(item, project) {
+		return project === 'all' || (item.Project || '').toLowerCase() === project.toLowerCase();
 	}
 
 	function buildContext(build) {
@@ -235,11 +238,11 @@
 		return `${build.Project || ''}:${build.Build}`;
 	}
 
-	$: visibleBuilds = builds.filter(matchesProject);
-	$: visibleSavegameBuilds = savegameBuilds.filter(matchesProject);
+	$: visibleBuilds = builds.filter(item => matchesProject(item, selectedProject));
+	$: visibleSavegameBuilds = savegameBuilds.filter(item => matchesProject(item, selectedProject));
 	$: metricBuildDates = [...new Set([
-		...builds.map(build => build.Build),
-		...savegameBuilds.map(build => build.Build)
+		...visibleBuilds.map(build => build.Build),
+		...visibleSavegameBuilds.map(build => build.Build)
 	])].sort().reverse();
 	$: reportProjects('metrics', [
 		...builds.map(build => build.Project),
@@ -247,26 +250,20 @@
 	]);
 </script>
 
-<main>
-	<header class="page-header">
-		<div>
-			<h2>Metrics</h2>
-			<p>{visibleBuilds.length} event build{visibleBuilds.length === 1 ? '' : 's'} / {visibleSavegameBuilds.length} save build{visibleSavegameBuilds.length === 1 ? '' : 's'}</p>
-		</div>
-	</header>
-
+<Panel title="Build Data">
 	{#if deleteError}
 		<p class="error">{deleteError}</p>
 	{/if}
 
-	<section class="settings">
+	{#if showGlobalSettings}<section class="settings">
 		<div>
-			<label for="oldest-build">Oldest accepted metric build</label>
-			<p>Metric events and savegames from builds before this date will be rejected.</p>
+			<label for="oldest-build">Oldest accepted build</label>
+			<p>For this project only: reject new metric events and save uploads from older builds. Existing records are not deleted.</p>
 		</div>
 		<div class="setting-control">
 			<select id="oldest-build" value={oldestBuild} disabled={loadingBuilds || savingOldestBuild} on:change={updateOldestBuild}>
 				<option value="">Accept all builds</option>
+ {#if oldestBuild && !metricBuildDates.includes(oldestBuild)}<option value={oldestBuild}>{formatBuildDate(oldestBuild)} (current cutoff)</option>{/if}
 				{#each metricBuildDates as build}
 					<option value={build}>{formatBuildDate(build)}</option>
 				{/each}
@@ -286,6 +283,7 @@
 		<p class="error">{settingsError}</p>
 	{/if}
 
+ {/if}
 	<section class="builds">
 		<div class="section-header">
 			<h3>Event Builds</h3>
@@ -304,7 +302,7 @@
 							<p class="build-count">{build.Count} events</p>
 							<button
 								type="button"
-								disabled={deletingEventBuild === buildKey(build)}
+								disabled={!$canWrite || deletingEventBuild === buildKey(build)}
 								on:click={() => deleteEventBuild(build)}
 							>
 								{deletingEventBuild === buildKey(build) ? 'Deleting...' : 'Delete All'}
@@ -337,7 +335,7 @@
 							<p class="build-count">{build.Count} save game{build.Count === 1 ? '' : 's'}</p>
 							<button
 								type="button"
-								disabled={deletingSavegameBuild === buildKey(build)}
+								disabled={!$canWrite || deletingSavegameBuild === buildKey(build)}
 								on:click={() => deleteSavegameBuildItems(build)}
 							>
 								{deletingSavegameBuild === buildKey(build) ? 'Deleting...' : 'Delete All'}
@@ -350,53 +348,28 @@
 			{/if}
 		{/if}
 	</section>
-</main>
+</Panel>
 
 <style>
-	main {
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		color: var(--text);
-		max-width: 1368px;
-		margin: 12px auto 32px;
-		padding: 14px;
-	}
 
-	.page-header {
-		border-bottom: 1px solid var(--line);
-		margin-bottom: 12px;
-		padding-bottom: 10px;
-	}
 
-	.page-header h2 {
-		font-size: 1.5rem;
-		line-height: 1.15;
-		text-align: left;
-	}
 
-	.page-header p {
-		color: var(--text-muted);
-		font-size: .82rem;
-		font-weight: 400;
-		letter-spacing: 0;
-		margin: 3px 0 0;
-		text-align: left;
-	}
+
+
+
+
 
 	.builds {
-		background: var(--paper-warm);
-		border-left: 3px solid var(--forest);
-		border-radius: 3px;
+		background: transparent;
+		border-top: 1px solid var(--line);
 		margin-top: 12px;
 		padding: 4px 10px;
 	}
 
 	.settings {
 		align-items: center;
-		background: var(--paper-warm);
-		border-left: 3px solid var(--forest);
-		border-radius: 3px;
+		background: transparent;
+		border-top: 1px solid var(--line);
 		display: flex;
 		justify-content: space-between;
 		gap: 20px;
@@ -567,10 +540,7 @@
 	}
 
 	@media (max-width: 520px) {
-		main {
-			margin: 10px 8px 24px;
-			padding: 14px;
-		}
+
 
 		.settings {
 			align-items: stretch;

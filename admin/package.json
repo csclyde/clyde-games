@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "chart.js": "^4.6.1",
+    "markdown-it": "15.0.3",
     "page": "^1.11.6",
     "sirv-cli": "^2.0.0"
   }

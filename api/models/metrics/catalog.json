@@ -474,5 +474,132 @@
     "row": 83,
     "col": 0,
     "width": 24
+  },
+  {
+    "id": 201,
+    "name": "Deaths",
+    "description": "Deaths reported in Journey and Roguelike over the last 30 days.",
+    "display": "scalar",
+    "settings": {},
+    "section": "Run Outcomes",
+    "row": 0,
+    "col": 0,
+    "width": 8,
+    "project": "necrovale"
+  },
+  {
+    "id": 202,
+    "name": "Journey Completions",
+    "description": "Successful Temple of Hope clears reported in the last 30 days.",
+    "display": "scalar",
+    "settings": {},
+    "section": "Run Outcomes",
+    "row": 1,
+    "col": 0,
+    "width": 8,
+    "project": "necrovale"
+  },
+  {
+    "id": 203,
+    "name": "Tracked Installations",
+    "description": "Distinct anonymous installations that reported an outcome in the last 30 days. Not total players.",
+    "display": "scalar",
+    "settings": {},
+    "section": "Run Outcomes",
+    "row": 2,
+    "col": 0,
+    "width": 8,
+    "project": "necrovale"
+  },
+  {
+    "id": 204,
+    "name": "Outcomes by Day",
+    "description": "Last 30 calendar days, including days with no reports. Completions are Journey only.",
+    "display": "line",
+    "settings": {
+      "graph.dimensions": [
+        "date"
+      ],
+      "graph.metrics": [
+        "journey_deaths",
+        "roguelike_deaths",
+        "journey_completions"
+      ],
+      "graph.x_axis.scale": "ordinal"
+    },
+    "section": "Run Outcomes",
+    "row": 3,
+    "col": 0,
+    "width": 24,
+    "project": "necrovale"
+  },
+  {
+    "id": 205,
+    "name": "Outcomes by Build and Difficulty",
+    "description": "Compare builds before interpreting a balance change. A dash means the field was not recorded.",
+    "display": "table",
+    "settings": {},
+    "section": "Run Outcomes",
+    "row": 4,
+    "col": 0,
+    "width": 24,
+    "project": "necrovale"
+  },
+  {
+    "id": 206,
+    "name": "Death Hotspots",
+    "description": "Where deaths were reported, not the odds of dying there. Filter rows by area, level, mode, or difficulty.",
+    "display": "table",
+    "settings": {},
+    "section": "Progression",
+    "row": 5,
+    "col": 0,
+    "width": 24,
+    "project": "necrovale"
+  },
+  {
+    "id": 207,
+    "name": "Deaths by Run Step",
+    "description": "Journey step and Roguelike progress have different meanings. The chart compares distributions, not survival rates.",
+    "display": "bar",
+    "settings": {
+      "graph.dimensions": [
+        "run_step",
+        "mode"
+      ],
+      "graph.metrics": [
+        "deaths"
+      ],
+      "graph.x_axis.scale": "linear"
+    },
+    "section": "Progression",
+    "row": 6,
+    "col": 0,
+    "width": 24,
+    "project": "necrovale"
+  },
+  {
+    "id": 208,
+    "name": "Equipment at Journey Outcomes",
+    "description": "Share of reported loadouts containing the item in this slot (with sample counts). Counts each item once per outcome and slot. This does not measure item strength.",
+    "display": "table",
+    "settings": {},
+    "section": "Loadouts",
+    "row": 7,
+    "col": 0,
+    "width": 24,
+    "project": "necrovale"
+  },
+  {
+    "id": 209,
+    "name": "Common Melds",
+    "description": "Parent and child item pairs across reported loadouts. Counts unique outcome snapshots, not the number of copies equipped.",
+    "display": "table",
+    "settings": {},
+    "section": "Loadouts",
+    "row": 8,
+    "col": 0,
+    "width": 24,
+    "project": "necrovale"
   }
 ]

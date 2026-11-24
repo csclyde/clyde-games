@@ -1,14 +1,32 @@
 <script>
+ import {onMount,onDestroy,tick} from "svelte";
+ import {canWrite} from "../portal-auth.mjs";
+ import ReportNotes from "../components/ReportNotes.svelte";
+ import {loadInvestigationStatuses,statusKey} from "../investigation-status.mjs";
+ import Panel from '../components/Panel.svelte';
+ import FeedbackMarkdown from '../components/FeedbackMarkdown.svelte';
+ import {feedbackPresentation} from '../feedback-presentation.mjs';
 	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
 
+ let investigations={},investigationGeneration=0;
+ async function refreshInvestigations(reports){const generation=++investigationGeneration;const result=await loadInvestigationStatuses('feedback',reports);if(generation===investigationGeneration)investigations=result;}
+ function noteChanged(e){const d=e.detail;investigations={...investigations,[`${d.project}:${d.id}`]:d.investigation};refreshInvestigations(feedback);}
+ $: refreshInvestigations(feedback);
 	export let selectedProject = 'all';
 	export let reportProjects = () => {};
+ export let reportFeedbackCounts = () => {};
+ export let refreshSignal=0;
+ export let sourceConfig;
+ export let reviewFeedback=()=>{};
+ let mounted=false,destroyed=false,request=null,controller,queued=false,waitingUpdates=false,updateError="",feedbackRoot,observer;
+ const watched=new Map();
 
-	async function getFeedback() {
-		const res = await fetch(`/api/feedback`);
+	async function getFeedback(signal) {
+		const res = await fetch(`/api/feedback`,{signal,cache:'no-store'});
 		const feedback = await res.json();
 
 		if (res.ok) {
+			if(!Array.isArray(feedback))throw Error("Feedback response was invalid.");
 			return feedback;
 		} else {
 			if (feedback.error == 'No feedback found') {
@@ -31,29 +49,35 @@
 	let sourceSyncError = '';
 	let searchText = '';
 
-	async function loadFeedback() {
-		loadingFeedback = true;
-		feedbackError = '';
 
-		try {
-			feedback = await getFeedback();
-		} catch (error) {
-			feedbackError = error.message;
-		} finally {
-			loadingFeedback = false;
-		}
-	}
-
-	loadFeedback();
-
-	async function refreshFeedback() {
-		try {
-			feedback = await getFeedback();
-			feedbackError = '';
-		} catch (error) {
-			feedbackError = error.message;
-		}
-	}
+ function hasDraft(){return !!ticketComment||syncingSources||Object.keys(resolvingFeedback).length>0||Object.keys(translatingFeedback).length>0||[...(feedbackRoot?.querySelectorAll('.notes form textarea,.notes form select')||[])].some(e=>e.value.trim())||!!feedbackRoot?.querySelector('.notes button:disabled[type=submit]');}
+ async function refreshFeedback(quiet=false){
+  if(destroyed)return;
+  if(quiet&&(document.visibilityState==='hidden'||hasDraft())){waitingUpdates=true;return;}
+  if(request){queued=true;return request;}
+  controller=new AbortController();const deadline=setTimeout(()=>controller?.abort(),10000);
+  request=(async()=>{try{
+   const next=await getFeedback(controller.signal);if(destroyed)return;
+   if(quiet&&hasDraft()){waitingUpdates=true;return;}
+   feedback=next;feedbackError='';updateError='';waitingUpdates=false;
+   await tick();markVisible();
+  }catch(e){if(!destroyed){if(loadingFeedback)feedbackError=e.message;else updateError=e.message;}}
+  finally{clearTimeout(deadline);request=null;controller=null;if(!destroyed){loadingFeedback=false;await tick();markVisible();if(queued){queued=false;queueMicrotask(()=>refreshFeedback(true));}}}})();
+  return request;
+ }
+ function markVisible(){
+  if(destroyed||document.visibilityState==='hidden'||!document.hasFocus()||loadingFeedback||feedbackError)return;
+  const byProject=Object.create(null);for(const [node,item] of watched){const r=node.getBoundingClientRect();const area=Math.min(r.width,innerWidth)*Math.min(r.height,innerHeight),visible=Math.max(0,Math.min(innerWidth,r.right)-Math.max(0,r.left))*Math.max(0,Math.min(innerHeight,r.bottom)-Math.max(0,r.top));if(area>0&&visible/area>=.5){const p=(item.Project||'').trim().toLowerCase();(byProject[p]??=[]).push(item.ID);}}
+  for(const [p,ids] of Object.entries(byProject))reviewFeedback(p,ids);
+ }
+ function watchFeedback(node,item){
+  watched.set(node,item);if(typeof IntersectionObserver!=='undefined'){observer??=new IntersectionObserver(markVisible,{threshold:[0,.5,1]});observer.observe(node);}
+  return {update(item){watched.set(node,item);},destroy(){observer?.unobserve(node);watched.delete(node);}};
+ }
+ onMount(()=>{mounted=true;refreshFeedback();const catchup=()=>{if(document.visibilityState!=='hidden'){refreshFeedback(true);tick().then(markVisible);}};const visible=()=>{if(document.visibilityState!=='hidden')catchup();};window.addEventListener('focus',catchup);window.addEventListener('online',catchup);window.addEventListener('pageshow',catchup);window.addEventListener('scroll',markVisible,{passive:true,capture:true});document.addEventListener('visibilitychange',visible);return()=>{window.removeEventListener('focus',catchup);window.removeEventListener('online',catchup);window.removeEventListener('pageshow',catchup);window.removeEventListener('scroll',markVisible,true);document.removeEventListener('visibilitychange',visible);};});
+ onDestroy(()=>{destroyed=true;controller?.abort();observer?.disconnect();watched.clear();});
+ $: if(mounted&&refreshSignal)refreshFeedback(true);
+ $: if(mounted&&selectedProject){refreshFeedback(true);tick().then(markVisible);}
 
 	function clearSearch() {
 		searchText = '';
@@ -75,26 +99,23 @@
 
 	async function syncSources() {
 		syncingSources = true;
-		sourceSyncStatus = 'Syncing Steam and Reddit...';
 		sourceSyncError = '';
-
-		const results = await Promise.allSettled([
-			syncSource('Steam', 'steamreviews/import'),
-			syncSource('Reddit', 'reddit/import')
-		]);
-		const synced = results.filter(result => result.status === 'fulfilled').map(result => result.value);
-		const failed = results.filter(result => result.status === 'rejected').map(result => result.reason.message);
-
-		if (synced.length > 0) {
-			await refreshFeedback();
-			sourceSyncStatus = synced
-				.map(result => `${result.name}: ${result.imported || 0} imported, ${result.skipped || 0} skipped`)
-				.join(' · ');
-		} else {
-			sourceSyncStatus = '';
+		if (sourceConfig?.steamSyncEnabled === false) {
+			sourceSyncStatus = 'Steam sync is disabled for this project.';
+			syncingSources = false;
+			return;
 		}
-		sourceSyncError = failed.join(' · ');
-		syncingSources = false;
+		sourceSyncStatus = 'Syncing Steam...';
+		try {
+			const result = await syncSource('Steam', 'steamreviews/import');
+			await refreshFeedback();
+			sourceSyncStatus = 'Steam: ' + (result.imported || 0) + ' imported, ' + (result.skipped || 0) + ' skipped';
+		} catch (error) {
+			sourceSyncStatus = '';
+			sourceSyncError = error.message;
+		} finally {
+			syncingSources = false;
+		}
 	}
 
 	async function resolveFeedback(id) {
@@ -284,21 +305,12 @@
 		};
 	}
 
-	function messageSegments(message) {
-		return message.split(/(https?:\/\/[^\s]+)/g).filter(Boolean).map(part => {
-			return {
-				text: part,
-				isURL: /^https?:\/\//.test(part)
-			};
-		});
-	}
-
 	function displayedMessage(comment) {
 		if (comment.Translated && !showingOriginalFeedback[comment.ID]) {
 			return comment.Translated;
 		}
 
-		return comment.Message;
+		return comment.Markdown || comment.Message || '';
 	}
 
 	function toggleOriginal(comment) {
@@ -325,7 +337,7 @@
 				throw new Error('Chrome translation is not available in this browser.');
 			}
 
-			const messageParts = getTranslatableMessage(comment.Message);
+			const messageParts = getTranslatableMessage(feedbackPresentation(comment, comment.Message).body);
 			const sourceLanguage = await detectSourceLanguage(messageParts.text);
 
 			if (sourceLanguage === 'en') {
@@ -373,7 +385,7 @@
 
 			feedback = feedback.map(item => {
 				if (item.ID !== comment.ID) {
-					return item;
+					return item.Replies ? { ...item, Replies: item.Replies.map(reply => reply.ID === comment.ID ? { ...reply, Translated: result.Translated || translatedMessage } : reply) } : item;
 				}
 
 				return {
@@ -442,26 +454,29 @@
 		return formatDate(value);
 	}
 
-	function matchesProject(item) {
-		return selectedProject === 'all' || (item.Project || '').toLowerCase() === selectedProject.toLowerCase();
+	function matchesProject(item, project) {
+		return project === 'all' || (item.Project || '').toLowerCase() === project.toLowerCase();
 	}
 
-	$: projectFeedback = feedback.filter(matchesProject);
+	$: projectFeedback = feedback.filter(item => matchesProject(item, selectedProject));
 	$: normalizedSearch = searchText.trim().toLowerCase();
 	$: visibleFeedback = normalizedSearch
-		? projectFeedback.filter(comment => `${comment.Message || ''}\n${comment.Translated || ''}`.toLowerCase().includes(normalizedSearch)).slice(0, 100)
+		? projectFeedback.filter(comment => [comment, ...(comment.Replies || [])].some(post => `${post.Message || ''}\n${post.Translated || ''}`.toLowerCase().includes(normalizedSearch))).slice(0, 100)
 		: projectFeedback;
+	$: if (!loadingFeedback && !feedbackError) reportFeedbackCounts(feedback);
 	$: reportProjects('feedback', feedback.map(comment => comment.Project));
 </script>
 
-<main>
+<main bind:this={feedbackRoot}>
+ {#if waitingUpdates}<p class="live-update" role="status">Feedback updates are waiting. Finish the current edit, then load updates. <button type="button" on:click={()=>refreshFeedback(true)}>Load updates</button></p>{/if}
+ {#if updateError}<p class="live-update" role="status">Feedback could not be refreshed. Showing the last loaded items. <button type="button" on:click={()=>refreshFeedback(true)}>Retry updates</button></p>{/if}
 	<header class="page-header">
 		<div>
-			<h2>Player Feedback</h2>
+
 			<p>{visibleFeedback.length} open item{visibleFeedback.length === 1 ? '' : 's'}</p>
 		</div>
 		<div class="header-actions">
-			<button type="button" disabled={syncingSources} on:click={syncSources}>
+			<button type="button" disabled={!$canWrite || syncingSources} on:click={syncSources}>
 				{syncingSources ? 'Syncing...' : 'Sync Sources'}
 			</button>
 			{#if sourceSyncStatus}
@@ -473,15 +488,16 @@
 		</div>
 	</header>
 
-	<div class="search">
-		<label for="feedback-search">Search message text</label>
+	<Panel inset={false}><div class="search">
+
 		<div class="search-controls">
-			<input id="feedback-search" type="search" bind:value={searchText} placeholder="Search player feedback…" autocomplete="off" />
+			<input id="feedback-search" aria-label="Search feedback" type="search" bind:value={searchText} placeholder="Search player feedback…" autocomplete="off" />
 			{#if searchText}<button class="clear-search" type="button" on:click={clearSearch}>Clear</button>{/if}
 		</div>
 		{#if normalizedSearch}<small>Showing up to 100 matching visible items.</small>{/if}
 	</div>
 
+ </Panel>
 	{#if loadingFeedback}
 		<p class="state-message">loading...</p>
 	{:else if feedbackError}
@@ -490,22 +506,15 @@
 		<p class="state-message">{normalizedSearch ? 'No matching feedback.' : 'No open feedback.'}</p>
 	{:else}
 		<div class="comment-list">
-		{#each visibleFeedback as comment}
-			<div class:resolving={resolvingFeedback[comment.ID]} class="comment">
-				<div class="comment-body">
+		{#each visibleFeedback as comment (comment.ID)}
+ {@const presentation = feedbackPresentation(comment, displayedMessage(comment))}
+			<Panel inset={false} class={resolvingFeedback[comment.ID] ? "comment resolving" : "comment"}>
+				<div class="comment-body" data-feedback-id={comment.ID} use:watchFeedback={comment}>
 					<div class="comment-main">
 						<div class="message-header">
 							<span class="rating" style="background-color:{ colors[comment.Rating] }"></span>
 							<div class="message-stack">
-								<p class="message">
-									{#each messageSegments(displayedMessage(comment)) as segment}
-										{#if segment.isURL}
-											<a target="_blank" rel="noreferrer" href={segment.text}>{segment.text}</a>
-										{:else}
-											{segment.text}
-										{/if}
-									{/each}
-								</p>
+								<FeedbackMarkdown message={presentation.body} discord={presentation.discord}/>
 								{#if comment.Translated}
 									<button class="original-toggle" type="button" on:click={() => toggleOriginal(comment)}>
 										{showingOriginalFeedback[comment.ID] ? 'See Translation' : 'See Original'}
@@ -519,13 +528,14 @@
 								{/if}
 							</div>
 						</div>
+ <ReportNotes kind="feedback" id={comment.ID} project={comment.Project} investigation={investigations[statusKey(comment)]} compactHeader on:changed={noteChanged}/>
 						<div class="meta-list">
 							{#if comment.Project}<span class="project-tag">project: {comment.Project}</span>{/if}
 							{#if comment.Env}<span>env: {comment.Env}</span>{/if}
 							{#if comment.Platform}<span>platform: {comment.Platform}</span>{/if}
-							{#if comment.Category}<span>category: {comment.Category}</span>{/if}
+							{#if presentation.category}<span>category: {presentation.category}</span>{/if}
 							{#if comment.PID}
-								<a class="user-id" href={`/user/${encodeURIComponent(comment.PID)}`}>user: {comment.PID}</a>
+								<a class="user-id" href={`/user/${encodeURIComponent(comment.PID)}`}>user: {presentation.username}</a>
 							{/if}
 							{#if comment.Commit}
 								<span>commit: {comment.Commit}</span>
@@ -538,25 +548,41 @@
 							<p><span>Build</span>{formatBuildDate(comment.Build)}</p>
 						</div>
 						<div class="actions">
-							<button type="button" disabled={translatingFeedback[comment.ID] || resolvingFeedback[comment.ID]} on:click={() => translateFeedback(comment)}>
+							<button type="button" disabled={!$canWrite || translatingFeedback[comment.ID] || resolvingFeedback[comment.ID]} on:click={() => translateFeedback(comment)}>
 								{translatingFeedback[comment.ID] ? 'Translating...' : 'Translate'}
 							</button>
-							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => openTicketModal(comment)}>
+							<button type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => openTicketModal(comment)}>
 								Make Ticket
 							</button>
 							<button type="button" disabled={!comment.SavegameID || resolvingFeedback[comment.ID]} on:click={() => downloadSavegame(comment)}>
 								Download Save
 							</button>
-							<button type="button" disabled={resolvingFeedback[comment.ID]} on:click={() => resolveFeedback(comment.ID)}>
+							<button type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => resolveFeedback(comment.ID)}>
 								{resolvingFeedback[comment.ID] ? 'Resolving...' : 'Resolve'}
 							</button>
 						</div>
 					</div>
 				</div>
-			</div>
+				{#if comment.Replies && comment.Replies.length}
+					<section class="discussion-replies" aria-label="Discussion replies">
+						<h3>{comment.Replies.length} {comment.Replies.length === 1 ? 'reply' : 'replies'}</h3>
+						{#each comment.Replies as reply (reply.ID)}
+							<article class="discussion-reply">
+								<header><strong>{reply.PID || 'Steam user'}</strong><time datetime={reply.CreatedAt}>{formatDate(reply.CreatedAt)}</time></header>
+								<FeedbackMarkdown message={displayedMessage(reply).replace(/^Steam discussion: [^\n]*\n\n/, '')} />
+								<button class="original-toggle" type="button" disabled={!$canWrite && !reply.Translated || translatingFeedback[reply.ID]} on:click={() => reply.Translated ? toggleOriginal(reply) : translateFeedback(reply)}>
+									{translatingFeedback[reply.ID] ? 'Translating...' : reply.Translated ? (showingOriginalFeedback[reply.ID] ? 'See Translation' : 'See Original') : 'Translate'}
+								</button>
+								{#if helperStatus[reply.ID] && helperStatus[reply.ID].error}<small class="helper-error">{helperStatus[reply.ID].error}</small>{/if}
+							</article>
+						{/each}
+					</section>
+				{/if}
+			</Panel>
 		{/each}
 		</div>
 	{/if}
+
 </main>
 
 <PlankaTicketModal
@@ -568,6 +594,10 @@
 />
 
 <style>
+	.discussion-replies { border-top: 1px solid #56616d; margin-top: 1rem; padding-top: .6rem; }
+	.discussion-replies h3 { font-size: .85rem; margin: 0 0 .5rem; }
+	.discussion-reply { margin: .6rem 0 .6rem .4rem; border-left: 2px solid #56616d; padding: .35rem .65rem; overflow-wrap: anywhere; }
+	.discussion-reply header { display: flex; flex-wrap: wrap; gap: .4rem .8rem; font-size: .82rem; margin-bottom: .3rem; }
 	main {
 		color: var(--text);
 		max-width: 1400px;
@@ -577,7 +607,6 @@
 
 	.page-header {
 		align-items: flex-start;
-		border-bottom: 1px solid var(--line);
 		display: flex;
 		gap: 18px;
 		justify-content: space-between;
@@ -585,11 +614,7 @@
 		padding-bottom: 12px;
 	}
 
-	.page-header h2 {
-		font-size: 2.5rem;
-		line-height: 1;
-		text-align: left;
-	}
+
 
 	.page-header p {
 		color: var(--olive);
@@ -615,8 +640,8 @@
 		text-align: right;
 	}
 
-	.search { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 14px; padding: 12px; }
-	.search label { color: var(--text-soft); display: block; font-size: .68rem; font-weight: 800; letter-spacing: .06em; margin-bottom: 6px; text-transform: uppercase; }
+	.search { min-width:0; }
+
 	.search-controls { display: flex; gap: 6px; }
 	.search input { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); flex: 1; font: inherit; min-width: 0; padding: 7px 10px; }
 	.search input:focus { border-color: var(--charcoal); outline: 2px solid transparent; }
@@ -626,20 +651,13 @@
 	.comment-list {
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: 12px;
+ margin-top:12px;
 	}
 
-	.comment {
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-left: 4px solid var(--forest);
-		border-radius: var(--radius);
-		box-sizing: border-box;
-		padding: 14px 16px;
-		transition: opacity 120ms ease, background-color 120ms ease;
-	}
 
-	.comment.resolving {
+
+	:global(.comment.resolving) {
 		opacity: 0.45;
 		pointer-events: none;
 	}
@@ -755,7 +773,7 @@
 		color: var(--text);
 	}
 
-	.comment p {
+	:global(.comment) p {
 		margin: 0;
 	}
 
@@ -766,16 +784,6 @@
 		height: 14px;
 		margin-top: 5px;
 		width: 14px;
-	}
-
-	.message {
-		color: var(--charcoal);
-		flex-grow: 1;
-		font-size: 1rem;
-		line-height: 1.4;
-		overflow-wrap: anywhere;
-		text-align: left;
-		white-space: pre-wrap;
 	}
 
 	.helper-status {
@@ -853,9 +861,7 @@
 			padding: 8px 4px 24px;
 		}
 
-		.page-header h2 {
-			font-size: 2rem;
-		}
+
 
 		.page-header {
 			align-items: flex-start;
@@ -878,14 +884,7 @@
 			gap: 12px;
 		}
 
-		.comment {
-			border: 1px solid var(--line-strong);
-			border-top: 4px solid var(--forest);
-			border-left-width: 1px;
-			border-radius: 6px;
-			padding: 12px;
-			width: 100%;
-		}
+
 
 		.comment-body {
 			grid-template-columns: 1fr;

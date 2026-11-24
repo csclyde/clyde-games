@@ -8,8 +8,17 @@ import (
 
 type SyncState struct {
 	gorm.Model
-	Name          string `gorm:"type:varchar(128);uniqueIndex"`
-	LastSuccessAt time.Time
+	Name           string `gorm:"type:varchar(128);uniqueIndex"`
+	BaselineAt     *time.Time
+	LastSuccessAt  time.Time
+	LastAttemptAt  *time.Time
+	LastFinishedAt *time.Time
+	WindowFrom     *time.Time
+	WindowTo       *time.Time
+	LastError      string `gorm:"type:text"`
+	Status         string `gorm:"type:varchar(32)"`
+	Imported       int
+	Skipped        int
 }
 
 func GetSyncState(name string) (*SyncState, error) {

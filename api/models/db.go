@@ -19,16 +19,34 @@ func GetDB(name string) (*gorm.DB, error) {
 }
 
 func MigrateAnalyticsDB() error {
-	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &Project{}, &Crash{}, &Event{}, &EventItem{}, &EventSetting{}, &Feedback{}, &Savegame{}, &SyncState{}, &PackratVersion{}); err != nil {
+	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &Project{}, &Crash{}, &CrashGroup{}, &Event{}, &EventItem{}, &EventSetting{}, &Feedback{}, &DiscordPendingMessage{}, &DiscordSnapshotRevision{}, &DiscordSyncSource{}, &Savegame{}, &SyncState{}, &PackratVersion{}); err != nil {
+		return err
+	}
+	if err := MigrateCrashGroups(); err != nil {
 		return err
 	}
 	if err := BackfillProjects(); err != nil {
+		return err
+	}
+	if err := SeedPathProdigyProject(); err != nil {
 		return err
 	}
 	if err := SeedProjectSources(); err != nil {
 		return err
 	}
 
+	if err := MigrateFeedbackSyncConfiguration(); err != nil {
+		return err
+	}
+	if err := MigrateProjectCrashCutoffs(); err != nil {
+		return err
+	}
+	if err := MigrateProjectBuildCutoffs(); err != nil {
+		return err
+	}
+	if err := BackfillSteamFeedbackThreads(); err != nil {
+		return err
+	}
 	return CreateSavegameRetentionEvent()
 }
 

@@ -43,3 +43,11 @@ feedback/crash work queue and metrics to MCP clients such as Codex. Run
 `npm run build:mcp` / `npm run test:mcp` with Go 1.25+ installed. Deployment is
 intentionally separate from the existing umbrella `deploy` command until the
 HTTPS endpoint and dedicated credentials are provisioned. Game ingestion is unchanged.
+
+### Necrovale run outcomes
+
+Choose **Necrovale** under **Metrics** for the last 30 days of production
+outcomes. Deaths are reported for both modes; completions count Journey clears
+at the Temple of Hope. These are counts, not win rates: abandoned runs are not
+tracked. Deploy the API and admin bundle together. The additive telemetry fields
+are populated for new events and are not backfilled for older events.

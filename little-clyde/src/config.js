@@ -14,6 +14,8 @@ function readConfig() {
     discordToken: requireEnv("DISCORD_TOKEN"),
     protectedDiscordUserId: process.env.PROTECTED_DISCORD_USER_ID || "",
     protectedDiscordUsername: process.env.PROTECTED_DISCORD_USERNAME || "c_l_y_d_e_",
+    feedbackIngestToken: process.env.FEEDBACK_INGEST_TOKEN || "",
+    feedbackInternalUrl: process.env.FEEDBACK_INTERNAL_URL || "http://127.0.0.1:9990/internal/discord",
     feedbackApiUrl: process.env.FEEDBACK_API_URL || "http://localhost:9990/feedback",
     feedbackProject: process.env.FEEDBACK_PROJECT || "Discord",
     feedbackEnv: process.env.FEEDBACK_ENV || "production",

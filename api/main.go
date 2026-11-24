@@ -28,7 +28,8 @@ func main() {
 		panic(err)
 	}
 
-	router := gin.Default()
+	router := gin.New()
+	router.Use(endpoints.SafePortalRequestLog(), endpoints.SafePortalRecovery())
 	router.Use(CORSMiddleware())
 	registerRoutes(router)
 
@@ -45,18 +46,29 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if err = models.MigrateReportNotes(models.AnalyticsDB); err != nil {
+		panic(err)
+	}
+	if err = models.MigrateCrashInvestigations(models.AnalyticsDB); err != nil {
+		panic("crash investigation migration failed")
+	}
+	if err = models.MigratePortalAuth(models.AnalyticsDB); err != nil {
+		panic("portal authentication schema migration failed")
+	}
 	if err = models.MigrateEtymologyDB(); err != nil {
 		panic(err)
 	}
 
 	endpoints.StartSteamReviewImporter()
-	endpoints.StartRedditPostImporter()
+	endpoints.StartDiscordFeedbackImporter()
 
 	router.Run(":9990")
 }
 
 // registerRoutes keeps routing testable without connecting production databases.
 func registerRoutes(router *gin.Engine) {
+	endpoints.RegisterPortalAuthRoutes(router)
+	endpoints.RegisterReportNoteRoutes(router)
 	endpoints.RegisterMCPRoutes(router)
 	router.GET("/metrics", endpoints.MetricsAuth, endpoints.GetMetrics)
 	router.GET("/metrics/:id", endpoints.MetricsAuth, endpoints.GetMetric)
@@ -67,7 +79,6 @@ func registerRoutes(router *gin.Engine) {
 	router.GET("/planka/hierarchy", endpoints.AdminAuth, endpoints.GetPlankaHierarchy)
 	router.POST("/planka/tickets", endpoints.AdminAuth, endpoints.CreatePlankaTicket)
 	router.POST("/steamreviews/import", endpoints.AdminAuth, endpoints.ImportSteamReviewsNow)
-	router.POST("/reddit/import", endpoints.AdminAuth, endpoints.ImportRedditPostsNow)
 	router.GET("/event", endpoints.AdminAuth, endpoints.GetEvent)
 	router.GET("/event/builds", endpoints.AdminAuth, endpoints.GetEventBuilds)
 	router.GET("/event/settings", endpoints.AdminAuth, endpoints.GetEventSettings)
@@ -76,6 +87,7 @@ func registerRoutes(router *gin.Engine) {
 	router.DELETE("/event/build", endpoints.AdminAuth, endpoints.DeleteEventsByBuild)
 	router.GET("/crash", endpoints.AdminAuth, endpoints.GetCrash)
 	router.GET("/crash/accessviolations", endpoints.AdminAuth, endpoints.GetAccessViolationCrashes)
+	router.GET("/crash/health", endpoints.AdminAuth, endpoints.GetCrashHealth)
 	router.GET("/crash/builds", endpoints.AdminAuth, endpoints.GetCrashBuilds)
 	router.GET("/crash/settings", endpoints.AdminAuth, endpoints.GetCrashSettings)
 	router.PUT("/crash/settings", endpoints.AdminAuth, endpoints.UpdateCrashSettings)
@@ -88,7 +100,7 @@ func registerRoutes(router *gin.Engine) {
 	router.GET("/packrat/version", endpoints.GetPackratVersion)
 	router.GET("/packrat/version/settings", endpoints.AdminAuth, endpoints.GetPackratVersionSettings)
 	router.PUT("/packrat/version/settings", endpoints.AdminAuth, endpoints.UpdatePackratVersionSettings)
-	router.POST("/packrat/rebuild", endpoints.RebuildPackratDocs)
+	router.POST("/packrat/rebuild", endpoints.PortalPrivilegedBridge, endpoints.RebuildPackratDocs)
 	router.POST("/savegame", endpoints.AddSavegame)
 	router.GET("/savegame/download", endpoints.AdminAuth, endpoints.DownloadSavegame)
 	router.DELETE("/savegame", endpoints.AdminAuth, endpoints.DeleteSavegame)
@@ -97,6 +109,7 @@ func registerRoutes(router *gin.Engine) {
 	router.POST("/user/:id/block", endpoints.AdminAuth, endpoints.BlockUser)
 	router.GET("/users/blocked", endpoints.AdminAuth, endpoints.GetBlockedUsers)
 	router.DELETE("/users/blocked/:id", endpoints.AdminAuth, endpoints.UnblockUser)
+	router.GET("/projects/discord-sources", endpoints.AdminAuth, endpoints.GetDiscordSourceCatalog)
 	router.GET("/projects", endpoints.AdminAuth, endpoints.GetProjects)
 	router.PUT("/projects/:id", endpoints.AdminAuth, endpoints.UpdateProject)
 

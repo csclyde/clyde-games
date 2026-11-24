@@ -1,6 +1,7 @@
 <script>
 	import router from 'page';
 	import Admin from './pages/Admin.svelte';
+ import PortalAuthGate from './components/PortalAuthGate.svelte';
 
 	let tab = 'admin';
 	let userID = '';
@@ -21,4 +22,4 @@
 	router.start();
 </script>
 
-<Admin {tab} {userID} />
+<PortalAuthGate let:beginPasswordChange let:signOutAccount let:accountBusy><Admin {tab} {userID} {beginPasswordChange} {signOutAccount} {accountBusy} /></PortalAuthGate>

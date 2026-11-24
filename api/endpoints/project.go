@@ -12,9 +12,36 @@ import (
 )
 
 func GetProjects(c *gin.Context) {
+	if c.Query("view") == "navigation" {
+		projects, err := models.SelectProjectNavigation()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, projects)
+		return
+	}
+
+	if c.Query("view") == "metadata" {
+		projects, err := models.SelectProjectMetadata()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if e := models.AttachDiscordSources(projects); e != nil {
+			c.JSON(500, gin.H{"error": "source configuration unavailable"})
+			return
+		}
+		c.JSON(http.StatusOK, projects)
+		return
+	}
 	projects, err := models.SelectProjects()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if e := attachProjectStatsDiscord(projects); e != nil {
+		c.JSON(500, gin.H{"error": "source configuration unavailable"})
 		return
 	}
 	attachSteamReviewSummaries(projects)
@@ -38,7 +65,9 @@ func attachSteamReviewSummaries(projects []models.ProjectStats) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			summary, err := FetchSteamReviewSummary(client, projects[index].SteamAppID)
+			summary, err := projectReviewCache.get(projects[index].SteamAppID, func() (models.SteamReviewStats, error) {
+				return FetchSteamReviewSummary(client, projects[index].SteamAppID)
+			})
 			if err != nil {
 				projects[index].SteamReviews = &models.SteamReviewStats{UnavailableReason: err.Error()}
 				return
@@ -50,19 +79,30 @@ func attachSteamReviewSummaries(projects []models.ProjectStats) {
 }
 
 type updateProjectRequest struct {
-	Name         string `json:"name"`
-	SteamAppID   string `json:"steamAppId"`
-	SubredditURL string `json:"subredditUrl"`
+	SteamSyncEnabled *bool                       `json:"steamSyncEnabled"`
+	DiscordSources   *[]models.DiscordSyncSource `json:"discordSources"`
+	Name             string                      `json:"name"`
+	SteamAppID       string                      `json:"steamAppId"`
 }
 
 func UpdateProject(c *gin.Context) {
+	cutoff := time.Now().UTC()
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10)
 	var request updateProjectRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	request.Name = strings.TrimSpace(request.Name)
-	project, err := models.UpdateProject(c.Param("id"), request.Name, request.SteamAppID, request.SubredditURL)
+	if request.DiscordSources != nil {
+		verified, e := validateDiscordSources(c, *request.DiscordSources)
+		if e != nil {
+			c.JSON(400, gin.H{"error": e.Error()})
+			return
+		}
+		request.DiscordSources = &verified
+	}
+	project, err := models.UpdateProjectWithSyncs(c.Param("id"), request.Name, request.SteamAppID, request.SteamSyncEnabled, request.DiscordSources, cutoff)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

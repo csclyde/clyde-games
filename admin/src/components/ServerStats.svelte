@@ -1,4 +1,5 @@
 <script>
+ import Panel from './Panel.svelte';
 	import { onDestroy } from 'svelte';
 
 	const refreshInterval = 15000;
@@ -54,17 +55,19 @@
 	onDestroy(() => clearInterval(timer));
 </script>
 
-<section class="server-health" aria-label="Server health">
-	<header>
-		<div>
-			<h2>Server Health</h2>
-			{#if stats}<p>Up {uptime(stats.uptime)} · updated {new Date(stats.collectedAt).toLocaleTimeString()}</p>{/if}
-		</div>
-		<button type="button" on:click={loadStats} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
-	</header>
+<Panel class="server-health" title="Server Health" subtitle={stats ? `Up ${uptime(stats.uptime)} · updated ${new Date(stats.collectedAt).toLocaleTimeString()}` : "Reading server statistics…"}>
+ <button slot="actions" type="button" on:click={loadStats} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
 
 	{#if !stats && refreshing}
-		<p class="message">Reading server statistics…</p>
+        <div class="stat-grid" aria-busy="true" aria-label="Reading server statistics">
+            {#each ['CPU', 'Memory', 'Disk', 'API', 'Database'] as name, index}
+                <div class="stat" class:health-stat={index > 2}>
+                    <div class="stat-label"><span>{name}</span><strong>--</strong></div>
+                    {#if index < 3}<div class="meter"></div>{/if}
+                    <p>Waiting for reading...</p>
+                </div>
+            {/each}
+        </div>
 	{:else if !stats}
 		<p class="message error">{error}</p>
 	{:else}
@@ -95,15 +98,15 @@
 		</div>
 		{#if error}<p class="stale-warning">Refresh failed: {error}. Showing the last reading.</p>{/if}
 	{/if}
-</section>
+</Panel>
 
 <style>
-	.server-health { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin: 12px auto 0; max-width: 1368px; padding: 14px; }
-	header { align-items: flex-start; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; }
-	h2 { font-size: 1.5rem; line-height: 1.15; margin: 0; text-align: left; }
-	header p { color: var(--text-muted); font-size: .82rem; margin: 3px 0 0; text-align: left; }
+
+
+
+
 	.stat p { color: var(--text-muted); font-size: .75rem; margin: 3px 0 0; }
-	button { background: var(--paper-warm); border: 1px solid var(--line); border-radius: 4px; color: var(--text); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 700; padding: 6px 9px; }
+	button { min-width: 106px; flex-shrink: 0; background: var(--paper-warm); border: 1px solid var(--line); border-radius: 4px; color: var(--text); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 700; padding: 6px 9px; }
 	button:disabled { cursor: wait; opacity: .6; }
 	.stat-grid { display: grid; gap: 12px; grid-template-columns: repeat(6, 1fr); }
 	.stat { grid-column: span 2; }
@@ -119,5 +122,5 @@
 	.message, .stale-warning { color: var(--text-muted); font-size: .82rem; margin: 6px 0; }
 	.error, .stale-warning { color: #a13c34; }
 	@media (max-width: 850px) { .stat-grid { grid-template-columns: 1fr; } .stat, .health-stat { grid-column: auto; } }
-	@media (max-width: 650px) { .server-health { margin: 10px 8px 0; } }
+	@media (max-width: 650px) {    }
 </style>
