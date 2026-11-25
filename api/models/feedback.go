@@ -84,6 +84,13 @@ func AddFeedback(fb Feedback) (*Feedback, error) {
 	fb.IngestedAt = nil
 	fb.Project = NormalizeProjectName(fb.Project)
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		blocked, err := isFeedbackBlocked(tx, fb.PID)
+		if err != nil {
+			return err
+		}
+		if blocked {
+			return ErrFeedbackBlocked
+		}
 		if err := ensureProject(tx, fb.Project); err != nil {
 			return err
 		}

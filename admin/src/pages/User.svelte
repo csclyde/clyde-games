@@ -6,13 +6,16 @@
 	let loadedUserID = '';
 	let loading = false;
 	let blocking = false;
+	let updatingFeedbackBlock = false;
+	let blockError = '';
 	let error = '';
-	let history = { Blocked: false, Feedback: [], Crashes: [], Savegames: [], Events: [] };
+	let history = { FeedbackBlocked: false, Blocked: false, Feedback: [], Crashes: [], Savegames: [], Events: [] };
 
 	async function loadUser(id) {
 		loadedUserID = id;
 		loading = true;
 		error = '';
+		blockError = '';
 
 		try {
 			const response = await fetch(`/api/user/${encodeURIComponent(id)}`);
@@ -39,6 +42,27 @@
 			error = blockError.message;
 		} finally {
 			blocking = false;
+		}
+	}
+
+	async function toggleFeedbackBlock() {
+		const id = userID;
+		const blocked = !history.FeedbackBlocked;
+		if (blocked && !confirm('Block future in-game feedback from this player ID across all projects? Past reports and telemetry will be kept.')) return;
+		updatingFeedbackBlock = true;
+		blockError = '';
+		try {
+			const response = await fetch(`/api/user/${encodeURIComponent(id)}/feedback-block`, { method: blocked ? 'PUT' : 'DELETE' });
+			if (!response.ok) {
+				const result = await response.json().catch(() => ({}));
+				throw new Error(result.error || 'Could not update the feedback block.');
+			}
+			const result = await response.json();
+			if (loadedUserID === id && userID === id) history = { ...history, FeedbackBlocked: result.feedbackBlocked };
+		} catch (requestError) {
+			if (loadedUserID === id && userID === id) blockError = requestError.message;
+		} finally {
+			updatingFeedbackBlock = false;
 		}
 	}
 
@@ -105,12 +129,23 @@
 			<h2>{userID}</h2>
 			<p>{itemCount} item{itemCount === 1 ? '' : 's'} · {timeline.length} shown · newest to oldest</p>
 		</div>
-		{#if history.Blocked}
-			<span class="blocked-badge">Blocked</span>
-		{:else}
-			<button class="danger" type="button" disabled={!$canWrite || loading || blocking} on:click={blockUser}>{blocking ? 'Blocking…' : 'Block user across all projects'}</button>
-		{/if}
+		<div class="block-actions">
+			{#if !loading && !error}
+				{#if history.FeedbackBlocked}<span class="blocked-badge">In-game feedback blocked</span>{/if}
+				{#if $canWrite}
+					<button class:danger={!history.FeedbackBlocked} type="button" disabled={updatingFeedbackBlock} on:click={toggleFeedbackBlock}>
+						{updatingFeedbackBlock ? 'Saving...' : history.FeedbackBlocked ? 'Unblock feedback' : 'Block feedback only'}
+					</button>
+				{/if}
+			{/if}
+			{#if history.Blocked}
+				<span class="blocked-badge">Telemetry blocked</span>
+			{:else}
+				<button class="danger" type="button" disabled={!$canWrite || loading || !!error || blocking} on:click={blockUser}>{blocking ? 'Blocking...' : 'Block telemetry across all projects'}</button>
+			{/if}
+		</div>
 	</header>
+	{#if blockError}<p class="error" role="alert">{blockError}</p>{/if}
 
 	{#if loading}
 		<p class="state-message">loading...</p>
@@ -166,6 +201,7 @@
 <style>
 	main { color: var(--text); max-width: 1400px; margin: 0 auto; padding: 12px 16px 32px; }
 	.page-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; gap: 16px; justify-content: space-between; margin-bottom: 14px; padding-bottom: 12px; }
+	.block-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
 	.page-header h2 { font-size: 2.5rem; line-height: 1.05; overflow-wrap: anywhere; text-align: left; }
 	.page-header p { color: var(--olive); font-size: .85rem; font-weight: 600; letter-spacing: .02em; margin: 6px 0 0; text-align: left; text-transform: uppercase; }
 	.page-header .eyebrow { color: var(--text-soft); font-size: .68rem; font-weight: 800; margin: 0 0 5px; }
@@ -194,6 +230,8 @@
 	.error { color: var(--rust); }
 	@media (max-width: 820px) {
 		main { padding: 8px 4px 24px; }
+		.page-header { align-items: flex-start; flex-direction: column; }
+		.block-actions { justify-content: flex-start; }
 		.page-header h2 { font-size: 2rem; }
 		.history-item { border: 1px solid var(--line-strong); border-top: 4px solid var(--forest); border-radius: 6px; flex-direction: column; padding: 12px; }
 		.history-item.crash { border-top-color: var(--rust); }

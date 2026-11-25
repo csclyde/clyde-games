@@ -20,11 +20,12 @@ type BlockedUser struct {
 // Resolved feedback and crashes are intentionally included: this is a history,
 // rather than another view of the open admin queues.
 type UserHistory struct {
-	Blocked   bool
-	Feedback  []Feedback
-	Crashes   []Crash
-	Savegames []Savegame
-	Events    []Event
+	FeedbackBlocked bool
+	Blocked         bool
+	Feedback        []Feedback
+	Crashes         []Crash
+	Savegames       []Savegame
+	Events          []Event
 }
 
 func SelectUserHistory(pid string) (*UserHistory, error) {
@@ -39,6 +40,11 @@ func SelectUserHistory(pid string) (*UserHistory, error) {
 		return nil, fmt.Errorf("check blocked user: %w", err)
 	}
 	history.Blocked = blockedCount > 0
+	blocked, err := isFeedbackBlocked(AnalyticsDB, pid)
+	if err != nil {
+		return nil, fmt.Errorf("check feedback block: %w", err)
+	}
+	history.FeedbackBlocked = blocked
 
 	if err := AnalyticsDB.Model(&Feedback{}).Where(&Feedback{PID: pid}).Order("created_at DESC, id DESC").Find(&history.Feedback).Error; err != nil {
 		return nil, fmt.Errorf("select user feedback: %w", err)

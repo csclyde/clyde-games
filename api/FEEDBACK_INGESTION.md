@@ -49,3 +49,9 @@ Forum context changes append revisions and return the issue to review without cr
 The forum/configuration/baseline/crash-cutoff extension was deployed and read-only verified at `2026-11-16T07:05:06.809926Z`. All seven enabled source baselines are durably `2026-11-16T05:58:21Z`, captured from the owner instruction rather than deployment completion. Sources currently report `baselined`; the first scheduled scan has not run. Next collection is `2026-11-16T05:00:00-08:00` (13:00 UTC). The separate 05:30 analysis automation is managed by the parent task. No production feedback or Discord reactions were created for smoke tests. See `FEEDBACK_SYNC_DEPLOYMENT_20261116.md` for evidence, backups, installed hashes and rollback limits.
 
 The later crash health API/admin deployment preserved these collector/configuration/baseline contracts. See CRASH_HEALTH_DEPLOYMENT_20261116.md for the latest API binary hash; MCP and Little Clyde remained on their existing releases.
+
+## Feedback-only player blocks
+
+In the admin portal, open the player ID on an in-game feedback card and choose **Block feedback only**. **Unblock feedback** on the same page removes the block. **Feedback Blocks** on the Users page lists blocked IDs. Mutations require an admin. A block applies to the player/installation ID across projects, not a verified Steam account. It does not delete or resolve past reports, affect saves or telemetry, or change Steam or Discord imports.
+
+The server rejects new in-game `POST /feedback` submissions from a blocked ID with HTTP `403 Forbidden` and JSON `{"code":"FEEDBACK_BLOCKED","error":"Feedback submissions are blocked for this player."}`. Clients should not retry that submission or upload its attachment. Successful submissions still return HTTP `201 Created` with the feedback ID.

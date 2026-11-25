@@ -4,6 +4,23 @@
 	import { tick } from 'svelte';
 
 	let users = [];
+	let feedbackBlocks = [];
+	let loadingFeedbackBlocks = true;
+	let feedbackBlockError = '';
+
+	async function loadFeedbackBlocks() {
+		loadingFeedbackBlocks = true;
+		feedbackBlockError = '';
+		try {
+			const response = await fetch('/api/users/feedback-blocked', { cache: 'no-store' });
+			if (!response.ok) throw new Error('Could not load the feedback blocks.');
+			feedbackBlocks = await response.json();
+		} catch (loadError) {
+			feedbackBlockError = loadError.message;
+		} finally {
+			loadingFeedbackBlocks = false;
+		}
+	}
 	let loading = true;
 	let error = '';
 	let addModalOpen = false;
@@ -85,11 +102,12 @@
 	}
 
 	loadUsers();
+	loadFeedbackBlocks();
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
 
-<Panel class="blocked-users" title="Blocked Users" subtitle="Blocks player IDs across all projects.">
+<Panel class="blocked-users" title="Telemetry Blocks" subtitle="Blocks player IDs from sending metrics and ordinary saves across projects.">
  <div slot="actions" class="header-actions">
   <button class="add" type="button" disabled={!$canWrite} on:click={openAddModal}>Add</button>
   <button class="refresh" type="button" on:click={loadUsers} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
@@ -107,6 +125,27 @@
 				<article>
 					<div><a href={`/user/${encodeURIComponent(user.PID)}`}>{user.PID}</a><time>Blocked {formatDate(user.CreatedAt)}</time></div>
 					<button class="delete" type="button" disabled={!$canWrite} on:click={() => unblock(user)}>Delete</button>
+				</article>
+			{/each}
+		</div>
+	{/if}
+</Panel>
+
+<Panel class="blocked-users" title="Feedback Blocks" subtitle="Applies to future in-game feedback across projects. Open a player to remove their block.">
+	<div slot="actions" class="header-actions">
+		<button class="refresh" type="button" on:click={loadFeedbackBlocks} disabled={loadingFeedbackBlocks}>Refresh</button>
+	</div>
+	{#if loadingFeedbackBlocks}
+		<p class="state">Loading...</p>
+	{:else if feedbackBlockError}
+		<p class="state error" role="alert">{feedbackBlockError}</p>
+	{:else if !feedbackBlocks.length}
+		<p class="state">No feedback blocks.</p>
+	{:else}
+		<div class="users scrolling">
+			{#each feedbackBlocks as user (user.PID)}
+				<article>
+					<div><a href={`/user/${encodeURIComponent(user.PID)}`}>{user.PID}</a><time>Blocked {formatDate(user.CreatedAt)}</time></div>
 				</article>
 			{/each}
 		</div>

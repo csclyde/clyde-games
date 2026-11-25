@@ -19,7 +19,7 @@ func GetDB(name string) (*gorm.DB, error) {
 }
 
 func MigrateAnalyticsDB() error {
-	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &Project{}, &Crash{}, &CrashGroup{}, &Event{}, &EventItem{}, &EventSetting{}, &Feedback{}, &DiscordPendingMessage{}, &DiscordSnapshotRevision{}, &DiscordSyncSource{}, &Savegame{}, &SyncState{}, &PackratVersion{}); err != nil {
+	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &FeedbackBlock{}, &Project{}, &Crash{}, &CrashGroup{}, &Event{}, &EventItem{}, &EventSetting{}, &Feedback{}, &DiscordPendingMessage{}, &DiscordSnapshotRevision{}, &DiscordSyncSource{}, &Savegame{}, &SyncState{}, &PackratVersion{}); err != nil {
 		return err
 	}
 	if err := MigrateCrashGroups(); err != nil {

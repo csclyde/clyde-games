@@ -1,6 +1,7 @@
 package endpoints
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -36,13 +37,17 @@ func GetFeedback(c *gin.Context) {
 func AddFeedback(c *gin.Context) {
 	var feedback models.Feedback
 
-	if err := c.BindJSON(&feedback); err != nil {
+	if err := c.ShouldBindJSON(&feedback); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// open db connection
 	updatedFeedback, err := models.AddFeedback(feedback)
+	if errors.Is(err, models.ErrFeedbackBlocked) {
+		c.JSON(http.StatusForbidden, gin.H{"code": "FEEDBACK_BLOCKED", "error": "Feedback submissions are blocked for this player."})
+		return
+	}
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

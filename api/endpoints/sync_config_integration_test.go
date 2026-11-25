@@ -57,7 +57,7 @@ func syncTestDB(t *testing.T) *gorm.DB {
 		admin.Exec("DROP DATABASE `" + name + "`")
 		admin.Close()
 	})
-	if e := db.AutoMigrate(&models.Project{}, &models.SyncState{}, &models.EventSetting{}, &models.Feedback{}, &models.DiscordPendingMessage{}, &models.DiscordSnapshotRevision{}, &models.DiscordSyncSource{}, &models.Crash{}, &models.CrashGroup{}); e != nil {
+	if e := db.AutoMigrate(&models.Project{}, &models.SyncState{}, &models.EventSetting{}, &models.Feedback{}, &models.FeedbackBlock{}, &models.DiscordPendingMessage{}, &models.DiscordSnapshotRevision{}, &models.DiscordSyncSource{}, &models.Crash{}, &models.CrashGroup{}); e != nil {
 		t.Fatal(e)
 	}
 	if e := models.MigrateCrashInvestigations(db); e != nil {

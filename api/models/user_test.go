@@ -11,11 +11,12 @@ func TestUserHistoryQueriesNewestFirstWithStableTies(t *testing.T) {
 	AnalyticsDB = db
 	defer func() { AnalyticsDB = old }()
 	m.ExpectQuery("SELECT count.* FROM `blocked_users` WHERE p_id = ").WithArgs("history-player").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	m.ExpectQuery("SELECT count.* FROM `feedback_blocks` WHERE p_id = ").WithArgs("history-player").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	for _, table := range []string{"feedbacks", "crashes", "savegames", "events"} {
 		m.ExpectQuery("SELECT .* FROM `" + table + "` WHERE .* ORDER BY created_at DESC, id DESC").WithArgs("history-player").WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	}
 	h, err := SelectUserHistory("history-player")
-	if err != nil || h == nil || h.Blocked || h.Feedback == nil || h.Crashes == nil || h.Savegames == nil || h.Events == nil {
+	if err != nil || h == nil || h.Blocked || !h.FeedbackBlocked || h.Feedback == nil || h.Crashes == nil || h.Savegames == nil || h.Events == nil {
 		t.Fatal(h, err)
 	}
 }
