@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -9,6 +11,9 @@ var AnalyticsDB *gorm.DB
 var EtymologyDB *gorm.DB
 
 func GetDB(name string) (*gorm.DB, error) {
+	if !validSchemaName(name) {
+		return nil, fmt.Errorf("invalid database name")
+	}
 	dbs := "root:root@tcp(127.0.0.1:3306)/" + name + "?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dbs), &gorm.Config{})
 	if err != nil {
@@ -19,7 +24,12 @@ func GetDB(name string) (*gorm.DB, error) {
 }
 
 func MigrateAnalyticsDB() error {
-	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &FeedbackBlock{}, &Project{}, &Crash{}, &CrashGroup{}, &Event{}, &EventItem{}, &EventSetting{}, &Feedback{}, &DiscordPendingMessage{}, &DiscordSnapshotRevision{}, &DiscordSyncSource{}, &Savegame{}, &SyncState{}, &PackratVersion{}); err != nil {
+	if len(gameMetricStores) == 0 {
+		if err := AnalyticsDB.AutoMigrate(&Event{}, &EventItem{}); err != nil {
+			return err
+		}
+	}
+	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &FeedbackBlock{}, &Project{}, &Crash{}, &CrashGroup{}, &EventSetting{}, &Feedback{}, &DiscordPendingMessage{}, &DiscordSnapshotRevision{}, &DiscordSyncSource{}, &Savegame{}, &SyncState{}, &PackratVersion{}); err != nil {
 		return err
 	}
 	if err := MigrateCrashGroups(); err != nil {

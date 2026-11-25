@@ -57,6 +57,9 @@ func NormalizeProjectID(id string) string {
 	if strings.EqualFold(id, cursemarkProject) {
 		return cursemarkProject
 	}
+	if strings.EqualFold(id, necrovaleProject) {
+		return necrovaleProject
+	}
 	return id
 }
 
@@ -101,7 +104,6 @@ func SelectProjects() ([]ProjectStats, error) {
 		{&Crash{}, func(project *ProjectStats, count int64) { project.Crashes += count }, "COALESCE(SUM(`count`), 0)"},
 		{&Feedback{}, func(project *ProjectStats, count int64) { project.Feedback += count }, "COUNT(*)"},
 		{&Savegame{}, func(project *ProjectStats, count int64) { project.Savegames += count }, "COUNT(*)"},
-		{&Event{}, func(project *ProjectStats, count int64) { project.Events += count }, "COUNT(*)"},
 	}
 
 	for _, query := range queries {
@@ -119,6 +121,26 @@ func SelectProjects() ([]ProjectStats, error) {
 				projects[id] = project
 			}
 			query.apply(project, count.Count)
+		}
+	}
+
+	for _, store := range allEventStores() {
+		var counts []projectCount
+		if err := store.events(AnalyticsDB).Select("COALESCE(project, '') AS project, COUNT(*) AS count").Group("project").Find(&counts).Error; err != nil {
+			return nil, err
+		}
+		for _, count := range counts {
+			id := NormalizeProjectID(count.Project)
+			if id == "" {
+				id = store.project
+				if id == "" {
+					continue
+				}
+			}
+			if projects[id] == nil {
+				projects[id] = &ProjectStats{ID: id, Name: id}
+			}
+			projects[id].Events += count.Count
 		}
 	}
 
@@ -148,6 +170,11 @@ func SelectProjectsWithSteam() ([]Project, error) {
 
 func BackfillProjects() error {
 	return AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		for _, store := range gameMetricStores {
+			if err := ensureProject(tx, store.project); err != nil {
+				return err
+			}
+		}
 		for _, model := range []interface{}{&Crash{}, &Feedback{}, &Savegame{}, &Event{}} {
 			var ids []string
 			if err := tx.Model(model).Distinct("project").Where("TRIM(project) <> ''").Pluck("project", &ids).Error; err != nil {

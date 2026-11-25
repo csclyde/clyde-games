@@ -58,7 +58,8 @@ func SelectUserHistory(pid string) (*UserHistory, error) {
 	if err := AnalyticsDB.Model(&Savegame{}).Omit("Data").Where(&Savegame{PID: pid}).Order("created_at DESC, id DESC").Find(&history.Savegames).Error; err != nil {
 		return nil, fmt.Errorf("select user savegames: %w", err)
 	}
-	if err := AnalyticsDB.Model(&Event{}).Preload("Items").Where(&Event{PID: pid}).Order("created_at DESC, id DESC").Find(&history.Events).Error; err != nil {
+	history.Events, err = selectEvents(&pid)
+	if err != nil {
 		return nil, fmt.Errorf("select user events: %w", err)
 	}
 
@@ -90,12 +91,10 @@ func BlockUser(pid string) error {
 			return err
 		}
 
-		eventIDs := tx.Unscoped().Model(&Event{}).Select("id").Where("p_id = ?", pid)
-		if err := tx.Unscoped().Where("event_id IN (?)", eventIDs).Delete(&EventItem{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Unscoped().Where("p_id = ?", pid).Delete(&Event{}).Error; err != nil {
-			return err
+		for _, store := range allEventStores() {
+			if _, err := store.deleteEvents(tx, store.events(tx).Unscoped().Where("p_id = ?", pid)); err != nil {
+				return err
+			}
 		}
 		// Feedback attachments are diagnostic evidence, even for blocked players.
 		// Ordinary telemetry saves are still removed when a player is blocked.

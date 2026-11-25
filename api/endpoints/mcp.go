@@ -44,8 +44,18 @@ func RegisterMCPRoutes(router *gin.Engine) {
 	g.POST("/crashes/:id/resolve", mcpResolveCrash)
 	g.GET("/metric-query/:id", mcpFilteredMetric)
 	g.GET("/crash-health", mcpCrashHealth)
-	g.GET("/metrics", GetMetrics)
-	g.GET("/metrics/:id", GetMetric)
+	g.GET("/metrics", explicitMCPMetricProject, GetMetrics)
+	g.GET("/metrics/:id", explicitMCPMetricProject, GetMetric)
+}
+
+func explicitMCPMetricProject(c *gin.Context) {
+	if len(c.Request.URL.Query()["project"]) != 1 {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "choose cursemark or necrovale explicitly"})
+		return
+	}
+	if _, err := (models.MetricFilters{Project: c.Query("project")}).Normalize(); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
 }
 
 func MCPAuth(c *gin.Context) {

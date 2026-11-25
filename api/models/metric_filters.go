@@ -9,9 +9,15 @@ import (
 )
 
 // Reviewed aggregates only. Raw crash/feedback catalog cards use dedicated reads.
-var gameplayMetricIDs = map[int]bool{88: true, 117: true, 130: true, 131: true, 104: true, 107: true, 132: true, 102: true, 121: true, 122: true, 123: true, 124: true, 125: true, 126: true, 127: true, 128: true, 83: true}
+func GameplayMetricAllowed(id int) bool {
+	_, ok := metricDefinition(id)
+	return ok && id != 38 && id != 39
+}
 
-func GameplayMetricAllowed(id int) bool { return gameplayMetricIDs[id] }
+func GameplayMetricForProject(id int, project string) bool {
+	card, ok := metricDefinition(id)
+	return ok && id != 38 && id != 39 && metricProject(card) == project
+}
 
 type MetricFilters struct {
 	Project     string `json:"project"`
@@ -25,8 +31,8 @@ type MetricFilters struct {
 
 func (f MetricFilters) Normalize() (MetricFilters, error) {
 	f.Project = strings.ToLower(strings.TrimSpace(f.Project))
-	if f.Project != "cursemark" {
-		return f, fmt.Errorf("gameplay metrics are currently configured only for cursemark; choose it explicitly")
+	if f.Project != cursemarkProject && f.Project != necrovaleProject {
+		return f, fmt.Errorf("choose cursemark or necrovale explicitly")
 	}
 	for _, p := range []*string{&f.Build, &f.Environment, &f.EventType, &f.Level} {
 		*p = strings.TrimSpace(*p)
@@ -83,28 +89,14 @@ func metricQueryBody(s string) string {
 	}
 }
 func filteredMetricSQL(id int, f MetricFilters, schema string) (string, []interface{}, error) {
-	if !GameplayMetricAllowed(id) {
-		return "", nil, fmt.Errorf("metric is not a reviewed gameplay aggregate; use dedicated crash or feedback tools for reports")
+	if !GameplayMetricForProject(id, f.Project) {
+		return "", nil, fmt.Errorf("metric is not a gameplay aggregate for the selected project")
 	}
-	var e error
-	f, e = f.Normalize()
-	if e != nil {
-		return "", nil, e
+	if !validSchemaName(schema) {
+		return "", nil, fmt.Errorf("invalid metrics schema")
 	}
-	if schema == "" || len(schema) > 64 {
-		return "", nil, fmt.Errorf("invalid analytics schema")
-	}
-	for _, r := range schema {
-		if !(r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
-			return "", nil, fmt.Errorf("invalid analytics schema")
-		}
-	}
-	data, e := metricFiles.ReadFile(fmt.Sprintf("metrics/%d.sql", id))
-	if e != nil {
-		return "", nil, e
-	}
-	body := metricQueryBody(string(data))
-	where := []string{"deleted_at IS NULL", "project = ?"}
+	store := metricStore{schema: schema, project: f.Project}
+	where := []string{"deleted_at IS NULL", store.projectFilter()}
 	args := []interface{}{f.Project}
 	for _, bound := range []struct{ value, op string }{{f.CreatedFrom, ">="}, {f.CreatedTo, "<"}} {
 		if bound.value != "" {
@@ -119,30 +111,22 @@ func filteredMetricSQL(id int, f MetricFilters, schema string) (string, []interf
 			args = append(args, filter.value)
 		}
 	}
-	prefix := "WITH events AS (SELECT * FROM `" + schema + "`.`events` WHERE " + strings.Join(where, " AND ") + ") "
-	if strings.HasPrefix(strings.ToUpper(body), "WITH ") {
-		return prefix + ", " + body[5:], args, nil
-	}
-	return prefix + body, args, nil
+	query, err := gameplaySQL(id, store, where)
+	return query, args, err
 }
+
 func RunFilteredMetric(ctx context.Context, id int, f MetricFilters) (*MetricResult, error) {
-	if !GameplayMetricAllowed(id) {
-		return nil, fmt.Errorf("unsupported gameplay metric")
+	f, err := f.Normalize()
+	if err != nil {
+		return nil, err
 	}
-	if _, e := f.Normalize(); e != nil {
-		return nil, e
+	store, err := metricsStoreFor(f.Project)
+	if err != nil {
+		return nil, err
 	}
-	db, e := AnalyticsDB.DB()
-	if e != nil {
-		return nil, e
-	}
-	var schema string
-	if e = db.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&schema); e != nil {
-		return nil, e
-	}
-	query, args, e := filteredMetricSQL(id, f, schema)
-	if e != nil {
-		return nil, e
+	query, args, err := filteredMetricSQL(id, f, store.schema)
+	if err != nil {
+		return nil, err
 	}
 	result, e := runMetricQuery(ctx, query, args)
 	if e != nil {

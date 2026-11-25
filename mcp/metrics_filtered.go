@@ -13,7 +13,7 @@ import (
 
 type metricQueryArgs struct {
 	ID          int    `json:"id" jsonschema:"Reviewed gameplay metric ID from list_metrics. Report cards 38 and 39 are excluded; use report-read tools."`
-	Project     string `json:"project" jsonschema:"Explicit project. Gameplay formulas are currently configured only for cursemark."`
+	Project     string `json:"project" jsonschema:"Game to query: cursemark or necrovale."`
 	CreatedFrom string `json:"created_from,omitempty" jsonschema:"Inclusive stored event created_at bound; RFC3339 with timezone."`
 	CreatedTo   string `json:"created_to,omitempty" jsonschema:"Exclusive stored event created_at bound; RFC3339 with timezone."`
 	Build       string `json:"build,omitempty" jsonschema:"Exact submitted build identifier."`
@@ -26,12 +26,43 @@ type crashHealthArgs struct {
 	Days    int    `json:"days,omitempty" jsonschema:"Receipt window: 7, 30 or 90 days. Defaults to 30."`
 }
 
+type metricProjectArgs struct {
+	Project string `json:"project" jsonschema:"Game to query: cursemark or necrovale."`
+}
+
+type metricReadArgs struct {
+	ID      int    `json:"id" jsonschema:"Metric ID from list_metrics for this game."`
+	Project string `json:"project" jsonschema:"Game to query: cursemark or necrovale."`
+}
+
+func metricProjectQuery(project string) (url.Values, error) {
+	project = strings.ToLower(strings.TrimSpace(project))
+	if project != "cursemark" && project != "necrovale" {
+		return nil, fmt.Errorf("choose cursemark or necrovale explicitly")
+	}
+	return url.Values{"project": {project}}, nil
+}
+
 func addMetricAnalysisTools(s *mcp.Server, b *backend) {
-	mcp.AddTool(s, &mcp.Tool{Name: "query_metric", Description: "Read a reviewed gameplay aggregate with explicit project and optional event date/build/environment/type/level filters. Filters apply to source events and nested baselines, not output rows. Only cursemark gameplay formulas are configured. Results include applied filters, cached computation time, row truncation and cohort caveats. No SQL, raw player/session IDs or writes.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true}}, func(ctx context.Context, _ *mcp.CallToolRequest, a metricQueryArgs) (*mcp.CallToolResult, any, error) {
-		if a.ID <= 0 || strings.ToLower(strings.TrimSpace(a.Project)) != "cursemark" {
-			return nil, nil, fmt.Errorf("choose a positive gameplay metric ID and explicit cursemark project")
+	mcp.AddTool(s, &mcp.Tool{Name: "list_metrics", Description: "List the reviewed metric definitions for Cursemark or Necrovale.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}}, func(ctx context.Context, _ *mcp.CallToolRequest, a metricProjectArgs) (*mcp.CallToolResult, any, error) {
+		q, err := metricProjectQuery(a.Project)
+		if err != nil {
+			return nil, nil, err
 		}
-		q := url.Values{"project": {"cursemark"}}
+		return b.call(ctx, http.MethodGet, "/metrics?"+q.Encode())
+	})
+	mcp.AddTool(s, &mcp.Tool{Name: "get_metric", Description: "Run a catalog metric for the selected game.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}}, func(ctx context.Context, _ *mcp.CallToolRequest, a metricReadArgs) (*mcp.CallToolResult, any, error) {
+		q, err := metricProjectQuery(a.Project)
+		if err != nil || a.ID <= 0 {
+			return nil, nil, fmt.Errorf("choose a positive metric ID and explicit cursemark or necrovale project")
+		}
+		return b.call(ctx, http.MethodGet, "/metrics/"+strconv.Itoa(a.ID)+"?"+q.Encode())
+	})
+	mcp.AddTool(s, &mcp.Tool{Name: "query_metric", Description: "Read a reviewed Cursemark or Necrovale gameplay aggregate. Filters scope source events before aggregation and baselines. Returns applied filters, cached computation time, row truncation and cohort details.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true}}, func(ctx context.Context, _ *mcp.CallToolRequest, a metricQueryArgs) (*mcp.CallToolResult, any, error) {
+		q, err := metricProjectQuery(a.Project)
+		if err != nil || a.ID <= 0 {
+			return nil, nil, fmt.Errorf("choose a positive gameplay metric ID and explicit cursemark or necrovale project")
+		}
 		for _, f := range []struct{ name, value string }{{"created_from", a.CreatedFrom}, {"created_to", a.CreatedTo}, {"build", a.Build}, {"environment", a.Environment}, {"event_type", a.EventType}, {"level", a.Level}} {
 			if f.value != "" {
 				if len(f.value) > 128 || strings.ContainsAny(f.value, "\x00\r\n") {

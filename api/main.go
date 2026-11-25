@@ -2,6 +2,9 @@ package main
 
 // import "net/http"
 import (
+	"fmt"
+	"os"
+
 	"api.clyde.games/endpoints"
 	"api.clyde.games/models"
 	"github.com/gin-gonic/gin"
@@ -34,8 +37,28 @@ func main() {
 	registerRoutes(router)
 
 	var err error
-	models.AnalyticsDB, err = models.GetDB("analytics")
+	shared, cursemark, necrovale := "analytics", "cursemark_metrics", "necrovale_metrics"
+	if len(os.Args) > 1 {
+		if (len(os.Args) != 3 && len(os.Args) != 6) || os.Args[1] != "metrics-storage" || (os.Args[2] != "split" && os.Args[2] != "rollback") {
+			fmt.Fprintln(os.Stderr, "Usage: api [metrics-storage split|rollback [shared_schema cursemark_schema necrovale_schema]]")
+			os.Exit(2)
+		}
+		if len(os.Args) == 6 {
+			shared, cursemark, necrovale = os.Args[3], os.Args[4], os.Args[5]
+		}
+	}
+	models.AnalyticsDB, err = models.GetDB(shared)
 	if err != nil {
+		panic(err)
+	}
+	if len(os.Args) > 1 {
+		if err := models.MigrateGameMetrics(models.AnalyticsDB, cursemark, necrovale, os.Args[2] == "rollback", os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if _, err = models.ConfigureGameMetrics(cursemark, necrovale); err != nil {
 		panic(err)
 	}
 	if err = models.MigrateAnalyticsDB(); err != nil {

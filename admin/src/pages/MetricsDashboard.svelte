@@ -56,7 +56,7 @@
 <main>
 	{#if necrovale}
 		<h2>Necrovale Metrics</h2>
-		<p>Last 30 days of production telemetry. Completions are Journey clears at the Temple of Hope. These counts do not include abandoned runs and are not a win rate.</p>
+		<p>Last 30 days of production telemetry. Journey clears count successful Temple of Hope exits. Deaths include Journey and Roguelike and exclude Phoenix revivals.</p>
 	{/if}
 	<header>
 

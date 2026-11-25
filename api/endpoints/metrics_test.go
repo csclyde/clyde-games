@@ -54,20 +54,31 @@ func TestMetricsProjectAccess(t *testing.T) {
 			t.Fatalf("metric %s: %d", project, w.Code)
 		}
 	}
-	for _, tc := range []struct{ project string; count int }{
-		{"", 19}, {"cursemark", 19}, {"necrovale", 9},
+	for _, tc := range []struct {
+		project string
+		count   int
+	}{
+		{"", 19}, {"cursemark", 19}, {"necrovale", 11},
 	} {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, httptest.NewRequest("GET", "/metrics?project="+tc.project, nil))
-		var cards []struct { Project string }
+		var cards []struct{ Project string }
 		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &cards) != nil || len(cards) != tc.count {
 			t.Fatalf("catalog %q: %d, %d cards", tc.project, w.Code, len(cards))
 		}
 		want := ""
-		if tc.project == "necrovale" { want = "necrovale" }
-		for _, card := range cards { if card.Project != want { t.Fatalf("cross-project catalog for %q", tc.project) } }
+		if tc.project == "necrovale" {
+			want = "necrovale"
+		}
+		for _, card := range cards {
+			if card.Project != want {
+				t.Fatalf("cross-project catalog for %q", tc.project)
+			}
+		}
 	}
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, httptest.NewRequest("GET", "/metrics/201?project=cursemark", nil))
-	if w.Code != 404 { t.Fatalf("cross-project Necrovale query returned %d", w.Code) }
+	if w.Code != 404 {
+		t.Fatalf("cross-project Necrovale query returned %d", w.Code)
+	}
 }

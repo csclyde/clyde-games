@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,23 +24,29 @@ var ErrBuildTooOld = errors.New("build is older than the oldest accepted build")
 
 type Event struct {
 	gorm.Model
-	PID        string `gorm:"type:varchar(32)"`
-	SID        string `gorm:"type:varchar(32)"`
-	Env        string `gorm:"type:varchar(32)"`
-	Build      string `gorm:"type:varchar(32)"`
-	Project    string `gorm:"type:varchar(32)"`
-	Type       string `gorm:"not null;type:varchar(32)"`
-	Level      string `gorm:"type:varchar(128)"`
-	Area       string `gorm:"type:varchar(128)"`
-	Mode       string `gorm:"type:varchar(24)"`
-	Difficulty *float64
-	RunStep    *int
-	Commit     string         `gorm:"type:varchar(64)"`
-	Platform   string         `gorm:"type:varchar(32)"`
-	Cursemark  int            `gorm:"type:tinyint"`
-	Resources  EventResources `gorm:"embedded;embeddedPrefix:resource_"`
-	Actions    EventActions   `gorm:"embedded;embeddedPrefix:action_"`
-	Items      []EventItem    `gorm:"foreignKey:EventID"`
+	PID                  string `gorm:"type:varchar(32)"`
+	SID                  string `gorm:"type:varchar(32)"`
+	Env                  string `gorm:"type:varchar(32)"`
+	Build                string `gorm:"type:varchar(32)"`
+	Project              string `gorm:"type:varchar(32)"`
+	Type                 string `gorm:"not null;type:varchar(32)"`
+	Level                string `gorm:"type:varchar(128)"`
+	Area                 string `gorm:"type:varchar(128)"`
+	Mode                 string `gorm:"type:varchar(24)"`
+	Difficulty           *float64
+	RunStep              *int
+	Commit               string         `gorm:"type:varchar(64)"`
+	Platform             string         `gorm:"type:varchar(32)"`
+	Cursemark            int            `gorm:"type:tinyint"`
+	Resources            EventResources `gorm:"embedded;embeddedPrefix:resource_"`
+	Actions              EventActions   `gorm:"embedded;embeddedPrefix:action_"`
+	Hopestones           *float64
+	Gold                 *float64
+	LifetimeClears       *uint64
+	LifetimeDeaths       *uint64
+	ClearHistoryComplete *bool
+	DeathHistoryComplete *bool
+	Items                []EventItem `gorm:"foreignKey:EventID"`
 }
 
 type EventResources struct {
@@ -80,30 +88,52 @@ type EventSettings struct {
 }
 
 func SelectAllEvents() ([]Event, error) {
-	var allEvents []Event
-	result := AnalyticsDB.Order("created_at desc").Find(&allEvents)
-
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	return allEvents, nil
+	return selectEvents(nil)
 }
 
 func SelectEventBuilds() ([]EventBuild, error) {
-	var builds []EventBuild
-	result := AnalyticsDB.Model(&Event{}).
-		Select("build, project, count(*) as count").
-		Where("build <> ''").
-		Group("build, project").
-		Order("build desc, project asc").
-		Find(&builds)
-
-	if result.Error != nil {
-		return nil, result.Error
+	builds := make([]EventBuild, 0)
+	for _, store := range allEventStores() {
+		var stored []EventBuild
+		if err := store.events(AnalyticsDB).
+			Select("build, project, count(*) as count").
+			Where("build <> ''").
+			Group("build, project").Find(&stored).Error; err != nil {
+			return nil, err
+		}
+		builds = append(builds, stored...)
 	}
-
+	sort.Slice(builds, func(i, j int) bool {
+		if builds[i].Build == builds[j].Build {
+			return builds[i].Project < builds[j].Project
+		}
+		return builds[i].Build > builds[j].Build
+	})
 	return builds, nil
+}
+
+func selectEvents(pid *string) ([]Event, error) {
+	events := make([]Event, 0)
+	for _, store := range allEventStores() {
+		query := store.events(AnalyticsDB)
+		if pid != nil {
+			query = query.Where("p_id = ?", *pid).Preload("Items", func(db *gorm.DB) *gorm.DB {
+				return db.Table(store.table("event_items"))
+			})
+		}
+		var stored []Event
+		if err := query.Order("created_at DESC, id DESC").Find(&stored).Error; err != nil {
+			return nil, err
+		}
+		events = append(events, stored...)
+	}
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].CreatedAt.Equal(events[j].CreatedAt) {
+			return events[i].ID > events[j].ID
+		}
+		return events[i].CreatedAt.After(events[j].CreatedAt)
+	})
+	return events, nil
 }
 
 func GetEventSettings(projects ...string) (*EventSettings, error) {
@@ -135,7 +165,7 @@ func SaveOldestEventBuild(build string, projects ...string) (*EventSettings, err
 		}
 
 		var eventCount int64
-		if err := AnalyticsDB.Model(&Event{}).Where("build = ? AND project = ?", build, project).Count(&eventCount).Error; err != nil {
+		if err := eventStoreFor(project).events(AnalyticsDB).Where("build = ? AND project = ?", build, project).Count(&eventCount).Error; err != nil {
 			return nil, err
 		}
 		var savegameCount int64
@@ -230,23 +260,29 @@ func rejectBuildBeforeSetting(tx *gorm.DB, settingKey string, build string, subj
 	return nil
 }
 
-// func AddEvent(event Event) (*Event, error) {
-// 	result := AnalyticsDB.Create(&event)
-
-// 	if result.Error != nil {
-// 		return nil, result.Error
-// 	}
-
-// 	return &event, nil
-// }
-
 func AddEvent(event Event) (*Event, error) {
 	event.Project = NormalizeProjectName(event.Project)
-	if eventExceedsResourceLimits(event) {
+	store := eventStoreFor(event.Project)
+	if event.Project != necrovaleProject && eventExceedsResourceLimits(event) {
 		if err := BlockUser(event.PID); err != nil {
 			return nil, fmt.Errorf("block user with excessive event resources: %w", err)
 		}
 		return nil, fmt.Errorf("%w: event resource limit exceeded", ErrUserBlocked)
+	}
+
+	if event.Project == necrovaleProject {
+		for _, balance := range []*float64{event.Hopestones, event.Gold} {
+			if balance != nil && (*balance < 0 || math.IsNaN(*balance) || math.IsInf(*balance, 0)) {
+				return nil, errors.New("balances must be finite and nonnegative")
+			}
+		}
+	}
+	if len(gameMetricStores) > 0 {
+		id, err := nextGameEventID()
+		if err != nil {
+			return nil, err
+		}
+		event.ID = id
 	}
 
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
@@ -260,8 +296,17 @@ func AddEvent(event Event) (*Event, error) {
 			return err
 		}
 
-		// Create the event itself (only)
-		if err := tx.Omit("Items").Create(&event).Error; err != nil {
+		omit := []string{"Items"}
+		if len(gameMetricStores) > 0 {
+			if store.project == necrovaleProject {
+				omit = append(omit, cursemarkColumns...)
+			} else {
+				for _, column := range necrovaleColumns {
+					omit = append(omit, column.name)
+				}
+			}
+		}
+		if err := store.events(tx).Omit(omit...).Create(&event).Error; err != nil {
 			return err
 		}
 
@@ -271,7 +316,7 @@ func AddEvent(event Event) (*Event, error) {
 				event.Items[i].EventID = event.ID
 			}
 
-			if err := tx.CreateInBatches(event.Items, len(event.Items)).Error; err != nil {
+			if err := store.items(tx).CreateInBatches(event.Items, len(event.Items)).Error; err != nil {
 				return err
 			}
 		}
@@ -292,28 +337,33 @@ func eventExceedsResourceLimits(event Event) bool {
 
 func DeleteEventsByBuild(build string, project string) (int64, error) {
 	var deleted int64
-
+	project = NormalizeProjectID(project)
+	stores := allEventStores()
+	if project != "" {
+		stores = []metricStore{eventStoreFor(project)}
+	}
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
-		eventQuery := tx.Unscoped().Model(&Event{}).Select("id").Where("build = ?", build)
-		deleteQuery := tx.Unscoped().Where("build = ?", build)
-		if project != "" {
-			eventQuery = eventQuery.Where("project = ?", project)
-			deleteQuery = deleteQuery.Where("project = ?", project)
+		for _, store := range stores {
+			query := store.events(tx).Unscoped().Where("build = ?", build)
+			if project != "" {
+				query = query.Where("project = ?", project)
+			}
+			count, err := store.deleteEvents(tx, query)
+			if err != nil {
+				return err
+			}
+			deleted += count
 		}
-
-		eventIDs := eventQuery
-		if err := tx.Where("event_id IN (?)", eventIDs).Delete(&EventItem{}).Error; err != nil {
-			return err
-		}
-
-		result := deleteQuery.Delete(&Event{})
-		if result.Error != nil {
-			return result.Error
-		}
-
-		deleted = result.RowsAffected
 		return nil
 	})
-
 	return deleted, err
+}
+
+func (s metricStore) deleteEvents(tx, query *gorm.DB) (int64, error) {
+	eventIDs := query.Session(&gorm.Session{}).Select("id")
+	if err := s.items(tx).Where("event_id IN (?)", eventIDs).Delete(&EventItem{}).Error; err != nil {
+		return 0, err
+	}
+	result := query.Delete(&Event{})
+	return result.RowsAffected, result.Error
 }

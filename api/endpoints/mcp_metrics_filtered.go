@@ -32,6 +32,10 @@ func mcpFilteredMetric(c *gin.Context) {
 		c.JSON(400, gin.H{"error": e.Error()})
 		return
 	}
+	if !models.GameplayMetricForProject(id, f.Project) {
+		c.JSON(404, gin.H{"error": "metric is not configured for the selected game"})
+		return
+	}
 	raw, _ := json.Marshal(f)
 	key := "filtered:" + strconv.Itoa(id) + ":" + string(raw)
 	now := time.Now()

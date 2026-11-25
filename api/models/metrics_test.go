@@ -1,113 +1,28 @@
 package models
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"os"
-	"reflect"
-	"sort"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestMetricScope(t *testing.T) {
 	for _, card := range MetricCatalog() {
-		if card.Project != "" {
-			t.Run(card.Name, func(t *testing.T) {
-				scoped, args, err := metricSQL(card.ID, card.Project)
-				if err != nil || len(args) != 1 || args[0] != "necrovale" || !strings.Contains(scoped, "WHERE project = ?") {
-					t.Fatalf("Necrovale query must be scoped: %v", err)
-				}
-				all, allArgs, err := metricSQL(card.ID, "all")
-				if err != nil || all != scoped || !reflect.DeepEqual(args, allArgs) {
-					t.Fatalf("All-project request must retain Necrovale scope: %v", err)
-				}
-				if _, _, err := metricSQL(card.ID, "cursemark"); err == nil {
-					t.Fatal("Necrovale cards must reject requests for other projects")
-				}
-				if strings.Contains(scoped, "WITH RECURSIVE") && !strings.HasPrefix(scoped, "WITH RECURSIVE events AS") {
-					t.Fatal("Recursive keyword must precede all common table expressions")
-				}
-			})
+		if !GameplayMetricAllowed(card.ID) {
 			continue
 		}
-		_, args, err := metricSQL(card.ID, "all")
-		if err != nil || len(args) != 0 {
-			t.Fatalf("metric %d: %v", card.ID, err)
+		project := metricProject(card)
+		store := metricStore{schema: project + "_fixture", project: project}
+		query, err := gameplaySQL(card.ID, store, []string{store.projectFilter()})
+		if err != nil || !strings.Contains(query, store.sqlTable("events")) || !strings.Contains(query, store.sqlTable("event_items")) {
+			t.Fatalf("metric %d escaped %s: %s (%v)", card.ID, project, query, err)
 		}
-		scoped, args, err := metricSQL(card.ID, "cursemark' OR 1=1 --")
-		if err != nil || len(args) != 1 || strings.Contains(scoped, "OR 1=1") || !strings.Contains(scoped, "WHERE project = ?") {
-			t.Fatalf("metric %d is not parameterized", card.ID)
-		}
-		raw, err := metricFiles.ReadFile(fmt.Sprintf("metrics/%d.sql", card.ID))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(string(raw))), "WITH ") && !strings.Contains(scoped, ") , ") {
-			t.Fatalf("metric %d has invalid CTE composition", card.ID)
+		if strings.Contains(query, "WITH RECURSIVE") && !strings.HasPrefix(query, "WITH RECURSIVE events AS") {
+			t.Fatalf("invalid recursive query %d", card.ID)
 		}
 	}
-	if _, _, err := metricSQL(1, ""); err == nil {
-		t.Fatal("unknown queries must be rejected")
+	for _, id := range []int{1, 38, 39} {
+		if GameplayMetricAllowed(id) {
+			t.Fatalf("unexpected gameplay metric %d", id)
+		}
 	}
-}
-
-// Opt-in integration check against the local analytics database. Runs SELECTs
-// only, and verifies every imported query for all, matching, and empty projects.
-func TestMetricsLiveParity(t *testing.T) {
-	if os.Getenv("METRICS_LIVE_TEST") != "1" {
-		t.Skip("set METRICS_LIVE_TEST=1 to check local analytics")
-	}
-	var err error
-	AnalyticsDB, err = GetDB("analytics")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, card := range MetricCatalog() {
-		t.Run(card.Name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			defer cancel()
-			all, err := RunMetric(ctx, card.ID, "all")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if card.Project != "" {
-				matching, err := RunMetric(ctx, card.ID, card.Project)
-				if err != nil || !reflect.DeepEqual(canonicalRows(all.Rows), canonicalRows(matching.Rows)) {
-					t.Fatalf("scoped Necrovale query mismatch: %v", err)
-				}
-				return
-			}
-			matching, err := RunMetric(ctx, card.ID, "cursemark")
-			if err != nil {
-				t.Fatal(err)
-			}
-			// Only events currently belong exclusively to Cursemark; feedback
-			// and crash logs may include other projects.
-			if card.ID != 38 && card.ID != 39 && !reflect.DeepEqual(canonicalRows(all.Rows), canonicalRows(matching.Rows)) {
-				t.Fatal("project-scoped values differ from the original query")
-			}
-			empty, err := RunMetric(ctx, card.ID, "__metrics_nonexistent_project__")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if card.Display != "scalar" && len(empty.Rows) != 0 {
-				t.Fatal("project filter leaked rows")
-			}
-			t.Logf("%d rows, %d columns, truncated=%v", len(all.Rows), len(all.Columns), all.Truncated)
-		})
-	}
-}
-
-// Rows with tied ORDER BY keys have no guaranteed relative order.
-func canonicalRows(rows [][]interface{}) []string {
-	values := make([]string, len(rows))
-	for i, row := range rows {
-		data, _ := json.Marshal(row)
-		values[i] = string(data)
-	}
-	sort.Strings(values)
-	return values
 }

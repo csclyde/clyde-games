@@ -601,5 +601,29 @@
     "col": 0,
     "width": 24,
     "project": "necrovale"
+  },
+  {
+    "id": 210,
+    "name": "Balances by Build and Mode",
+    "description": "Average Hopestones and gold on hand at each outcome, before any death penalty. Sample counts show coverage. A dash marks an unavailable balance and zero marks an observed balance.",
+    "display": "table",
+    "settings": {},
+    "section": "Economy and Lifetime",
+    "row": 9,
+    "col": 0,
+    "width": 24,
+    "project": "necrovale"
+  },
+  {
+    "id": 211,
+    "name": "Latest Outcome Counters",
+    "description": "One latest outcome per reporting installation and mode in the last 30 days. Journey totals describe the save used for that event. Roguelike deaths describe the installation's Roguelike history. Partial history includes any totals available from older saves plus newly tracked outcomes.",
+    "display": "table",
+    "settings": {},
+    "section": "Economy and Lifetime",
+    "row": 10,
+    "col": 0,
+    "width": 24,
+    "project": "necrovale"
   }
 ]
