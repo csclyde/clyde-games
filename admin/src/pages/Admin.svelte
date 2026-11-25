@@ -72,29 +72,44 @@
    apply:applyNavigation,onError:message=>{navigationError=message;navigationLoading=false;}});
   return()=>{poller.stop();window.removeEventListener('storage',merge);setActivity({unseen:{},any:false,persistent:true});};
  });
- $: isClyde=selectedProject==='clyde-games';
+ $: isClyde=selectedProject.toLowerCase()==='clyde-games';
  $: isPackrat=selectedProject.toLowerCase()==='packrat';
  $: hasMetrics=selectedProject.toLowerCase()==='cursemark';
  $: visibleTabs=tabs.filter(t => t.id==='admin' || (!isClyde && !isPackrat && (t.id==='feedback' || t.id==='crashes' || (t.id==='metrics' && (hasMetrics || selectedProject.toLowerCase()==='necrovale')))));
  $: activeTab=visibleTabs.find(t=>t.id===tab)||visibleTabs[0];
  $: selectedName=isClyde?'Clyde Games':projects.find(p=>p.id.toLowerCase()===selectedProject.toLowerCase())?.name || selectedProject;
- const projectOrder=['pathprodigy','packrat','cursemark','necrovale'];
- function rank(id) {const i=projectOrder.indexOf(id.toLowerCase());return i<0?projectOrder.length:i;}
- $: sortedProjects=[...projects].sort((a,b)=>rank(a.id)-rank(b.id)||a.name.localeCompare(b.name));
+ const gameOrder=['pathprodigy','cursemark','necrovale'];
+ const toolOrder=['packrat','game-editor'];
+ const clydeProject={id:'clyde-games',name:'Clyde Games'};
+ function sortProjects(entries, order) {
+  const rank=id=>{const i=order.indexOf(id.toLowerCase());return i<0?order.length:i;};
+  return [...entries].sort((a,b)=>rank(a.id)-rank(b.id)||a.name.localeCompare(b.name));
+ }
+ $: navigationGroups=[
+  {label:'Games',projects:sortProjects(projects.filter(p=>!toolOrder.includes(p.id.toLowerCase())&&p.id.toLowerCase()!==clydeProject.id),gameOrder)},
+  {label:'Tools',projects:[...sortProjects(projects.filter(p=>toolOrder.includes(p.id.toLowerCase())),toolOrder),...($canWrite||$portalAuth.mode==='session'?[clydeProject]:[])]}
+ ];
 </script>
 
 <div class="admin-page">
  <button class="project-toggle" aria-expanded={mobileOpen} aria-controls="project-sidebar" on:click={()=>mobileOpen=!mobileOpen}>Projects: {selectedName}{#if activity.any}<span class="feedback-dot" role="img" aria-label="Unseen feedback"></span>{/if}</button>
  <aside id="project-sidebar" class:mobile-open={mobileOpen} aria-label="Projects">
-  <div class="sidebar-heading"><strong>CLYDE GAMES</strong><span>Projects</span></div>
+  <div class="sidebar-heading"><strong>CLYDE GAMES</strong></div>
   <nav class="project-list" aria-label="Choose project">
-   {#each sortedProjects as project}
-    <button class:chosen={selectedProject.toLowerCase()===project.id.toLowerCase()} aria-pressed={selectedProject.toLowerCase()===project.id.toLowerCase()} on:click={()=>selectProject(project.id)}>
-     <span class="project-name">{project.name}{#if activity.unseen[project.id.toLowerCase()]}<span class="feedback-dot" role="img" aria-label="Unseen feedback"></span>{/if}</span>
-     <span class="activity" aria-label="Open report counts">Feedback {counts[project.id.toLowerCase()] ?? 'unavailable'} · Crashes {crashCounts[project.id.toLowerCase()] ?? 'unavailable'}</span>
-    </button>
+   {#each navigationGroups as group (group.label)}
+    {#if group.projects.length}
+     <div class="project-group" role="group" aria-label={group.label}>
+      <h2>{group.label}</h2>
+      {#each group.projects as project (project.id)}
+       {@const id=project.id.toLowerCase()}
+       <button type="button" class:chosen={selectedProject.toLowerCase()===id} aria-pressed={selectedProject.toLowerCase()===id} on:click={()=>selectProject(project.id)}>
+        <span class="project-name">{project.name}{#if activity.unseen[id]}<span class="feedback-dot" role="img" aria-label="Unseen feedback"></span>{/if}</span>
+        {#if id!==clydeProject.id}<span class="activity" aria-label="Open report counts">Feedback {counts[id] ?? 'unavailable'} · Crashes {crashCounts[id] ?? 'unavailable'}</span>{/if}
+       </button>
+      {/each}
+     </div>
+    {/if}
    {/each}
-{#if $canWrite || $portalAuth.mode==="session"}   <button class="all-projects" class:chosen={isClyde} aria-pressed={isClyde} on:click={()=>selectProject('clyde-games')}>Clyde Games</button>{/if}
   </nav>
   {#if navigationError||activityError}<div class="sidebar-footer"><p role="status">{navigationError||activityError}</p><button class="retry-updates" on:click={()=>poller?.refresh()}>Retry updates</button></div>{/if}
  </aside>
@@ -130,15 +145,15 @@
  .overview-account button{font:inherit;padding:.45rem .65rem;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface);color:var(--text);cursor:pointer}
  .admin-page {color:var(--text);}
  aside {position:fixed;inset:0 auto 0 0;width:240px;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--line);z-index:20;}
- .sidebar-heading {padding:24px 18px 18px;display:grid;gap:14px;text-align:left;}
+ .sidebar-heading {padding:24px 18px 18px;text-align:left;}
  .sidebar-heading strong {font-size:.85rem;letter-spacing:.08em;}
- .sidebar-heading span {color:var(--text-muted);font-size:.75rem;text-transform:uppercase;}
+ .project-group h2 {margin:0;padding:0 8px 4px;color:var(--text-muted);font-size:.75rem;text-align:left;text-transform:uppercase;}
+ .project-group + .project-group {margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
  .project-list {overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:0 10px;}
  .project-list button {display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;text-align:left;margin:3px 0;padding:12px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--text);font:inherit;font-size:.9rem;cursor:pointer;}
  .project-list button:hover {background:var(--paper-warm);}
  .project-list button.chosen {background:var(--forest);color:white;border-color:var(--forest);font-weight:700;}
  .project-list button span:first-child {overflow-wrap:anywhere;}
- .project-list .all-projects {margin-top:20px;border-top-color:var(--line);}
  .feedback-dot{display:inline-block;flex:none;width:8px;height:8px;margin-left:8px;border-radius:50%;background:#b64d35;box-shadow:0 0 0 2px var(--surface);vertical-align:middle}.retry-updates{font:inherit;font-size:.75rem;padding:5px 8px;border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer}
  .project-name {font-size:1.03rem;font-weight:700;line-height:1.25;}
  .activity {font-size:.69rem;font-style:italic;line-height:1.4;opacity:.8;}
