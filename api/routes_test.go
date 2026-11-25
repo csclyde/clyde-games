@@ -58,3 +58,22 @@ func TestGameAndWebsiteSubmissionRoutesStayPublic(t *testing.T) {
 		}
 	}
 }
+
+func TestFarmBuilderReportHeadersAllowedByPublicPreflight(t *testing.T) {
+	router := gin.New()
+	router.Use(CORSMiddleware())
+	registerRoutes(router)
+	for _, tc := range []struct{ route, header string }{
+		{"/crash", "X-Clyde-Crash-Report-ID"}, {"/event", "X-Clyde-Event-ID"},
+	} {
+		req := httptest.NewRequest("OPTIONS", tc.route, nil)
+		req.Header.Set("Origin", "https://game.example")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "Content-Type, "+tc.header)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != 204 || !strings.Contains(w.Header().Get("Access-Control-Allow-Headers"), tc.header) {
+			t.Errorf("preflight %s: %d %v", tc.route, w.Code, w.Header())
+		}
+	}
+}

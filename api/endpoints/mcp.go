@@ -50,7 +50,7 @@ func RegisterMCPRoutes(router *gin.Engine) {
 
 func explicitMCPMetricProject(c *gin.Context) {
 	if len(c.Request.URL.Query()["project"]) != 1 {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "choose cursemark or necrovale explicitly"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "choose cursemark, necrovale, or farm-builder explicitly"})
 		return
 	}
 	if _, err := (models.MetricFilters{Project: c.Query("project")}).Normalize(); err != nil {
@@ -167,12 +167,39 @@ func mcpQuery(c *gin.Context, crash bool) *gorm.DB {
 	}
 	return mcpDB(c).Table(table).Select(fields).Where("deleted_at IS NULL")
 }
+
+func mcpReportProject(c *gin.Context) (*string, bool) {
+	if _, present := c.Request.URL.Query()["project"]; !present {
+		return nil, true
+	}
+	project, ok := noteProject(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "choose one canonical project"})
+		return nil, false
+	}
+	if project == "all" {
+		return nil, true
+	}
+	return &project, true
+}
+
+func scopeMCPReports(query *gorm.DB, project *string) *gorm.DB {
+	if project == nil {
+		return query
+	}
+	return query.Where("(BINARY COALESCE(TRIM(project),'') = ? OR (? = 'cursemark' AND LOWER(TRIM(project)) = 'cursemark'))", *project, *project)
+}
+
 func mcpList(c *gin.Context, crash bool) {
 	// Return a complete compact work index even when only the first 200 reports
 	// fit as summaries. The caller can retrieve any later report directly by ID.
+	project, ok := mcpReportProject(c)
+	if !ok {
+		return
+	}
 	const maxActiveIDs = 100000
 	ids := []uint{}
-	queue := mcpQuery(c, crash)
+	queue := scopeMCPReports(mcpQuery(c, crash), project)
 	if !crash {
 		queue = queue.Where("parent_feedback_id IS NULL")
 	}
@@ -191,7 +218,7 @@ func mcpList(c *gin.Context, crash bool) {
 		summaryIDs = ids[:mcpListLimit]
 	}
 	if len(summaryIDs) > 0 {
-		if err := mcpQuery(c, crash).Where("id IN ?", summaryIDs).Order("created_at ASC, id ASC").Find(&items).Error; err != nil {
+		if err := scopeMCPReports(mcpQuery(c, crash), project).Where("id IN ?", summaryIDs).Order("created_at ASC, id ASC").Find(&items).Error; err != nil {
 			mcpDBError(c, err)
 			return
 		}
@@ -217,8 +244,12 @@ func mcpDetail(c *gin.Context, crash bool) {
 	if !ok {
 		return
 	}
+	project, ok := mcpReportProject(c)
+	if !ok {
+		return
+	}
 	var item mcpReport
-	if err := mcpQuery(c, crash).Where("id = ?", id).Take(&item).Error; err != nil {
+	if err := scopeMCPReports(mcpQuery(c, crash), project).Where("id = ?", id).Take(&item).Error; err != nil {
 		mcpDBError(c, err)
 		return
 	}

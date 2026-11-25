@@ -11,6 +11,8 @@ import (
 )
 
 const cursemarkProject = "cursemark"
+const FarmBuilderProject = "farm-builder"
+const farmBuilderName = "Farm Builder"
 
 // Project is the durable identity and display metadata for an analytics project.
 // ID is supplied by clients and is never changed; Name is editable by admins.
@@ -60,6 +62,9 @@ func NormalizeProjectID(id string) string {
 	if strings.EqualFold(id, necrovaleProject) {
 		return necrovaleProject
 	}
+	if strings.EqualFold(id, FarmBuilderProject) {
+		return FarmBuilderProject
+	}
 	return id
 }
 
@@ -75,6 +80,9 @@ func ensureProject(tx *gorm.DB, id string) error {
 		return nil
 	}
 	project := Project{ID: id, Name: id}
+	if id == FarmBuilderProject {
+		project.Name = farmBuilderName
+	}
 	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&project).Error
 }
 
@@ -284,6 +292,17 @@ func SelectProjectNavigation() ([]ProjectNavigation, error) {
 // Register the explicitly requested project independently from legacy clients.
 func SeedPathProdigyProject() error {
 	return AnalyticsDB.Clauses(clause.OnConflict{DoNothing: true}).Create(&Project{ID: "pathprodigy", Name: "Path of the Prodigy"}).Error
+}
+
+func SeedFarmBuilderProject() error {
+	return AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		if err := ensureProject(tx, FarmBuilderProject); err != nil {
+			return err
+		}
+		// An earlier client could have auto-registered the ID as its label.
+		return tx.Model(&Project{}).Where("id = ? AND BINARY name = ?", FarmBuilderProject, FarmBuilderProject).
+			Update("name", farmBuilderName).Error
+	})
 }
 
 // Snapshot the legacy cutoff once. Each existing project then changes independently.

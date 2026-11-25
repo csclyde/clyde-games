@@ -1,8 +1,12 @@
 package models
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -28,9 +32,15 @@ type Crash struct {
 	OccurrenceVersion uint `gorm:"not null;default:0"`
 	IngestedAt        *time.Time
 	ResolvedAt        *time.Time
-	GroupKey          string `gorm:"type:varchar(67);index"`
-	GroupIdentity     string `gorm:"type:longtext"`
+	GroupKey          string  `gorm:"type:varchar(67);index"`
+	GroupIdentity     string  `gorm:"type:longtext"`
+	ReceiptKey        *string `gorm:"type:char(64);uniqueIndex" json:"-"`
 }
+
+const CrashReportIDHeader = "X-Clyde-Crash-Report-ID"
+
+var ErrInvalidCrashReportID = errors.New("crash report ID requires 32 lowercase hexadecimal characters and a nonempty PID")
+var hex32Pattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 // CrashGroup stores identity/locking only; reports remain in crashes.
 type CrashGroup struct {
@@ -182,15 +192,39 @@ func SaveOldestCrashBuild(build string, projects ...string) (*CrashSettings, err
 }
 
 func AddCrash(crash Crash) (*Crash, error) {
+	return AddCrashWithReportID(crash, nil)
+}
+
+func AddCrashWithReportID(crash Crash, reportID *string) (*Crash, error) {
 	crash.Project = NormalizeProjectName(crash.Project)
-	// Discard all client-controlled persistence/resolution fields. Every accepted
-	// submission is a new occurrence, including identical/retried submissions.
+	crash.ReceiptKey = nil
+	if crash.Project == FarmBuilderProject && reportID != nil {
+		if !hex32Pattern.MatchString(*reportID) || strings.TrimSpace(crash.PID) == "" {
+			return nil, ErrInvalidCrashReportID
+		}
+		identity, _ := json.Marshal([]string{crash.Project, crash.PID, *reportID})
+		key := fmt.Sprintf("%x", sha256.Sum256(identity))
+		crash.ReceiptKey = &key
+	}
+
+	// Discard all client-controlled persistence and resolution fields.
 	crash.Model = gorm.Model{}
 	crash.Count, crash.Resolved, crash.ResolvedAt = 1, false, nil
 	crash.OccurrenceVersion = 1
 	crash.IngestedAt = nil
 	crash.GroupKey, crash.GroupIdentity = CrashIdentityV1(crash)
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
+		if crash.ReceiptKey != nil {
+			var existing Crash
+			err := tx.Unscoped().Where("receipt_key = ?", *crash.ReceiptKey).Take(&existing).Error
+			if err == nil {
+				crash = existing
+				return nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
 		if err := ensureProject(tx, crash.Project); err != nil {
 			return err
 		}
@@ -202,7 +236,17 @@ func AddCrash(crash Crash) (*Crash, error) {
 		}
 		now := tx.NowFunc()
 		crash.CreatedAt, crash.UpdatedAt, crash.IngestedAt = now, now, &now
-		return tx.Create(&crash).Error
+		if crash.ReceiptKey == nil {
+			return tx.Omit("ReceiptKey").Create(&crash).Error
+		}
+		key := *crash.ReceiptKey
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&crash).Error; err != nil {
+			return err
+		}
+		// Use a current read so retries can see a simultaneous insert even
+		// if the initial lookup used an earlier transaction snapshot.
+		crash = Crash{}
+		return tx.Unscoped().Clauses(clause.Locking{Strength: "UPDATE"}).Where("receipt_key = ?", key).Take(&crash).Error
 	})
 	if err != nil {
 		return nil, err

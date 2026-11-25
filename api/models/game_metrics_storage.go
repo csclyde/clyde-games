@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -12,6 +13,7 @@ const necrovaleProject = "necrovale"
 type metricStore struct{ schema, project string }
 
 var gameMetricStores []metricStore
+var ErrMetricsStoreUnavailable = errors.New("metrics store unavailable")
 
 func quoteIdentifier(name string) string { return "`" + name + "`" }
 
@@ -70,7 +72,7 @@ func metricsStoreFor(project string) (metricStore, error) {
 			return store, nil
 		}
 	}
-	return metricStore{}, fmt.Errorf("metrics storage unavailable for %s", project)
+	return metricStore{}, fmt.Errorf("%w for %s", ErrMetricsStoreUnavailable, project)
 }
 
 func eventStoreFor(project string) metricStore {

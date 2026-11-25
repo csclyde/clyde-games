@@ -625,5 +625,41 @@
     "col": 0,
     "width": 24,
     "project": "necrovale"
+  },
+  {
+    "id": 301,
+    "name": "Seasons Completed",
+    "description": "Unique season completions reported in the last 30 days.",
+    "display": "scalar",
+    "settings": {},
+    "section": "Seasons",
+    "row": 0,
+    "col": 0,
+    "width": 12,
+    "project": "farm-builder"
+  },
+  {
+    "id": 302,
+    "name": "Actual Earnings",
+    "description": "Total money credited at season finish across the same completions.",
+    "display": "scalar",
+    "settings": {},
+    "section": "Seasons",
+    "row": 0,
+    "col": 12,
+    "width": 12,
+    "project": "farm-builder"
+  },
+  {
+    "id": 303,
+    "name": "Board Items",
+    "description": "Total quantity and number of boards containing each piece or feature, grouped by build and season.",
+    "display": "table",
+    "settings": {},
+    "section": "Seasons",
+    "row": 1,
+    "col": 0,
+    "width": 24,
+    "project": "farm-builder"
   }
 ]

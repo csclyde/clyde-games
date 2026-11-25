@@ -1,11 +1,14 @@
 # Crash occurrence storage and grouping
 
-Every accepted `POST /crash` creates a fresh row with the submitted PID, project,
+An accepted `POST /crash` creates a row with the submitted PID, project,
 message, full raw stack (including GPU/runtime details), environment, category,
 platform, build and commit. Client IDs, timestamps, counts, grouping and resolution
-fields are ignored. The game submission shape and unauthenticated ingestion route
-are unchanged. Identical submissions, including transport retries, are separate
-reports: clients do not currently supply an occurrence idempotency token.
+fields are ignored. Farm Builder may send `X-Clyde-Crash-Report-ID` with a
+32-character lowercase hexadecimal value and a nonempty `PID`. The server
+scopes the ID to the project and PID and returns HTTP 201 with the stored
+occurrence on retry. An empty, malformed, or repeated header returns HTTP 400
+with `INVALID_CRASH_REPORT_ID`. Requests without the header create separate
+occurrences. Other projects use their existing occurrence behavior.
 
 New rows have `OccurrenceVersion=1`, `Count=1`, server `IngestedAt` and matching
 `CreatedAt`/`UpdatedAt`. Resolution changes only `Resolved` and `ResolvedAt`.

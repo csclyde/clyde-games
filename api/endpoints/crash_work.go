@@ -43,7 +43,14 @@ func crashJSON(c *gin.Context, v any) bool {
 	return true
 }
 func listCrashInvestigations(c *gin.Context) {
-	p := c.DefaultQuery("project", "all")
+	project, ok := mcpReportProject(c)
+	if !ok {
+		return
+	}
+	p := "all"
+	if project != nil {
+		p = *project
+	}
 	out, e := models.ListCrashWork(mcpDB(c), p)
 	if e != nil {
 		crashWorkError(c, e)

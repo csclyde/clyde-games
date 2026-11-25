@@ -7,6 +7,7 @@
 	let states = {};
 	let section = '';
 	$: necrovale = selectedProject.toLowerCase() === 'necrovale';
+	$: farmBuilder = selectedProject.toLowerCase() === 'farm-builder';
 	let loading = true;
 	let error = '';
 	let controller = new AbortController();
@@ -57,6 +58,9 @@
 	{#if necrovale}
 		<h2>Necrovale Metrics</h2>
 		<p>Last 30 days of production telemetry. Journey clears count successful Temple of Hope exits. Deaths include Journey and Roguelike and exclude Phoenix revivals.</p>
+	{:else if farmBuilder}
+		<h2>Farm Builder Metrics</h2>
+		<p>Last 30 days of production reports. Earnings are the amounts credited at each season finish. Board counts come from the same season-end snapshots.</p>
 	{/if}
 	<header>
 

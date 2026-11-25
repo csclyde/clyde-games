@@ -75,10 +75,10 @@
  $: isClyde=selectedProject.toLowerCase()==='clyde-games';
  $: isPackrat=selectedProject.toLowerCase()==='packrat';
  $: hasMetrics=selectedProject.toLowerCase()==='cursemark';
- $: visibleTabs=tabs.filter(t => t.id==='admin' || (!isClyde && !isPackrat && (t.id==='feedback' || t.id==='crashes' || (t.id==='metrics' && (hasMetrics || selectedProject.toLowerCase()==='necrovale')))));
+ $: visibleTabs=tabs.filter(t => t.id==='admin' || (!isClyde && !isPackrat && (t.id==='feedback' || t.id==='crashes' || (t.id==='metrics' && ['cursemark','necrovale','farm-builder'].includes(selectedProject.toLowerCase())))));
  $: activeTab=visibleTabs.find(t=>t.id===tab)||visibleTabs[0];
  $: selectedName=isClyde?'Clyde Games':projects.find(p=>p.id.toLowerCase()===selectedProject.toLowerCase())?.name || selectedProject;
- const gameOrder=['pathprodigy','cursemark','necrovale'];
+ const gameOrder=['pathprodigy','cursemark','necrovale','farm-builder'];
  const toolOrder=['packrat','game-editor'];
  const clydeProject={id:'clyde-games',name:'Clyde Games'};
  function sortProjects(entries, order) {

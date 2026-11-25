@@ -57,6 +57,9 @@ func MigrateAnalyticsDB() error {
 	if err := BackfillSteamFeedbackThreads(); err != nil {
 		return err
 	}
+	if err := SeedFarmBuilderProject(); err != nil {
+		return err
+	}
 	return CreateSavegameRetentionEvent()
 }
 

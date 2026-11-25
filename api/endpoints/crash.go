@@ -1,6 +1,7 @@
 package endpoints
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"net/http"
@@ -121,8 +122,22 @@ func AddCrash(c *gin.Context) {
 
 	crash.Hash = crashFingerprint(crash)
 
-	// open db connection
-	updatedCrash, err := models.AddCrash(crash)
+	var reportID *string
+	if models.NormalizeProjectID(crash.Project) == models.FarmBuilderProject {
+		ids := c.Request.Header.Values(models.CrashReportIDHeader)
+		if len(ids) > 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"code": "INVALID_CRASH_REPORT_ID", "error": "send a single crash report ID"})
+			return
+		}
+		if len(ids) == 1 {
+			reportID = &ids[0]
+		}
+	}
+	updatedCrash, err := models.AddCrashWithReportID(crash, reportID)
+	if errors.Is(err, models.ErrInvalidCrashReportID) {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "INVALID_CRASH_REPORT_ID", "error": err.Error()})
+		return
+	}
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

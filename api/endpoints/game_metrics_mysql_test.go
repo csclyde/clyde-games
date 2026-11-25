@@ -120,6 +120,9 @@ func TestGameMetricsCutoverAndRollback(t *testing.T) {
 	count(necrovale+".event_items", "item = 'Item'", 0)
 	ctx := context.Background()
 	for _, card := range models.MetricCatalog() {
+		if card.Project == models.FarmBuilderProject {
+			continue
+		}
 		p := card.Project
 		if p == "" {
 			p = "cursemark"
@@ -182,6 +185,20 @@ func TestGameMetricsCutoverAndRollback(t *testing.T) {
 }
 
 func exerciseGameMetricsMCP(t *testing.T, router http.Handler) {
+	exerciseMCPReports(t, router, func(call func(string, string, bool, string, string)) {
+		call("list_metrics", `{"project":"necrovale"}`, false, "Balances by Build and Mode", "Most played level")
+		call("list_metrics", `{"project":"cursemark"}`, false, "Most played level", "Balances by Build and Mode")
+		call("get_metric", `{"project":"cursemark","id":83}`, false, "CurseOnly", "NecroOnly")
+		call("get_metric", `{"project":"necrovale","id":210}`, false, "average_hopestones", "CurseOnly")
+		call("query_metric", `{"project":"necrovale","id":201,"level":"NecroOnly"}`, false, `"rows":[[1]]`, "")
+		call("query_metric", `{"project":"cursemark","id":83,"level":"CurseOnly"}`, false, "CurseOnly", "NecroOnly")
+		call("query_metric", `{"project":"cursemark","id":201}`, true, "", "")
+		call("list_metrics", `{}`, true, "", "")
+		call("get_metric", `{"project":"other","id":83}`, true, "", "")
+	})
+}
+
+func exerciseMCPReports(t *testing.T, router http.Handler, check func(func(string, string, bool, string, string))) {
 	t.Helper()
 	binary := os.Getenv("GAME_METRICS_MCP_BINARY")
 	if binary == "" {
@@ -265,13 +282,5 @@ func exerciseGameMetricsMCP(t *testing.T, router http.Handler) {
 			t.Fatalf("%s %s: %s", tool, args, out)
 		}
 	}
-	call("list_metrics", `{"project":"necrovale"}`, false, "Balances by Build and Mode", "Most played level")
-	call("list_metrics", `{"project":"cursemark"}`, false, "Most played level", "Balances by Build and Mode")
-	call("get_metric", `{"project":"cursemark","id":83}`, false, "CurseOnly", "NecroOnly")
-	call("get_metric", `{"project":"necrovale","id":210}`, false, "average_hopestones", "CurseOnly")
-	call("query_metric", `{"project":"necrovale","id":201,"level":"NecroOnly"}`, false, `"rows":[[1]]`, "")
-	call("query_metric", `{"project":"cursemark","id":83,"level":"CurseOnly"}`, false, "CurseOnly", "NecroOnly")
-	call("query_metric", `{"project":"cursemark","id":201}`, true, "", "")
-	call("list_metrics", `{}`, true, "", "")
-	call("get_metric", `{"project":"other","id":83}`, true, "", "")
+	check(call)
 }

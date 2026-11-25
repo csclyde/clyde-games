@@ -263,7 +263,17 @@ func rejectBuildBeforeSetting(tx *gorm.DB, settingKey string, build string, subj
 func AddEvent(event Event) (*Event, error) {
 	event.Project = NormalizeProjectName(event.Project)
 	store := eventStoreFor(event.Project)
-	if event.Project != necrovaleProject && eventExceedsResourceLimits(event) {
+	if event.Project == FarmBuilderProject {
+		var err error
+		store, err = metricsStoreFor(event.Project)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateFarmBuilderSeason(event); err != nil {
+			return nil, err
+		}
+	}
+	if event.Project != necrovaleProject && event.Project != FarmBuilderProject && eventExceedsResourceLimits(event) {
 		if err := BlockUser(event.PID); err != nil {
 			return nil, fmt.Errorf("block user with excessive event resources: %w", err)
 		}
@@ -294,6 +304,9 @@ func AddEvent(event Event) (*Event, error) {
 		}
 		if err := rejectBuildBeforeOldest(tx, event.Build, "event", event.Project); err != nil {
 			return err
+		}
+		if store.project == FarmBuilderProject {
+			return store.addFarmBuilderSeason(tx, &event)
 		}
 
 		omit := []string{"Items"}

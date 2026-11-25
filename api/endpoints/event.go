@@ -77,6 +77,10 @@ func AddEvent(c *gin.Context) {
 	updatedEvent, err := models.AddEvent(event)
 
 	if err != nil {
+		if errors.Is(err, models.ErrMetricsStoreUnavailable) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Metrics storage is unavailable for this project."})
+			return
+		}
 		if errors.Is(err, models.ErrUserBlocked) {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 			return

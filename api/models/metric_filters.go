@@ -31,8 +31,8 @@ type MetricFilters struct {
 
 func (f MetricFilters) Normalize() (MetricFilters, error) {
 	f.Project = strings.ToLower(strings.TrimSpace(f.Project))
-	if f.Project != cursemarkProject && f.Project != necrovaleProject {
-		return f, fmt.Errorf("choose cursemark or necrovale explicitly")
+	if f.Project != cursemarkProject && f.Project != necrovaleProject && f.Project != FarmBuilderProject {
+		return f, fmt.Errorf("choose cursemark, necrovale, or farm-builder explicitly")
 	}
 	for _, p := range []*string{&f.Build, &f.Environment, &f.EventType, &f.Level} {
 		*p = strings.TrimSpace(*p)

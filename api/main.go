@@ -14,7 +14,7 @@ func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, "+models.CrashReportIDHeader+", X-Clyde-Event-ID")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
 		if c.Request.Method == "OPTIONS" {
@@ -37,28 +37,45 @@ func main() {
 	registerRoutes(router)
 
 	var err error
-	shared, cursemark, necrovale := "analytics", "cursemark_metrics", "necrovale_metrics"
+	shared, cursemark, necrovale, farmBuilder := "analytics", "cursemark_metrics", "necrovale_metrics", "farm_builder_metrics"
+	action := ""
 	if len(os.Args) > 1 {
-		if (len(os.Args) != 3 && len(os.Args) != 6) || os.Args[1] != "metrics-storage" || (os.Args[2] != "split" && os.Args[2] != "rollback") {
-			fmt.Fprintln(os.Stderr, "Usage: api [metrics-storage split|rollback [shared_schema cursemark_schema necrovale_schema]]")
-			os.Exit(2)
+		if len(os.Args) >= 3 && os.Args[1] == "metrics-storage" {
+			action = os.Args[2]
 		}
-		if len(os.Args) == 6 {
+		switch {
+		case (action == "split" || action == "rollback") && len(os.Args) == 3:
+		case (action == "split" || action == "rollback") && len(os.Args) == 6:
 			shared, cursemark, necrovale = os.Args[3], os.Args[4], os.Args[5]
+		case action == "add-farm-builder" && len(os.Args) == 3:
+		case action == "add-farm-builder" && len(os.Args) == 5:
+			shared, farmBuilder = os.Args[3], os.Args[4]
+		default:
+			fmt.Fprintln(os.Stderr, "Usage: api metrics-storage split|rollback [shared_schema cursemark_schema necrovale_schema]")
+			fmt.Fprintln(os.Stderr, "       api metrics-storage add-farm-builder [shared_schema farm_builder_schema]")
+			os.Exit(2)
 		}
 	}
 	models.AnalyticsDB, err = models.GetDB(shared)
 	if err != nil {
 		panic(err)
 	}
-	if len(os.Args) > 1 {
-		if err := models.MigrateGameMetrics(models.AnalyticsDB, cursemark, necrovale, os.Args[2] == "rollback", os.Stdout); err != nil {
+	if action != "" {
+		if action == "add-farm-builder" {
+			err = models.ProvisionFarmBuilderMetrics(models.AnalyticsDB, farmBuilder)
+		} else {
+			err = models.MigrateGameMetrics(models.AnalyticsDB, cursemark, necrovale, action == "rollback", os.Stdout)
+		}
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 		return
 	}
 	if _, err = models.ConfigureGameMetrics(cursemark, necrovale); err != nil {
+		panic(err)
+	}
+	if _, err = models.ConfigureFarmBuilderMetrics(farmBuilder); err != nil {
 		panic(err)
 	}
 	if err = models.MigrateAnalyticsDB(); err != nil {

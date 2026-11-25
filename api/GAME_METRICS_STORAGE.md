@@ -18,4 +18,51 @@ Pass three explicit schema names after `split` or `rollback` for an isolated reh
 
 Drain and stop every event writer. From the new API binary run `./api metrics-storage rollback`. The command combines the current stores, preserves the IDs and Necrovale fields, and keeps the split tables in a new archive. It includes writes accepted since cutover and preserves intervening deletions. Check counts and start the previous API and MCP binaries and portal files. Keep the archive and the dump under restricted access. Restore an older backup only when intentionally recovering to its point in time.
 
-MCP tools `list_metrics`, `get_metric`, and `query_metric` require `project: "cursemark"` or `project: "necrovale"`. Use IDs from the selected project's catalog. Unavailable storage produces an error for that game.
+MCP tools `list_metrics`, `get_metric`, and `query_metric` require an explicit game project. Use IDs from the selected project's catalog. Unavailable storage produces an error for that game.
+
+## Farm Builder
+
+Farm Builder appears under Games with project ID `farm-builder`. Public
+`POST /feedback` and `POST /crash` accept the shared JSON fields and store the
+reports in `analytics`. Recovered crashes can use the optional header documented
+in [Crash occurrence storage](CRASH_REPORTS.md).
+
+`POST /event` accepts the following season snapshot and returns HTTP 201.
+The same `PID`, run `SID`, and positive `RunStep` return the same stored event.
+Send a fresh 32-character lowercase hexadecimal `SID` per run and reuse the
+same snapshot on retries. The endpoint needs no event ID header. Existing
+clients may send `X-Clyde-Event-ID`, which collection ignores.
+
+```json
+{
+  "Project": "farm-builder",
+  "Type": "season_completed",
+  "PID": "7db70ccabf3a4732986ac14ce017abf5",
+  "SID": "915fa90c426a41fcbac1698d63e239c6",
+  "RunStep": 1,
+  "Level": "spring",
+  "Gold": 11,
+  "Items": [
+    {"Item": "Garden-Square", "Slot": "piece", "Level": 2},
+    {"Item": "Crop+L", "Slot": "feature", "Level": 1}
+  ],
+  "Env": "production",
+  "Build": "0.1.0",
+  "Platform": "windows"
+}
+```
+
+`Gold` is the amount credited for finishing this season. `Level` is `spring`,
+`summer`, `fall`, or `winter`. Each item records its exact case-sensitive
+catalog ID and a positive quantity in `Level`. Combine repeated
+`(Slot, Item)` entries in the game snapshot. Season snapshots remain in
+`farm_builder_metrics`. The dashboard reports the last 30 days for
+`production` and `prod` events. MCP metrics accept `project: "farm-builder"`
+and IDs 301–303.
+
+To add the database to an existing split, stop legacy event writers and run
+`./api metrics-storage add-farm-builder` before starting the new API.
+Provisioning can be rerun and leaves the existing database tables in place.
+It stops if it finds Farm Builder history in the shared events table. Preserve
+and migrate any such history before activation. Keep Farm Builder event
+producers paused if reverting to a binary that predates its dedicated store.
