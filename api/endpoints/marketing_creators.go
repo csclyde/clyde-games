@@ -13,6 +13,7 @@ import (
 	"net/mail"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 
 	"api.clyde.games/models"
@@ -171,11 +172,13 @@ func prepareCreator(input marketingTargetInput) (models.MarketingTarget, models.
 	var target models.MarketingTarget
 	var person models.MarketingCreator
 	if !marketingStrings(map[*string]int{&input.Name: 160, &input.Email: 254}) || input.Name == "" {
-		return target, person, errors.New("a creator name and contact address are required")
+		return target, person, errors.New("a creator name is required")
 	}
-	address, err := mail.ParseAddress(input.Email)
-	if err != nil || address.Name != "" || address.Address != input.Email || !contactPattern.MatchString(input.Email) {
-		return target, person, errors.New("the contact address must be a single valid email")
+	if input.Email != "" {
+		address, err := mail.ParseAddress(input.Email)
+		if err != nil || address.Name != "" || address.Address != input.Email || !contactPattern.MatchString(input.Email) {
+			return target, person, errors.New("the contact address must be a single valid email")
+		}
 	}
 	if input.Platform != "youtube" && input.Platform != "twitch" && input.Platform != "other" {
 		return target, person, errors.New("choose YouTube, Twitch or Other for the creator platform")
@@ -193,7 +196,7 @@ func prepareCreator(input marketingTargetInput) (models.MarketingTarget, models.
 		if !ok {
 			return target, person, errors.New("enter only public HTTPS channel URLs")
 		}
-		key := marketingSourceKey(channel)
+		key := creatorChannelKey(channel)
 		if !seen[key] {
 			links = append(links, channel)
 			seen[key] = true
@@ -213,13 +216,69 @@ func prepareCreator(input marketingTargetInput) (models.MarketingTarget, models.
 	}
 	encodedLinks, _ := json.Marshal(links)
 	encodedGames, _ := json.Marshal(games)
-	key := sha256.Sum256([]byte("creator\x00" + strings.ToLower(input.Email)))
+	identity := "creator\x00" + strings.ToLower(input.Email)
+	if input.Email == "" {
+		if len(links) == 0 {
+			return target, person, errors.New("provide a public creator channel if no contact email is known")
+		}
+		keys := make([]string, 0, len(links))
+		for _, channel := range links {
+			keys = append(keys, creatorChannelKey(channel))
+		}
+		sort.Strings(keys)
+		identity = "creator-channel\x00" + keys[0]
+	}
+	key := sha256.Sum256([]byte(identity))
 	target = models.MarketingTarget{Project: marketingProject, Name: input.Name, URLKey: hex.EncodeToString(key[:]), Version: 1, IsCreator: true}
 	if len(links) > 0 {
 		target.URL = links[0]
 	}
 	person = models.MarketingCreator{Email: input.Email, Platform: input.Platform, ChannelURLs: string(encodedLinks), Games: string(encodedGames)}
 	return target, person, nil
+}
+
+func creatorChannelKey(link string) string {
+	if normalized, ok := creatorChannel(link); ok {
+		link = normalized
+	}
+	key := marketingSourceKey(link)
+	if marketingPlatform(link) == "youtube" && strings.Contains(key, "/channel/") {
+		return key // YouTube channel IDs are case-sensitive.
+	}
+	return strings.ToLower(key)
+}
+
+// All writes that introduce new creator identities share the project lock.
+// Email identity is still enforced by the current unique target key.
+func lockMarketingCreatorCatalog(tx *gorm.DB) error {
+	var project models.Project
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").Where("id = ?", marketingProject).Find(&project).Error
+	return err
+}
+
+var errDuplicateCreatorChannel = errors.New("creator channel already in catalog")
+
+func rejectDuplicateCreatorChannels(db *gorm.DB, id uint, channels []string) error {
+	if len(channels) == 0 {
+		return nil
+	}
+	var existing []models.MarketingCreator
+	query := db.Model(&models.MarketingTarget{}).Select("id").Where("project = ? AND is_creator = ? AND id != ?", marketingProject, true, id)
+	if err := db.Select("target_id", "channel_urls").Where("target_id IN (?)", query).Find(&existing).Error; err != nil {
+		return err
+	}
+	keys := map[string]bool{}
+	for _, link := range channels {
+		keys[creatorChannelKey(link)] = true
+	}
+	for _, creator := range existing {
+		for _, link := range creatorFields(creator).ChannelURLs {
+			if keys[creatorChannelKey(link)] {
+				return errDuplicateCreatorChannel
+			}
+		}
+	}
+	return nil
 }
 
 func readMarketingCreator(db *gorm.DB, targetID uint) (models.MarketingCreator, error) {
@@ -279,12 +338,27 @@ func saveMarketingCreator(c *gin.Context, in marketingTargetInput) {
 		status = 200
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := lockMarketingCreatorCatalog(tx); err != nil {
+			return err
+		}
 		if status == 201 {
+			if err := rejectDuplicateCreatorChannels(tx, 0, creatorFields(person).ChannelURLs); err != nil {
+				return err
+			}
 			if err := tx.Create(&target).Error; err != nil {
 				return err
 			}
 			person.TargetID = target.ID
 			return tx.Create(&person).Error
+		}
+		prior, err := readMarketingCreator(tx, target.ID)
+		if err != nil {
+			return err
+		}
+		if person.ChannelURLs != prior.ChannelURLs {
+			if err := rejectDuplicateCreatorChannels(tx, target.ID, creatorFields(person).ChannelURLs); err != nil {
+				return err
+			}
 		}
 		update := tx.Model(&models.MarketingTarget{}).
 			Where("id = ? AND project = ? AND version = ? AND is_creator = ?", target.ID, marketingProject, in.Version, true).
@@ -300,6 +374,10 @@ func saveMarketingCreator(c *gin.Context, in marketingTargetInput) {
 	})
 	if errors.Is(err, errCreatorVersion) {
 		marketingError(c, 409, "This creator changed. Reload before saving.")
+		return
+	}
+	if errors.Is(err, errDuplicateCreatorChannel) {
+		marketingError(c, 409, "A creator already has this public channel. Read or edit the existing target.")
 		return
 	}
 	if err != nil {
@@ -353,6 +431,9 @@ func readCreatorCSV(input io.Reader) ([]creatorImportRow, error) {
 			return nil, fmt.Errorf("invalid CSV near row %d or over 200 creators", line)
 		}
 		field := func(key string) string { return row[columns[key]] }
+		if strings.TrimSpace(field("email")) == "" {
+			return nil, fmt.Errorf("row %d: the private contact CSV requires an email", line)
+		}
 		target, person, err := prepareCreator(marketingTargetInput{Name: field("name"), Kind: "creator", marketingCreatorFields: marketingCreatorFields{
 			Email: field("email"), Platform: strings.ToLower(strings.TrimSpace(field("platform"))),
 			ChannelURLs: strings.Split(field("channel_urls"), "|"), Games: strings.Split(field("games_covered"), "|"),
@@ -393,7 +474,16 @@ func importMarketingCreators(c *gin.Context) {
 	}
 	added := 0
 	err = marketingDB(c).Transaction(func(tx *gorm.DB) error {
+		if err := lockMarketingCreatorCatalog(tx); err != nil {
+			return err
+		}
 		for _, row := range rows {
+			if err := rejectDuplicateCreatorChannels(tx, 0, creatorFields(row.creator).ChannelURLs); err != nil {
+				if errors.Is(err, errDuplicateCreatorChannel) {
+					continue
+				}
+				return err
+			}
 			created := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row.target)
 			if created.Error != nil {
 				return created.Error

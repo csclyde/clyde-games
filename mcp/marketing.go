@@ -54,7 +54,7 @@ type marketingTargetWrite struct {
 	Kind         string   `json:"kind" jsonschema:"destination or creator; existing kind cannot change"`
 	Name         string   `json:"name"`
 	URL          string   `json:"url,omitempty" jsonschema:"Public destination URL for a destination"`
-	Email        string   `json:"email,omitempty" jsonschema:"For explicitly authorized creator creation or address change only. Omit on update to preserve. Never returned by this MCP."`
+	Email        string   `json:"email,omitempty" jsonschema:"Optional private address. Create with verified public channel URLs when no address is known. Omit on update to preserve. Never returned by this MCP."`
 	Platform     string   `json:"platform,omitempty" jsonschema:"youtube, twitch or other for creators"`
 	ChannelURLs  []string `json:"channel_urls,omitempty"`
 	GamesCovered []string `json:"games_covered,omitempty"`
@@ -142,6 +142,33 @@ type marketingEvidenceWrite struct {
 	Version  uint                    `json:"version" jsonschema:"Read evidence version first; 0 creates the report"`
 	Coverage *marketingCoverageWrite `json:"coverage,omitempty"`
 	Reply    *marketingReplyWrite    `json:"reply,omitempty"`
+}
+
+type marketingImpactWrite struct {
+	marketingTargetArgs
+	Version      *uint `json:"version" jsonschema:"Read impact_evidence.version first; 0 creates the first snapshot"`
+	Observations *[]struct {
+		Metric     string `json:"metric" jsonschema:"youtube_views, youtube_short_views or reddit_score"`
+		URL        string `json:"url" jsonschema:"Exact public content permalink. YouTube must match confirmed Cursemark coverage; Reddit must be a verified Casey-authored Cursemark post in this target subreddit"`
+		Title      string `json:"title"`
+		ObservedOn string `json:"observed_on" jsonschema:"UTC observation date YYYY-MM-DD"`
+		Value      *int64 `json:"value" jsonschema:"Visible count or null for unavailable; only Reddit net score can be negative"`
+		Comments   *int64 `json:"comments,omitempty" jsonschema:"Optional visible comment count"`
+		Scope      string `json:"scope" jsonschema:"dedicated for Cursemark-only measurement; shared for mixed-game metrics shown for context only"`
+		Note       string `json:"note,omitempty" jsonschema:"Optional sponsorship, snapshot or source qualification. No email addresses or private links"`
+	} `json:"observations" jsonschema:"Replacement set (up to 24); keep unchanged observations when editing individual entries"`
+}
+
+type marketingHistoryWrite struct {
+	marketingTargetArgs
+	Version *uint `json:"version" jsonschema:"Read history.version first; 0 if a target has no history yet"`
+	History *struct {
+		OutreachStatus string   `json:"outreach_status" jsonschema:"contacted, inbound_first, none_found (searched using verified identity), identity_unverified, not_checked, or not_applicable (Reddit)"`
+		ActivityStatus string   `json:"activity_status" jsonschema:"post_found, coverage_found, none_found or not_checked. Use not_checked for creators and store actual coverage with marketing_save_creator_evidence."`
+		CheckedOn      string   `json:"checked_on" jsonschema:"UTC date YYYY-MM-DD"`
+		Sources        []string `json:"sources" jsonschema:"Up to six public links. Never use mailbox links or private identifiers."`
+		Note           string   `json:"note,omitempty" jsonschema:"Factual status summary without contact details, correspondence, or links"`
+	} `json:"history"`
 }
 type marketingReportImport struct {
 	marketingProjectArgs
@@ -344,6 +371,20 @@ func addMarketingTools(s *mcp.Server, b *backend) {
 			return marketingOperation{}, fmt.Errorf("provide coverage or reply facts")
 		}
 		p, e := checkedMarketingPaths(a.Project, "/targets/%d/creator-evidence", a.TargetID)
+		return marketingOperation{Method: "PUT", Path: p, Body: a}, e
+	})
+	marketingTool(s, b, "marketing_save_target_impact", "Save dated measured Cursemark observations for a target. Start with marketing_get_target for the current impact_evidence version and observations. Use one row per source permalink. Keep unknown counts null and mixed-game views shared. This never sends anything or updates creator replies, coverage or Steamworks attribution.", false, func(a marketingImpactWrite) (marketingOperation, error) {
+		if a.Version == nil || a.Observations == nil || len(*a.Observations) > 24 {
+			return marketingOperation{}, fmt.Errorf("supply the current impact version and up to 24 observations")
+		}
+		p, e := checkedMarketingPaths(a.Project, "/targets/%d/impact", a.TargetID)
+		return marketingOperation{Method: "PUT", Path: p, Body: a}, e
+	})
+	marketingTool(s, b, "marketing_save_target_history", "Save independent prior Cursemark outreach and public activity statuses for a chosen target. A verified identity search with no results differs from an unverified identity. For Reddit use prior Casey posts only, not Gmail. Keep inbox links, messages and addresses out. This operation never contacts the target.", false, func(a marketingHistoryWrite) (marketingOperation, error) {
+		if a.Version == nil || a.History == nil {
+			return marketingOperation{}, fmt.Errorf("supply the current history version and dated facts")
+		}
+		p, e := checkedMarketingPaths(a.Project, "/targets/%d/history", a.TargetID)
 		return marketingOperation{Method: "PUT", Path: p, Body: a}, e
 	})
 	nondestructive := false

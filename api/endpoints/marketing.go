@@ -73,6 +73,8 @@ func registerMarketingHandlers(g *gin.RouterGroup) {
 	g.PUT("/targets/:target/archive", archiveMarketingTarget)
 	g.PUT("/targets/:target/research", saveMarketingResearch)
 	g.PUT("/targets/:target/creator-evidence", saveCreatorEvidence)
+	g.PUT("/targets/:target/impact", saveMarketingImpact)
+	g.PUT("/targets/:target/history", saveMarketingHistory)
 	g.GET("/reports", listMarketingReports)
 	g.POST("/reports", importMarketingReport)
 }

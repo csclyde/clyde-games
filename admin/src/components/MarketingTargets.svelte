@@ -2,6 +2,7 @@
  import {createEventDispatcher} from 'svelte';
  import {portalRequest} from '../portal-auth.mjs';
  import MarketingCreatorEvidence from './MarketingCreatorEvidence.svelte';
+ import MarketingTargetImpact from './MarketingTargetImpact.svelte';
  import MarketingResearchEditor from './MarketingResearchEditor.svelte';
  export let targets=[];
  export let pending=false;
@@ -9,13 +10,20 @@
  const base='/marketing/cursemark/targets';
  const policies={links:'Links',self_promotion:'Self-promotion',ai:'AI rules for publication',flair:'Flair',cadence:'Cadence'};
  const platforms={youtube:'YouTube',twitch:'Twitch',other:'Other'};
+ const destinationPlatforms={reddit:'Reddit',x:'X',youtube:'YouTube',twitch:'Twitch'};
+ const impactLabels=['Unscored','Low','OK','Great'];
+ const outreachLabels={contacted:'Contacted',inbound_first:'Creator or outlet contacted Casey first',none_found:'No prior outreach found',identity_unverified:'Outreach unknown · contact identity unverified',not_checked:'Outreach not checked'};
+ const activityLabels={post_found:'Prior Casey post found',coverage_found:'Prior Cursemark coverage found',none_found:'No prior public activity found',not_checked:'Public activity not checked'};
+ const coverageLabels={covered:'Covered before',self_reported:'Coverage self-reported',no_result:'No prior coverage found',inaccessible:'Coverage unknown · channel unavailable',not_checked:'Coverage not checked'};
+ const targetPlatform=target=>target.kind==='creator'
+  ?platforms[target.creator_platform]||'Creator':destinationPlatforms[target.platform]||'Public destination';
  let query='',filter='all',selection=0,readID=0,detail=null,detailLoading=false;
  let form=null,editing=null,busy=false,editingResearch=false,showArchived=false,error='',notice='';
  let importOpen=false,file,uploading=false,receipt='';
  $: terms=query.trim().toLowerCase().split(/\s+/);
  $: filtered=targets.filter(t=>(showArchived||!t.archived_at)&&(filter==='all'||filter==='destination'&&t.kind==='destination'||
-   filter==='creator'&&t.kind==='creator'||t.kind==='creator'&&t.creator_platform===filter)&&
-   terms.every(term=>[t.name,t.url,platforms[t.creator_platform]||''].some(text=>text?.toLowerCase().includes(term))));
+   filter==='creator'&&t.kind==='creator'||filter==='reddit'&&t.platform==='reddit'||t.kind==='creator'&&t.creator_platform===filter)&&
+   terms.every(term=>[t.name,t.url,targetPlatform(t)].some(text=>text?.toLowerCase().includes(term))));
  $: if(!selection&&filtered.length&&!form)select(filtered[0].id,false);
  function open(target=null){
   editing=target;
@@ -34,7 +42,7 @@
   finally{if(ticket===readID)detailLoading=false;}
  }
  function publish(target){
-  const {creator,research,creator_evidence,...summary}=target;
+  const {creator,research,creator_evidence,impact_evidence,steam_attribution,history,...summary}=target;
   change('saved',summary);
  }
  async function save(){
@@ -71,6 +79,14 @@
   editingResearch=false;
   notice='Research saved.';
  }
+ async function creatorReportSaved(event){
+  const id=detail.id;
+  detail={...detail,creator_evidence:event.detail};
+  try{
+   const updated=await portalRequest(base+'/'+id,'GET');
+   if(detail?.id===id){detail=updated;publish(updated);}
+  }catch(e){if(detail?.id===id)error=e.message;}
+ }
  async function upload(event){
   const uploadForm=event.currentTarget;
   uploading=true;receipt='';error='';
@@ -97,7 +113,7 @@
   <div class="filters">
    <label>Search targets<input type="search" bind:value={query}/></label>
    <label>Target type<select bind:value={filter}><option value="all">All</option><option value="destination">Public destinations</option><option value="creator">All creators</option>
-    <option value="youtube">YouTube</option><option value="twitch">Twitch</option><option value="other">Other creators</option></select></label>
+    <option value="reddit">Reddit</option><option value="youtube">YouTube</option><option value="twitch">Twitch</option><option value="other">Other creators</option></select></label>
   </div>
   <label class="check"><input type="checkbox" bind:checked={showArchived}/> Show archived targets</label>
   <p class="count">{filtered.length} of {targets.length} targets</p>
@@ -105,7 +121,10 @@
   <div class="choices">
    {#each filtered as target (target.id)}
     <button type="button" disabled={busy} aria-pressed={selection===target.id&&!form} on:click={()=>select(target.id)}>
-     <span>{target.name}</span><small>{target.kind==='creator'?platforms[target.creator_platform]||'Creator':'Public destination'}{target.archived_at?' · Archived':''}</small>
+     <span class="target-name"><span>{target.name}</span><span class={'impact-badge level-'+(target.impact?.level||0)}><span class="screen-reader">Impact: </span>{impactLabels[target.impact?.level||0]}</span>
+      {#if target.new_status?.is_new}<span class="new-badge" title={target.new_status.label}>New<span class="screen-reader"> · {target.new_status.label}</span></span>{/if}
+     </span>
+     <small>{targetPlatform(target)}{target.archived_at?' · Archived':''}</small>
     </button>
    {/each}
   </div>
@@ -130,7 +149,7 @@
     {#if !editing}<label>Target kind<select bind:value={form.kind}><option value="destination">Public destination</option><option value="creator">Creator contact</option></select></label>{/if}
     <label>Target name<input maxlength="160" bind:value={form.name} required/></label>
     {#if form.kind==='creator'}
-     <label>Private contact email<input type="email" autocomplete="off" maxlength="254" bind:value={form.email} required/></label>
+     <label>Private contact email (optional with a public channel)<input type="email" autocomplete="off" maxlength="254" bind:value={form.email}/></label>
      <label>Creator platform<select required bind:value={form.platform}><option value="" disabled>Select a platform</option>
       {#each Object.entries(platforms) as [id,label]}<option value={id}>{label}</option>{/each}</select></label>
      <label>Public channel URLs (one per line)<textarea rows="3" bind:value={form.channels}></textarea></label>
@@ -153,13 +172,26 @@
     </header>
     {#if detail.creator}
      <dl class="identity">
-      <div><dt>Private contact email</dt><dd>{detail.creator.email}</dd></div>
+      <div><dt>Private contact email</dt><dd>{detail.creator.email||'Not saved'}</dd></div>
       <div><dt>Creator platform</dt><dd>{platforms[detail.creator.platform]}</dd></div>
       <div><dt>Public channels</dt><dd>{#each detail.creator.channel_urls as link}<a href={link} rel="noreferrer" target="_blank">{link}</a>{:else}None saved{/each}</dd></div>
       <div><dt>Games covered</dt><dd>{detail.creator.games_covered.join(' · ')||'None saved'}</dd></div>
      </dl>
-     {#key detail.id}<MarketingCreatorEvidence target={detail} on:saved={event=>detail={...detail,creator_evidence:event.detail}}/>{/key}
-    {:else if detail.url}<a href={detail.url} rel="noreferrer" target="_blank">{detail.url}</a>{/if}
+     {#key detail.id}<MarketingCreatorEvidence target={detail} on:saved={creatorReportSaved}/>{/key}
+    {:else if detail.url}<p>{targetPlatform(detail)} · <a href={detail.url} rel="noreferrer" target="_blank">{detail.url}</a></p>{/if}
+    {#if detail.history}
+     <section aria-label="Prior outreach and coverage">
+      <h3>Prior activity</h3>
+      {#if detail.history.outreach_status!=='not_applicable'}
+       <p>{detail.new_status?.label==='New contact'?'New contact · ':''}{outreachLabels[detail.history.outreach_status]}</p>
+      {/if}
+      <p>{detail.creator?coverageLabels[detail.creator_evidence?.coverage?.status||'not_checked']:activityLabels[detail.history.activity_status]}</p>
+      <p>Checked {detail.history.checked_on}</p>
+      {#if detail.history.note}<p>{detail.history.note}</p>{/if}
+      {#if detail.history.sources?.length}<ul>{#each detail.history.sources as link}<li><a href={link} rel="noreferrer" target="_blank">{link}</a></li>{/each}</ul>{/if}
+     </section>
+    {/if}
+    <MarketingTargetImpact target={detail}/>
     {#if editingResearch}
      {#key detail.id}<MarketingResearchEditor target={detail} on:saved={researchSaved} on:cancel={()=>editingResearch=false}/>{/key}
     {:else if detail.research}
@@ -221,6 +253,13 @@
  .choices{display:grid;gap:.2rem;overflow:auto;max-height:max(15rem,calc(100vh - 21rem));padding:3px}
  .choices button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;background:var(--surface);color:var(--text);border-color:transparent;overflow-wrap:anywhere}
  .choices button[aria-pressed=true],.choices button:hover{background:var(--paper-warm);border-color:var(--line-strong)}
+ .target-name{display:flex;align-items:baseline;flex-wrap:wrap;column-gap:.45rem;row-gap:.18rem;width:100%}
+ .impact-badge{display:inline-block;flex:none;white-space:nowrap;border-radius:999px;padding:.08rem .4rem;font-size:.69rem;font-weight:700;background:#e9e9e7;color:#484946}
+ .level-1{background:#f8dede;color:#831f28}
+ .level-2{background:#fff0bf;color:#674900}
+ .level-3{background:#dcefe0;color:#235832}
+ .new-badge{display:inline-block;flex:none;white-space:nowrap;border-radius:999px;padding:.08rem .4rem;font-size:.69rem;font-weight:700;background:#e4edf9;color:#244d80}
+ .screen-reader{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
  small{color:var(--text-muted);font-size:.75rem;font-weight:400}
  a{color:var(--forest);text-decoration:underline}
  .identity a{display:block}

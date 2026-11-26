@@ -46,20 +46,26 @@ type marketingResearch struct {
 }
 
 type marketingTargetView struct {
-	ID              uint                          `json:"id"`
-	Version         uint                          `json:"version"`
-	Name            string                        `json:"name"`
-	URL             string                        `json:"url"`
-	ResearchURL     string                        `json:"research_url"`
-	CheckedAt       *time.Time                    `json:"checked_at"`
-	Research        *marketingResearch            `json:"research"`
-	Kind            string                        `json:"kind"`
-	ResearchReady   bool                          `json:"research_ready"`
-	ResearchHold    bool                          `json:"research_hold"`
-	CreatorPlatform string                        `json:"creator_platform,omitempty"`
-	Creator         *marketingCreatorFields       `json:"creator,omitempty"`
-	ArchivedAt      *time.Time                    `json:"archived_at"`
-	Evidence        *marketingCreatorEvidenceView `json:"creator_evidence,omitempty"`
+	ID               uint                          `json:"id"`
+	Version          uint                          `json:"version"`
+	Name             string                        `json:"name"`
+	URL              string                        `json:"url"`
+	ResearchURL      string                        `json:"research_url"`
+	CheckedAt        *time.Time                    `json:"checked_at"`
+	Research         *marketingResearch            `json:"research"`
+	Kind             string                        `json:"kind"`
+	ResearchReady    bool                          `json:"research_ready"`
+	ResearchHold     bool                          `json:"research_hold"`
+	CreatorPlatform  string                        `json:"creator_platform,omitempty"`
+	Creator          *marketingCreatorFields       `json:"creator,omitempty"`
+	ArchivedAt       *time.Time                    `json:"archived_at"`
+	Evidence         *marketingCreatorEvidenceView `json:"creator_evidence,omitempty"`
+	Platform         string                        `json:"platform,omitempty"`
+	Impact           marketingImpactSummary        `json:"impact"`
+	ImpactEvidence   *marketingImpactDetail        `json:"impact_evidence,omitempty"`
+	SteamAttribution *marketingTargetAttribution   `json:"steam_attribution,omitempty"`
+	History          *marketingHistoryView         `json:"history,omitempty"`
+	NewStatus        *marketingNewStatus           `json:"new_status,omitempty"`
 }
 
 var subredditName = regexp.MustCompile("^[a-zA-Z0-9_]{2,30}$")
@@ -122,7 +128,8 @@ func marketingSourceKey(value string) string {
 
 func targetDetails(target models.MarketingTarget) marketingTargetView {
 	out := marketingTargetView{ID: target.ID, Version: target.Version, Name: target.Name, URL: target.URL,
-		ResearchURL: target.ResearchURL, CheckedAt: target.CheckedAt, Kind: "destination", ArchivedAt: target.ArchivedAt}
+		ResearchURL: target.ResearchURL, CheckedAt: target.CheckedAt, Kind: "destination", ArchivedAt: target.ArchivedAt,
+		Platform: marketingPlatform(target.URL)}
 	if target.IsCreator {
 		out.Kind = "creator"
 		out.ResearchURL = ""
@@ -140,6 +147,7 @@ func targetDetails(target models.MarketingTarget) marketingTargetView {
 
 func targetPrivateDetails(db *gorm.DB, target models.MarketingTarget) (marketingTargetView, error) {
 	out := targetDetails(target)
+	coverageStatus := ""
 	if target.IsCreator {
 		person, err := readMarketingCreator(db, target.ID)
 		if err != nil {
@@ -148,12 +156,36 @@ func targetPrivateDetails(db *gorm.DB, target models.MarketingTarget) (marketing
 		fields := creatorFields(person)
 		out.Creator = &fields
 		out.CreatorPlatform = fields.Platform
+		out.Platform = fields.Platform
 		out.ResearchReady = out.Research != nil && target.CheckedAt != nil && target.ResearchURL == creatorResearchKey(person)
 		evidence, err := creatorEvidenceView(db, target.ID)
 		if err != nil {
 			return out, err
 		}
 		out.Evidence = &evidence
+		coverageStatus = evidence.Coverage.Status
+	}
+	saved, err := readMarketingImpact(db, []uint{target.ID})
+	if err != nil {
+		return out, err
+	}
+	impact, ok := saved[target.ID]
+	if !ok {
+		impact.Items = []marketingImpactObservation{}
+	}
+	out.Impact = summarizeImpact(impact, target)
+	out.ImpactEvidence = &impact
+	history, err := readMarketingHistory(db, []uint{target.ID})
+	if err != nil {
+		return out, err
+	}
+	if item, ok := history[target.ID]; ok {
+		out.History = &item
+		out.NewStatus = marketingHistorySummary(target, item, coverageStatus)
+	}
+	out.SteamAttribution, err = targetSteamAttribution(db, target.ID)
+	if err != nil {
+		return out, err
 	}
 	return out, nil
 }
@@ -222,12 +254,40 @@ func listMarketingTargets(c *gin.Context) {
 		creatorKeys[person.TargetID] = creatorResearchKey(person)
 		platforms[person.TargetID] = person.Platform
 	}
+	ids := make([]uint, 0, len(targets))
+	for _, target := range targets {
+		ids = append(ids, target.ID)
+	}
+	impact, err := readMarketingImpact(marketingDB(c), ids)
+	if err != nil {
+		marketingDBError(c, err)
+		return
+	}
+	history, err := readMarketingHistory(marketingDB(c), ids)
+	if err != nil {
+		marketingDBError(c, err)
+		return
+	}
+	creatorHistoryIDs := []uint{}
+	for _, target := range targets {
+		if target.IsCreator && history[target.ID].Version > 0 {
+			creatorHistoryIDs = append(creatorHistoryIDs, target.ID)
+		}
+	}
+	coverage, err := marketingCoveredStatuses(marketingDB(c), creatorHistoryIDs)
+	if err != nil {
+		marketingDBError(c, err)
+		return
+	}
 	for _, target := range targets {
 		summary := targetDetails(target)
 		if target.IsCreator {
 			summary.ResearchReady = summary.Research != nil && target.CheckedAt != nil && target.ResearchURL == creatorKeys[target.ID]
 			summary.CreatorPlatform = platforms[target.ID]
+			summary.Platform = summary.CreatorPlatform
 		}
+		summary.Impact = summarizeImpact(impact[target.ID], target)
+		summary.NewStatus = marketingHistorySummary(target, history[target.ID], coverage[target.ID])
 		summary.Research = nil
 		out = append(out, summary)
 	}
@@ -283,7 +343,12 @@ func saveMarketingTarget(c *gin.Context) {
 		marketingTargetError(c, err)
 		return
 	}
-	c.JSON(200, targetDetails(out))
+	detail, err := targetPrivateDetails(db, out)
+	if err != nil {
+		marketingDBError(c, err)
+		return
+	}
+	marketingTargetResponse(c, 200, detail)
 }
 
 func setMarketingBeatTarget(c *gin.Context) {
@@ -340,7 +405,7 @@ func researchLinkMatches(target, source string, official bool) bool {
 		}
 		community := strings.TrimRight(strings.ToLower(t.Path), "/")
 		if official {
-			return path == community+"/about/rules" || path == "/mod/"+strings.TrimPrefix(community, "/r/")+"/rules" ||
+			return path == community+"/about/rules" || path == community+"/about/rules.json" || path == "/mod/"+strings.TrimPrefix(community, "/r/")+"/rules" ||
 				path == community+"/wiki" || strings.HasPrefix(path, community+"/wiki/")
 		}
 		return strings.HasPrefix(path, community+"/comments/") && len(strings.TrimPrefix(path, community+"/comments/")) > 0
