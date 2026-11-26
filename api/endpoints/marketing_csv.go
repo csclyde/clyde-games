@@ -279,7 +279,7 @@ func marketingResults(db *gorm.DB, beatID uint) ([]marketingPost, marketingSumma
 	// when an import is refreshing an existing range.
 	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("project = ? AND beat_id = ?", marketingProject, beatID).
-			Order("rank = 0, rank ASC, id ASC").Find(&posts).Error; err != nil {
+			Order("`rank` = 0, `rank` ASC, id ASC").Find(&posts).Error; err != nil {
 			return err
 		}
 		if len(posts) == 0 {
