@@ -44,6 +44,8 @@ func RegisterMarketingRoutes(router *gin.Engine) {
 	g.POST("/beats/:beat/targets/:target/generate", generateMarketingPost)
 	g.GET("/targets", listMarketingTargets)
 	g.POST("/targets", saveMarketingTarget)
+	g.POST("/targets/import-creators", importMarketingCreators)
+	g.GET("/targets/:target", getMarketingTarget)
 	g.PUT("/targets/:target", saveMarketingTarget)
 	g.POST("/targets/:target/research", updateMarketingResearch)
 	g.GET("/reports", listMarketingReports)

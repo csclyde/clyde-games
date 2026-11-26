@@ -201,11 +201,11 @@
         {/each}
        </div>
        {#each attached as target (target.id)}
-        {@const current=target.research&&target.research_url===target.url}
+        {@const current=target.research_ready}
         <div class="target-row">
          <div class="attached-label"><span>{target.name}</span><button type="button" aria-label={'Remove '+target.name+' from Beat'} disabled={updatingTarget} on:click={()=>setTarget(target,false)}>×</button></div>
-         <small>{!current?'Research needed':target.research.hold?'Hold':'Research saved'}</small>
-         <button type="button" class="secondary" aria-label={'Generate Post for '+target.name} disabled={!aiEnabled||!!generating||!current||!beat.call_to_action||!beat.brief.trim()} on:click={()=>generate(target)}>{generating===target.id?'Drafting…':'Generate Post'}</button>
+         <small>{!current?'Research needed':target.research_hold?'Hold':'Research saved'}</small>
+         <button type="button" class="secondary" aria-label={(target.kind==='creator'?'Generate draft for ':'Generate Post for ')+target.name} disabled={!aiEnabled||!!generating||!current||!beat.call_to_action||!beat.brief.trim()} on:click={()=>generate(target)}>{generating===target.id?'Drafting…':target.kind==='creator'?'Generate draft':'Generate Post'}</button>
         </div>
        {/each}
       </section>
@@ -228,7 +228,7 @@
  <div role="tabpanel" id="marketing-panel-targets" aria-labelledby="marketing-tab-targets" hidden={section!=='targets'}>
   {#if targetsError}<p class="error" role="alert">{targetsError} <button type="button" class="secondary" on:click={loadTargets}>Retry</button></p>{/if}
   {#if !aiEnabled&&!loading}<p>OpenAI research requires a server-side key.</p>{/if}
-  <MarketingTargets {targets} {aiEnabled} pending={targetsLoading} on:saved={savedTarget}/>
+  <MarketingTargets {targets} {aiEnabled} pending={targetsLoading} on:saved={savedTarget} on:imported={loadTargets}/>
  </div>
 
  <div role="tabpanel" id="marketing-panel-imports" aria-labelledby="marketing-tab-imports" hidden={section!=='imports'}>

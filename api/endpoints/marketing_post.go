@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const marketingPostInstructions = `Write one private, editable Cursemark post for the single attached destination. Use the Beat brief as the hook and its Wishlist or Purchase call to action only when permitted by the saved research. Use the provided research as evidence for format and timing. Treat dated examples as observations, never as permission. Follow the saved self-promotion, disclosure, flair, cadence and link rules. If research says Hold or permission is unclear, produce a conservative draft for review and omit the CTA and links. If the rules clearly permit a Steam link and the CTA, use the literal {steam_link} placeholder, never an invented link. Include a title, copy, suggested timing and optional format notes in asset_notes. No calls to search or actions outside this draft. Do not impersonate a community member, disguise AI use, or present posting permission as confirmed by you.`
+const marketingPostInstructions = `Write one private, editable Cursemark draft for the single attached target. For a creator, write a pitch draft about their public coverage without claiming prior correspondence or consent to contact. Use the Beat brief as the hook and its Wishlist or Purchase call to action only when permitted by the saved research. Use saved research as evidence for format and timing. Treat dated examples as observations, never as permission. The editor personally rewrites and finalizes the public submission. Do not add an AI disclosure to this private draft. Leave any applicable disclosure or AI restriction in the separate saved rule evidence for the editor to apply when publishing. Follow the saved self-promotion, routing, flair, cadence, approval and link rules. If research says Hold or permission is unclear, produce a conservative draft for review and omit the CTA and links. If the rules clearly permit a Steam link and the CTA, use the literal {steam_link} placeholder. Include a title, copy, suggested timing and optional format notes in asset_notes. Do not search, contact, disclose an email address, claim permission or impersonate a community member.`
 
 var errMarketingAttachmentChanged = errors.New("Beat target attachment changed")
 
@@ -61,7 +61,27 @@ func generateMarketingPost(c *gin.Context) {
 		return
 	}
 	research := targetDetails(target).Research
-	if research == nil || target.CheckedAt == nil || target.ResearchURL != target.URL {
+	researchURL := target.URL
+	platform := ""
+	destination := map[string]any{"name": withoutContact(target.Name), "url": target.URL, "kind": "destination"}
+	if target.IsCreator {
+		person, err := readMarketingCreator(db, targetID)
+		if err != nil {
+			marketingDBError(c, err)
+			return
+		}
+		fields := creatorFields(person)
+		publicLinks := []string{}
+		for _, link := range fields.ChannelURLs {
+			if clean, ok := creatorChannel(link); ok {
+				publicLinks = append(publicLinks, clean)
+			}
+		}
+		researchURL = creatorResearchKey(person)
+		platform = fields.Platform
+		destination = map[string]any{"kind": "creator", "platform": platform, "public_channel_urls": publicLinks}
+	}
+	if research == nil || target.CheckedAt == nil || target.ResearchURL != researchURL {
 		marketingError(c, 409, "Run Update Research for this destination before drafting.")
 		return
 	}
@@ -74,7 +94,10 @@ func generateMarketingPost(c *gin.Context) {
 		return
 	}
 	defer marketingGeneration.Unlock()
-	input := map[string]any{"beat": draft, "target": map[string]string{"name": target.Name, "url": target.URL}, "saved_research": research,
+	cleanResearchText(research)
+	draft.Name = withoutContact(draft.Name)
+	draft.Brief = withoutContact(draft.Brief)
+	input := map[string]any{"beat": draft, "target": destination, "saved_research": research,
 		"research_date": target.CheckedAt.UTC().Format(marketingDay)}
 	data, _, err := marketingAsk(c.Request.Context(), key, "cursemark_target_post", marketingPostInstructions, input,
 		marketingObject(marketingTextFields("title", "copy", "timing", "asset_notes")), false)
@@ -87,11 +110,17 @@ func generateMarketingPost(c *gin.Context) {
 		marketingError(c, 502, "OpenAI returned an incomplete draft. Existing placements were kept.")
 		return
 	}
-	u, _ := url.Parse(target.URL)
-	post.Platform = strings.TrimPrefix(u.Hostname(), "www.")
+	if !target.IsCreator {
+		u, _ := url.Parse(target.URL)
+		platform = strings.TrimPrefix(u.Hostname(), "www.")
+	}
+	post.Platform = platform
 	post.Community = target.Name
 	post.AudienceFit = research.Takeaway
 	post.RuleEvidence = placementRules(research)
+	if target.IsCreator && post.RuleEvidence == "" {
+		post.RuleEvidence = "Based on publicly sourced creator coverage. Contact and sending are manual."
+	}
 	post.Decision = "hold"
 	if len(research.Sources) > 0 {
 		post.RulesURL = research.Sources[0]

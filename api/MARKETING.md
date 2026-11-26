@@ -4,11 +4,19 @@ Open **Cursemark → Marketing → Targets** with an admin account. Add or edit 
 
 In **Beats**, create a Beat with a name, a brief that serves as the hook, and a Wishlist or Purchase call to action. Attach any catalog targets you want to use and choose **Generate Post** per target. Drafting uses the saved research, and research older than 90 days puts the draft on Hold. Removing a target from a Beat preserves its posts and results. Placements are editable and publication is manual. After publishing, record the live URL, date and details on the placement. The Steam link stays stable as the draft is edited. The editor can copy draft text with its `{steam_link}` placeholder filled in.
 
+## Private creator contacts
+
+Use **New Target → Creator contact** to save a creator's name, private email, and primary platform. You can add public channels and games covered now or later. The catalog list omits private addresses. The authenticated selected detail displays the address. Creator research uses only the public channel URLs and platform.
+
+Use **Import creators** to upload a private UTF-8 CSV with the exact headers `name,email,platform,channel_urls,games_covered`. Use `youtube`, `twitch` or `other` for the platform and separate multiple channels or games with `|`. Leave optional cells blank when unknown. The upload accepts 200 rows and 512 KB, skips existing addresses case-insensitively, and reports counts only. The authenticated endpoint is `POST /api/marketing/cursemark/targets/import-creators` with multipart field `csv`. Supply the file in the request body. Keep addresses and correspondence out of shared storage, URLs, commands, chat and logs.
+
 ## OpenAI setup
 
 Provision a key belonging to the Cursemark marketing OpenAI project. Set `CURSEMARK_OPENAI_API_KEY` in a root-owned, mode-0600 environment file loaded by the existing Clyde Games API service, then restart that service. Use the existing service secret management workflow. Production sets `CURSEMARK_OPENAI_MODEL` to `gpt-6.2-sol`. The API default is `gpt-6.1-terra` when the setting is absent. The API sends the key directly to OpenAI. The browser receives only a configuration flag. The model receives the Beat name, brief, and call to action. Enter only Beat text that can be shared with the provider. Research calls are initiated by admins and may incur OpenAI charges.
 
 Target research uses the Responses API with `web_search`, a structured schema, and `store: false`. Only an explicit **Update Research** runs web search. Only an explicit **Generate Post** drafts for an attached target using the Beat and saved research. Sources must appear in the search evidence and belong to the relevant destination. The checked date records when the service ran the research. A Candidate still needs human review. See the official [web search guide](https://developers.openai.com/api/docs/guides/tools-web-search) and [structured outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
+
+The editor rewrites and finalizes public posts. Private drafting alone does not cause a Hold or add a disclosure line. Review the sourced policy before publishing, especially when a rule covers AI-assisted submissions or applies to the final public content. The portal preserves self-promotion, routing, links, flair, cadence and approval requirements.
 
 ## Steamworks imports
 

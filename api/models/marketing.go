@@ -95,11 +95,21 @@ type MarketingTarget struct {
 	Project     string `gorm:"type:varchar(64);uniqueIndex:marketing_target_identity;not null"`
 	URLKey      string `gorm:"type:char(64);uniqueIndex:marketing_target_identity;not null"`
 	Name        string `gorm:"type:varchar(160);not null"`
+	IsCreator   bool   `gorm:"not null;default:false"`
 	URL         string `gorm:"type:varchar(1000);not null"`
 	Version     uint   `gorm:"not null"`
 	ResearchURL string `gorm:"type:varchar(1000);not null"`
 	Research    string `gorm:"type:mediumtext;not null"`
 	CheckedAt   *time.Time
+}
+
+// Creator contacts are read only on the authenticated target detail route.
+type MarketingCreator struct {
+	TargetID    uint   `gorm:"primaryKey;autoIncrement:false"`
+	Email       string `gorm:"type:varchar(254);not null"`
+	Platform    string `gorm:"type:varchar(16);not null"`
+	ChannelURLs string `gorm:"type:text;not null"`
+	Games       string `gorm:"type:text;not null"`
 }
 
 type MarketingBeatTarget struct {
@@ -109,5 +119,5 @@ type MarketingBeatTarget struct {
 
 func MigrateMarketing(db *gorm.DB) error {
 	return db.AutoMigrate(&MarketingBeat{}, &MarketingPlacement{}, &MarketingReport{}, &MarketingImport{},
-		&MarketingResult{}, &MarketingTarget{}, &MarketingBeatTarget{})
+		&MarketingResult{}, &MarketingTarget{}, &MarketingBeatTarget{}, &MarketingCreator{})
 }
