@@ -6,6 +6,7 @@
 	import Feedback from './Feedback.svelte';
 	import Crashes from './Crashes.svelte';
 	import Metrics from './Metrics.svelte';
+ import Marketing from './Marketing.svelte';
 	import ServerStats from '../components/ServerStats.svelte';
 	import User from './User.svelte';
 	import Users from './Users.svelte';
@@ -19,6 +20,7 @@
  export let beginPasswordChange, signOutAccount, accountBusy;
  const tabs = [
   {id:'admin',label:'Overview',href:'/admin',component:Metrics},
+  {id:'marketing',label:'Marketing',href:'/marketing',component:Marketing},
   {id:'metrics',label:'Metrics',href:'/metrics',component:MetricsDashboard},
   {id:'feedback',label:'Feedback',href:'/feedback',component:Feedback},
   {id:'crashes',label:'Crashes',href:'/crashes',component:Crashes},
@@ -75,7 +77,7 @@
  $: isClyde=selectedProject.toLowerCase()==='clyde-games';
  $: isPackrat=selectedProject.toLowerCase()==='packrat';
  $: hasMetrics=selectedProject.toLowerCase()==='cursemark';
- $: visibleTabs=tabs.filter(t => t.id==='admin' || (!isClyde && !isPackrat && (t.id==='feedback' || t.id==='crashes' || (t.id==='metrics' && ['cursemark','necrovale','farm-builder'].includes(selectedProject.toLowerCase())))));
+ $: visibleTabs=tabs.filter(t => t.id==='admin' || (t.id==='marketing' && selectedProject==='cursemark' && $canWrite) || (!isClyde && !isPackrat && (t.id==='feedback' || t.id==='crashes' || (t.id==='metrics' && ['cursemark','necrovale','farm-builder'].includes(selectedProject.toLowerCase())))));
  $: activeTab=visibleTabs.find(t=>t.id===tab)||visibleTabs[0];
  $: selectedName=isClyde?'Clyde Games':projects.find(p=>p.id.toLowerCase()===selectedProject.toLowerCase())?.name || selectedProject;
  const gameOrder=['pathprodigy','cursemark','necrovale','farm-builder'];
@@ -133,6 +135,8 @@
    <Projects {reportProjects} {selectedProject} compact={true}/>
    {#if hasMetrics}<Metrics {selectedProject} showGlobalSettings={$canWrite} {reportProjects}/><Users/>{/if}
 
+  {:else if activeTab.id==='marketing'}
+   <Marketing/>
   {:else}
    {#key activeTab.id==='metrics'?`${activeTab.id}:${selectedProject}`:activeTab.id}
     <svelte:component this={activeTab.component} {selectedProject} {reportProjects} {reportFeedbackCounts} {reportCrashCounts} refreshSignal={feedbackRefreshSignal} sourceConfig={projects.find(p => p.id === selectedProject)} {reviewFeedback}/>

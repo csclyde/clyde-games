@@ -8,6 +8,7 @@
 
 	router('/', () => router.redirect('/admin'));
 	router('/admin', () => tab = 'admin');
+	router('/marketing', () => tab = 'marketing');
 	router('/metrics', () => tab = 'metrics');
 	router('/feedback', () => tab = 'feedback');
 	router('/crashes', () => tab = 'crashes');

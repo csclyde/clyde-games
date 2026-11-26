@@ -95,6 +95,9 @@ func main() {
 	if err = models.MigratePortalAuth(models.AnalyticsDB); err != nil {
 		panic("portal authentication schema migration failed")
 	}
+	if err = models.MigrateMarketing(models.AnalyticsDB); err != nil {
+		panic("marketing schema migration failed")
+	}
 	if err = models.MigrateEtymologyDB(); err != nil {
 		panic(err)
 	}
@@ -109,6 +112,7 @@ func main() {
 // registerRoutes keeps routing testable without connecting production databases.
 func registerRoutes(router *gin.Engine) {
 	endpoints.RegisterPortalAuthRoutes(router)
+	endpoints.RegisterMarketingRoutes(router)
 	endpoints.RegisterReportNoteRoutes(router)
 	endpoints.RegisterMCPRoutes(router)
 	router.GET("/metrics", endpoints.MetricsAuth, endpoints.GetMetrics)
