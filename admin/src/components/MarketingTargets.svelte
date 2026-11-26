@@ -1,29 +1,35 @@
 <script>
  import {createEventDispatcher} from 'svelte';
  import {portalRequest} from '../portal-auth.mjs';
+ import {compareMarketingTargets,publicMarketingURL,targetPlatform} from '../marketing-targets.mjs';
  import MarketingCreatorEvidence from './MarketingCreatorEvidence.svelte';
  import MarketingTargetImpact from './MarketingTargetImpact.svelte';
+ import MarketingTargetBadges from './MarketingTargetBadges.svelte';
  import MarketingResearchEditor from './MarketingResearchEditor.svelte';
  export let targets=[];
  export let pending=false;
+ export let requestedTarget=null;
  const change=createEventDispatcher();
  const base='/marketing/cursemark/targets';
  const policies={links:'Links',self_promotion:'Self-promotion',ai:'AI rules for publication',flair:'Flair',cadence:'Cadence'};
  const platforms={youtube:'YouTube',twitch:'Twitch',other:'Other'};
- const destinationPlatforms={reddit:'Reddit',x:'X',youtube:'YouTube',twitch:'Twitch'};
- const impactLabels=['Unscored','Low','OK','Great'];
  const outreachLabels={contacted:'Contacted',inbound_first:'Creator or outlet contacted Casey first',none_found:'No prior outreach found',identity_unverified:'Outreach unknown · contact identity unverified',not_checked:'Outreach not checked'};
  const activityLabels={post_found:'Prior Casey post found',coverage_found:'Prior Cursemark coverage found',none_found:'No prior public activity found',not_checked:'Public activity not checked'};
  const coverageLabels={covered:'Covered before',self_reported:'Coverage self-reported',no_result:'No prior coverage found',inaccessible:'Coverage unknown · channel unavailable',not_checked:'Coverage not checked'};
- const targetPlatform=target=>target.kind==='creator'
-  ?platforms[target.creator_platform]||'Creator':destinationPlatforms[target.platform]||'Public destination';
  let query='',filter='all',selection=0,readID=0,detail=null,detailLoading=false;
+ let handledTarget=null;
  let form=null,editing=null,busy=false,editingResearch=false,showArchived=false,error='',notice='';
  let importOpen=false,file,uploading=false,receipt='';
  $: terms=query.trim().toLowerCase().split(/\s+/);
  $: filtered=targets.filter(t=>(showArchived||!t.archived_at)&&(filter==='all'||filter==='destination'&&t.kind==='destination'||
    filter==='creator'&&t.kind==='creator'||filter==='reddit'&&t.platform==='reddit'||t.kind==='creator'&&t.creator_platform===filter)&&
-   terms.every(term=>[t.name,t.url,targetPlatform(t)].some(text=>text?.toLowerCase().includes(term))));
+   terms.every(term=>[t.name,t.url,targetPlatform(t)].some(text=>text?.toLowerCase().includes(term)))).sort(compareMarketingTargets);
+ $: if(requestedTarget&&requestedTarget!==handledTarget){
+  handledTarget=requestedTarget;
+  query='';filter='all';
+  if(targets.some(t=>t.id===requestedTarget.id&&t.archived_at))showArchived=true;
+  select(requestedTarget.id);
+ }
  $: if(!selection&&filtered.length&&!form)select(filtered[0].id,false);
  function open(target=null){
   editing=target;
@@ -121,9 +127,7 @@
   <div class="choices">
    {#each filtered as target (target.id)}
     <button type="button" disabled={busy} aria-pressed={selection===target.id&&!form} on:click={()=>select(target.id)}>
-     <span class="target-name"><span>{target.name}</span><span class={'impact-badge level-'+(target.impact?.level||0)}><span class="screen-reader">Impact: </span>{impactLabels[target.impact?.level||0]}</span>
-      {#if target.new_status?.is_new}<span class="new-badge" title={target.new_status.label}>New<span class="screen-reader"> · {target.new_status.label}</span></span>{/if}
-     </span>
+     <span class="target-name"><span>{target.name}</span><MarketingTargetBadges {target}/></span>
      <small>{targetPlatform(target)}{target.archived_at?' · Archived':''}</small>
     </button>
    {/each}
@@ -163,7 +167,7 @@
   {:else if detail}
    <article class="card" aria-label={detail.name}>
     <header>
-     <h2>{detail.name}</h2>
+     <div><h2>{detail.name}</h2><div class="identity-heading"><small>{targetPlatform(detail)}</small><MarketingTargetBadges target={detail}/></div></div>
      <div class="buttons">
       <button type="button" class="secondary" aria-label={'Edit '+detail.name} disabled={busy} on:click={()=>open(detail)}>Edit</button>
       <button type="button" class="secondary" disabled={busy} on:click={archive}>{detail.archived_at?'Restore target':'Archive target'}</button>
@@ -173,15 +177,14 @@
     {#if detail.creator}
      <dl class="identity">
       <div><dt>Private contact email</dt><dd>{detail.creator.email||'Not saved'}</dd></div>
-      <div><dt>Creator platform</dt><dd>{platforms[detail.creator.platform]}</dd></div>
-      <div><dt>Public channels</dt><dd>{#each detail.creator.channel_urls as link}<a href={link} rel="noreferrer" target="_blank">{link}</a>{:else}None saved{/each}</dd></div>
+      <div><dt>Public channels</dt><dd>{#each detail.creator.channel_urls.filter(publicMarketingURL) as link}<a href={publicMarketingURL(link)} rel="noreferrer" target="_blank">{link}</a>{:else}None saved{/each}</dd></div>
       <div><dt>Games covered</dt><dd>{detail.creator.games_covered.join(' · ')||'None saved'}</dd></div>
      </dl>
      {#key detail.id}<MarketingCreatorEvidence target={detail} on:saved={creatorReportSaved}/>{/key}
-    {:else if detail.url}<p>{targetPlatform(detail)} · <a href={detail.url} rel="noreferrer" target="_blank">{detail.url}</a></p>{/if}
+    {:else if publicMarketingURL(detail.url)}<p><a href={publicMarketingURL(detail.url)} rel="noreferrer" target="_blank">{detail.url}</a></p>{/if}
     {#if detail.history}
-     <section aria-label="Prior outreach and coverage">
-      <h3>Prior activity</h3>
+     <details aria-label="Prior outreach and coverage">
+      <summary>Prior activity</summary>
       {#if detail.history.outreach_status!=='not_applicable'}
        <p>{detail.new_status?.label==='New contact'?'New contact · ':''}{outreachLabels[detail.history.outreach_status]}</p>
       {/if}
@@ -189,14 +192,14 @@
       <p>Checked {detail.history.checked_on}</p>
       {#if detail.history.note}<p>{detail.history.note}</p>{/if}
       {#if detail.history.sources?.length}<ul>{#each detail.history.sources as link}<li><a href={link} rel="noreferrer" target="_blank">{link}</a></li>{/each}</ul>{/if}
-     </section>
+     </details>
     {/if}
-    <MarketingTargetImpact target={detail}/>
+    <details class="evidence"><summary>Impact and attribution</summary><MarketingTargetImpact target={detail}/></details>
     {#if editingResearch}
      {#key detail.id}<MarketingResearchEditor target={detail} on:saved={researchSaved} on:cancel={()=>editingResearch=false}/>{/key}
     {:else if detail.research}
      {@const snapshot=detail.research}
-     <h3>Research</h3>
+     <details class="evidence"><summary>Research {snapshot.hold?"· Hold":""}</summary>
      <p>{snapshot.hold?'Hold · ':''}Checked {new Date(detail.checked_at).toISOString().slice(0,10)}</p>
      {#if !detail.research_ready}<p>This research predates a change to the destination or channels.</p>{/if}
      {#if snapshot.hold}<p>{snapshot.hold_reason}</p>{/if}
@@ -221,6 +224,7 @@
        </li>
       {/each}</ul>
      {:else}<p>No recent examples could be verified.</p>{/if}
+     </details>
     {:else}<p>No research saved.</p>{/if}
    </article>
   {:else if targets.length}<p>Select a target to see its details.</p>{/if}
@@ -254,15 +258,12 @@
  .choices button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;background:var(--surface);color:var(--text);border-color:transparent;overflow-wrap:anywhere}
  .choices button[aria-pressed=true],.choices button:hover{background:var(--paper-warm);border-color:var(--line-strong)}
  .target-name{display:flex;align-items:baseline;flex-wrap:wrap;column-gap:.45rem;row-gap:.18rem;width:100%}
- .impact-badge{display:inline-block;flex:none;white-space:nowrap;border-radius:999px;padding:.08rem .4rem;font-size:.69rem;font-weight:700;background:#e9e9e7;color:#484946}
- .level-1{background:#f8dede;color:#831f28}
- .level-2{background:#fff0bf;color:#674900}
- .level-3{background:#dcefe0;color:#235832}
- .new-badge{display:inline-block;flex:none;white-space:nowrap;border-radius:999px;padding:.08rem .4rem;font-size:.69rem;font-weight:700;background:#e4edf9;color:#244d80}
- .screen-reader{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
  small{color:var(--text-muted);font-size:.75rem;font-weight:400}
  a{color:var(--forest);text-decoration:underline}
  .identity a{display:block}
+ .identity-heading{display:flex;align-items:center;flex-wrap:wrap;gap:.35rem;margin:.2rem 0}
+ details{margin-top:.65rem}
+ details>summary{color:var(--forest);cursor:pointer;font-size:.89rem;font-weight:650}
  dl{margin:.4rem 0;font-size:.88rem}
  dl div{margin:.35rem 0}
  dt{font-weight:650}

@@ -38,6 +38,16 @@ type marketingTargetArgs struct {
 type marketingPlacementArgs struct {
 	marketingBeatArgs
 	PlacementID int `json:"placement_id"`
+	TargetID    int `json:"target_id,omitempty" jsonschema:"Optional expected linked target ID. Rejects a placement for another target."`
+}
+
+type marketingPlacementText struct {
+	marketingBeatArgs
+	PlacementID int     `json:"placement_id"`
+	TargetID    int     `json:"target_id" jsonschema:"Exact linked target ID"`
+	Version     uint    `json:"version" jsonschema:"Current placement version from marketing_get_placement"`
+	Title       *string `json:"title" jsonschema:"Full title, or empty to clear"`
+	Copy        *string `json:"copy" jsonschema:"Full body, or empty to clear. Use {steam_link} for this placement's stable URL."`
 }
 type marketingBeatWrite struct {
 	marketingProjectArgs
@@ -284,9 +294,22 @@ func addMarketingTools(s *mcp.Server, b *backend) {
 		p, e := checkedMarketingPaths(a.Project, "/targets/%d", a.TargetID)
 		return marketingOperation{Method: "GET", Path: p}, e
 	})
-	marketingTool(s, b, "marketing_get_placement", "Read one existing draft or externally published placement and its stable Steam link and attribution.", true, func(a marketingPlacementArgs) (marketingOperation, error) {
+	marketingTool(s, b, "marketing_get_placement", "Read one existing draft or externally published placement and its stable Steam link and attribution. Set target_id to require an exact target match.", true, func(a marketingPlacementArgs) (marketingOperation, error) {
 		p, e := checkedMarketingPaths(a.Project, "/beats/%d/placements/%d", a.BeatID, a.PlacementID)
+		if a.TargetID < 0 {
+			return marketingOperation{}, fmt.Errorf("use a positive target ID")
+		}
+		if a.TargetID > 0 {
+			p += "?" + (url.Values{"target_id": {strconv.Itoa(a.TargetID)}}).Encode()
+		}
 		return marketingOperation{Method: "GET", Path: p}, e
+	})
+	marketingTool(s, b, "marketing_update_placement_text", "Save only the title and body for the exact Cursemark Beat, placement and target using the current version. Does not change rules, publication, history or attribution. Opens no composer and sends nothing.", false, func(a marketingPlacementText) (marketingOperation, error) {
+		if a.TargetID < 1 || a.Version == 0 || a.Title == nil || a.Copy == nil {
+			return marketingOperation{}, fmt.Errorf("supply the exact target, current version, title and copy")
+		}
+		p, e := checkedMarketingPaths(a.Project, "/beats/%d/placements/%d", a.BeatID, a.PlacementID)
+		return marketingOperation{Method: "PATCH", Path: p, Body: a}, e
 	})
 	marketingTool(s, b, "marketing_save_beat", "Create a Cursemark Beat or update it with the current version. Supply name, brief and wishlist or purchase CTA.", false, func(a marketingBeatWrite) (marketingOperation, error) {
 		if a.CallToAction != "wishlist" && a.CallToAction != "purchase" {

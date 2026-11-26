@@ -200,6 +200,33 @@ func TestMarketingHTTPAndSteamworks(t *testing.T) {
 		detail.Placements[0].PublishedAt == nil || detail.Result.Wishlists == nil || *detail.Result.Wishlists != 3 {
 		t.Fatal("Unlinking a target removed a published post or its metrics")
 	}
+	var otherPost marketingPost
+	call("POST", path+"/placements", map[string]any{"target_id": other.ID, "platform": "X", "community": "Other target",
+		"title": "Other draft", "copy": "Other body", "decision": "hold"}, true, 201, &otherPost)
+	postURL := fmt.Sprintf("%s/placements/%d", path, post.ID)
+	call("GET", fmt.Sprintf("%s?target_id=%d", postURL, other.ID), nil, true, 404, nil)
+	call("GET", fmt.Sprintf("%s?target_id=%d", postURL, target.ID), nil, true, 200, &post)
+	text := map[string]any{"target_id": other.ID, "version": post.Version, "title": "Scoped title", "copy": "Scoped body"}
+	call("PATCH", postURL, text, false, 401, nil)
+	call("PATCH", postURL, text, true, 404, nil)
+	text["target_id"] = target.ID
+	var edited marketingPost
+	call("PATCH", postURL, text, true, 200, &edited)
+	if edited.Title != "Scoped title" || edited.Copy != "Scoped body" || edited.SteamURL != post.SteamURL ||
+		edited.Version != post.Version+1 || edited.PublishedURL != post.PublishedURL || edited.PublishedNote != post.PublishedNote ||
+		edited.RuleEvidence != post.RuleEvidence || edited.Result.Wishlists == nil || *edited.Result.Wishlists != 3 {
+		t.Fatal("Scoped text edit changed independent publication, rules or attribution")
+	}
+	call("PATCH", postURL, text, true, 409, nil)
+	call("GET", fmt.Sprintf("%s/placements/%d", path, otherPost.ID), nil, true, 200, &otherPost)
+	if otherPost.Title != "Other draft" || otherPost.Copy != "Other body" {
+		t.Fatal("Scoped editor overwrote another target's draft")
+	}
+	call("PUT", linkPath, nil, true, 204, nil)
+	call("GET", postURL, nil, true, 200, &edited)
+	if edited.Title != "Scoped title" || edited.SteamURL != post.SteamURL {
+		t.Fatal("Reattaching a target lost its original placement")
+	}
 
 	var wg sync.WaitGroup
 	errs := make(chan error, 2)

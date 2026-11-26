@@ -1,9 +1,12 @@
 <script>
  import {onMount,tick} from 'svelte';
  import {portalRequest} from '../portal-auth.mjs';
+ import {compareMarketingTargets,marketingPlatformGroups} from '../marketing-targets.mjs';
  import MarketingBeatDialog from '../components/MarketingBeatDialog.svelte';
+ import MarketingBeatTarget from '../components/MarketingBeatTarget.svelte';
  import MarketingPlacement from '../components/MarketingPlacement.svelte';
  import MarketingResults from '../components/MarketingResults.svelte';
+ import MarketingTargetBadges from '../components/MarketingTargetBadges.svelte';
  import MarketingTargets from '../components/MarketingTargets.svelte';
 
  const base='/marketing/cursemark';
@@ -14,11 +17,13 @@
  let section='beats',beats=[],reports=[],posts=[],result=null;
  let selected=0,requestID=0,loading=true,detailLoading=false,showArchivedBeats=false,archiving=false;
  let targets=[],linked=[],targetsLoading=true,targetsError='',updatingTarget=false;
+ let requestedTarget=null;
  let error='',notice='',editor=null,saving=false,editorError='',detailHeading;
  let start='',end='',confirmed=false,file,importing=false,importMessage='',importError='',reportsLoaded=false,reportsLoading=false;
  $: beat=beats.find(item=>item.id===selected);
- $: attached=targets.filter(target=>linked.includes(target.id));
- $: available=targets.filter(target=>!target.archived_at&&!linked.includes(target.id));
+ $: attached=targets.filter(target=>linked.includes(target.id)).sort(compareMarketingTargets);
+ $: available=marketingPlatformGroups(targets.filter(target=>!target.archived_at&&!linked.includes(target.id)));
+ $: historical=posts.filter(post=>post.archived_at||!linked.includes(post.target_id));
  $: visibleBeats=beats.filter(item=>showArchivedBeats||!item.archived_at);
 
  onMount(async()=>{
@@ -131,6 +136,11 @@
   if(selected===event.detail.beat_id)refreshBeat();
  }
 
+ function viewTarget(event){
+  requestedTarget={id:event.detail};
+  selectTab('targets');
+ }
+
  async function loadReports(){
   reportsLoading=true;importError='';
   try{
@@ -192,35 +202,51 @@
        <p class="cta"><strong>Call to Action</strong> {ctaLabels[beat.call_to_action]||'Choose Wishlist or Purchase'}</p>
        {#if notice}<p role="status">{notice}</p>{/if}
       </section>
-      <section class="card" aria-label="Beat targets">
-       <div class="beat-title"><h3>Targets</h3><button type="button" class="secondary" on:click={()=>selectTab('targets')}>Manage targets</button></div>
+      <section class="card" aria-label="Selected Beat targets">
+       <div class="beat-title"><h3>Selected targets</h3><button type="button" class="secondary" on:click={()=>selectTab('targets')}>Manage targets</button></div>
        {#if targetsError}<p class="error" role="alert">{targetsError} <button type="button" class="secondary" on:click={loadTargets}>Retry</button></p>
-       {:else if !targetsLoading&&!targets.length}<p>Add destinations in Targets to draft posts for this Beat.</p>{/if}
-       <div class="pills" aria-label="Available targets">
-        {#each available as target (target.id)}
-         <button type="button" class="pill" aria-label={'Attach '+target.name} disabled={updatingTarget||!!beat.archived_at} on:click={()=>setTarget(target,true)}>+ {target.name}</button>
+       {:else if !targetsLoading&&!attached.length}<p>Choose targets below to draft posts for this Beat.</p>{/if}
+       <div class="selected-targets">
+        {#each attached as target (selected+':'+target.id)}
+         <MarketingBeatTarget {target} beatID={selected} placements={posts.filter(post=>post.target_id===target.id&&!post.archived_at)}
+          beatArchived={!!beat.archived_at} busy={updatingTarget} on:view={viewTarget}
+          on:remove={event=>setTarget(event.detail,false)} on:saved={placementSaved}/>
         {/each}
        </div>
-       {#each attached as target (target.id)}
-        {@const current=target.research_ready}
-        <div class="target-row">
-         <div class="attached-label"><span>{target.name}</span><button type="button" aria-label={'Remove '+target.name+' from Beat'} disabled={updatingTarget} on:click={()=>setTarget(target,false)}>×</button></div>
-         <small>{target.archived_at?'Archived':!current?'Research needed':target.research_hold?'Hold':'Research saved'}</small>
-        </div>
-       {/each}
       </section>
       <section class="card" aria-label="Beat results">
        <h3>Beat results</h3>
        <MarketingResults {result}/>
       </section>
-      <section aria-label="Placements">
-       <h3>Placements</h3>
-       {#each posts as post (post.id)}<MarketingPlacement beatID={selected} {post} on:saved={placementSaved}/>{/each}
-       {#if !posts.length}<p>No placements yet.</p>{/if}
+      <section aria-label="Other placements">
+       {#if historical.length}
+        <details class="card placement-history">
+         <summary>Other placements ({historical.length})</summary>
+         {#each historical as post (post.id)}<MarketingPlacement beatID={selected} {post} on:saved={placementSaved}/>{/each}
+        </details>
+       {/if}
        {#if !beat.archived_at}
-        {#key selected}<MarketingPlacement beatID={selected} targets={attached.filter(target=>!target.archived_at)} on:saved={placementSaved}/>{/key}
+        {#key selected}<MarketingPlacement beatID={selected} on:saved={placementSaved}/>{/key}
        {/if}
       </section>
+      {#if !beat.archived_at&&available.length}
+       <section class="card add-targets" aria-label="Add targets to this Beat">
+        <h3>Add targets</h3>
+        {#each available as group (group.id)}
+         <div class="platform-group">
+          <h4>{group.name}</h4>
+          <div class="pills">
+           {#each group.targets as target (target.id)}
+            <button type="button" class="pill" disabled={updatingTarget} on:click={()=>setTarget(target,true)}>
+             <span aria-hidden="true">+</span><span class="sr-only">Attach </span><span>{target.name}</span><MarketingTargetBadges {target}/>
+            </button>
+           {/each}
+          </div>
+         </div>
+        {/each}
+       </section>
+      {/if}
+
      {:else}<p>No Beats yet.</p>{/if}
     </div>
    </div>
@@ -229,7 +255,7 @@
 
  <div role="tabpanel" id="marketing-panel-targets" aria-labelledby="marketing-tab-targets" hidden={section!=='targets'}>
   {#if targetsError}<p class="error" role="alert">{targetsError} <button type="button" class="secondary" on:click={loadTargets}>Retry</button></p>{/if}
-  <MarketingTargets {targets} pending={targetsLoading} on:saved={savedTarget} on:imported={loadTargets}/>
+  <MarketingTargets {targets} {requestedTarget} pending={targetsLoading} on:saved={savedTarget} on:imported={loadTargets}/>
  </div>
 
  <div role="tabpanel" id="marketing-panel-imports" aria-labelledby="marketing-tab-imports" hidden={section!=='imports'}>
@@ -283,12 +309,15 @@
  .brief{white-space:pre-wrap;overflow-wrap:anywhere}
  .cta{margin-bottom:.8rem}
  .cta strong{margin-right:.25rem}
- .pills{display:flex;gap:.35rem;flex-wrap:wrap;margin:.55rem 0}
- .pill,.attached-label{border-radius:999px;background:var(--paper-warm);border:1px solid var(--line);color:var(--forest)}
- .target-row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.4rem 0}
- .attached-label{display:inline-flex;align-items:center;overflow-wrap:anywhere;padding-left:.7rem}
- .attached-label button{border:0;background:transparent;color:var(--forest);width:44px;flex:none;padding:0;font-size:1.2rem}
- small{color:var(--text-muted)}
+ .selected-targets{display:grid;gap:.7rem}
+ .add-targets{margin-top:1rem}
+ .platform-group+.platform-group{margin-top:.7rem}
+ .platform-group h4{margin:.35rem 0;color:var(--text-muted);font-size:.84rem}
+ .pills{display:flex;gap:.35rem;flex-wrap:wrap}
+ .pill{display:inline-flex;align-items:center;flex-wrap:wrap;gap:.3rem;border-radius:999px;background:var(--paper-warm);border:1px solid var(--line);color:var(--forest);font-size:.8rem;overflow-wrap:anywhere;text-align:left;max-width:100%}
+ .pill:not(:disabled):hover{border-color:var(--forest)}
+ .placement-history summary{cursor:pointer;color:var(--forest)}
+ .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
  .imports{max-width:760px}
  .imports h3{margin-top:1rem}
  .imports ul{padding-left:1.25rem}
@@ -305,5 +334,5 @@
  .imports button{justify-self:start}
  .error{color:var(--rust)}
  @media(max-width:860px){.work{grid-template-columns:1fr;gap:.65rem}.beat-list{position:static;margin-bottom:0}.beat-list>button{width:auto}.beat-choices{max-height:9rem}.beat-choices button{min-height:44px}}
- @media(max-width:520px){.fields{grid-template-columns:1fr}.marketing{padding:0 8px}.card{padding:.7rem}}
+ @media(max-width:520px){.fields{grid-template-columns:1fr}.marketing{padding:0 8px}.card{padding:.7rem}.beat-title{flex-wrap:wrap}}
 </style>

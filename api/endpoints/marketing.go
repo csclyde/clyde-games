@@ -56,6 +56,7 @@ func registerMarketingHandlers(g *gin.RouterGroup) {
 	g.POST("/beats/:beat/placements", saveMarketingPlacement)
 	g.GET("/beats/:beat/placements/:placement", getMarketingPlacement)
 	g.PUT("/beats/:beat/placements/:placement", saveMarketingPlacement)
+	g.PATCH("/beats/:beat/placements/:placement", editMarketingPlacementText)
 	g.PUT("/beats/:beat/placements/:placement/archive", archiveMarketingPlacement)
 	g.PUT("/beats/:beat/targets/:target", setMarketingBeatTarget)
 	g.DELETE("/beats/:beat/targets/:target", setMarketingBeatTarget)
@@ -316,6 +317,15 @@ func getMarketingPlacement(c *gin.Context) {
 	if !ok {
 		return
 	}
+	var target uint64
+	if supplied := c.Query("target_id"); supplied != "" {
+		var err error
+		target, err = strconv.ParseUint(supplied, 10, 32)
+		if err != nil || target == 0 {
+			marketingError(c, 400, "Invalid target ID.")
+			return
+		}
+	}
 	db := marketingDB(c)
 	if _, err := readMarketingBeat(db, beat); err != nil {
 		marketingDBError(c, err)
@@ -327,12 +337,55 @@ func getMarketingPlacement(c *gin.Context) {
 		return
 	}
 	for _, post := range posts {
-		if post.ID == id {
+		if post.ID == id && (target == 0 || post.TargetID != nil && uint64(*post.TargetID) == target) {
 			c.JSON(200, post)
 			return
 		}
 	}
 	marketingError(c, 404, "That placement was not found for this Beat.")
+}
+
+func editMarketingPlacementText(c *gin.Context) {
+	beat, ok := marketingID(c, "beat")
+	if !ok {
+		return
+	}
+	id, ok := marketingID(c, "placement")
+	if !ok {
+		return
+	}
+	var in struct {
+		TargetID uint    `json:"target_id"`
+		Version  uint    `json:"version"`
+		Title    *string `json:"title"`
+		Copy     *string `json:"copy"`
+	}
+	if !marketingJSON(c, &in) {
+		return
+	}
+	if in.TargetID == 0 || in.Version == 0 || in.Title == nil || in.Copy == nil ||
+		!marketingStrings(map[*string]int{in.Title: 255, in.Copy: 5000}) {
+		marketingError(c, 400, "Provide the target, current placement version, title and body.")
+		return
+	}
+	db := marketingDB(c)
+	scope := db.Where("id = ? AND project = ? AND beat_id = ? AND target_id = ?", id, marketingProject, beat, in.TargetID)
+	var post models.MarketingPlacement
+	if err := scope.First(&post).Error; err != nil {
+		marketingDBError(c, err)
+		return
+	}
+	update := scope.Session(&gorm.Session{}).Model(&models.MarketingPlacement{}).Where("version = ?", in.Version).
+		Updates(map[string]any{"title": *in.Title, "copy": *in.Copy, "version": in.Version + 1})
+	if update.Error != nil {
+		marketingDBError(c, update.Error)
+		return
+	}
+	if update.RowsAffected != 1 {
+		marketingError(c, 409, "This placement changed. Copy your edits and reload before saving.")
+		return
+	}
+	getMarketingPlacement(c)
 }
 
 func checkMarketingDraft(d *models.MarketingPlacementDraft) bool {
@@ -421,6 +474,10 @@ func saveMarketingPlacement(c *gin.Context) {
 	var prior models.MarketingPlacement
 	if err := scope.First(&prior).Error; err != nil {
 		marketingDBError(c, err)
+		return
+	}
+	if in.TargetID != nil && (prior.TargetID == nil || *in.TargetID != *prior.TargetID) {
+		marketingError(c, 404, "That placement was not found for this target.")
 		return
 	}
 	p.Version = in.Version + 1

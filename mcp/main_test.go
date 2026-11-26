@@ -68,7 +68,7 @@ func TestToolRoundTrip(t *testing.T) {
 	}
 	defer cs.Close()
 	listed, err := cs.ListTools(ctx, nil)
-	if err != nil || len(listed.Tools) != 46 {
+	if err != nil || len(listed.Tools) != 47 {
 		t.Fatalf("tools %v %v", listed, err)
 	}
 	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "resolve_feedback", Arguments: map[string]any{"id": 7}})
