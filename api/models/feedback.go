@@ -1,40 +1,52 @@
 package models
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
+const (
+	FeedbackResolved = "resolved"
+	FeedbackIgnored  = "ignored"
+)
+
+var ErrFeedbackDisposition = errors.New("invalid feedback disposition")
+
 type Feedback struct {
 	gorm.Model
-	ParentFeedbackID *uint      `gorm:"index" json:"-"`
-	ThreadActivityAt *time.Time `json:",omitempty"`
-	Replies          []Feedback `gorm:"-" json:",omitempty"`
-	TriageState      string     `gorm:"type:varchar(16)"`
-	TriageNote       string     `gorm:"type:text"`
-	TriageAt         *time.Time
-	SourceKey        *string `gorm:"type:char(64);uniqueIndex" json:"-"`
-	Source           string  `gorm:"type:varchar(32)"`
-	SourceID         string  `gorm:"type:varchar(255)"`
-	SourceURL        string  `gorm:"type:varchar(1024)"`
-	IngestedAt       *time.Time
-	PID              string `gorm:"type:tinytext"`
-	Project          string `gorm:"type:tinytext"`
-	Message          string `gorm:"type:text"`
-	Markdown         string `gorm:"type:mediumtext" json:",omitempty"`
-	Translated       string `gorm:"type:text"`
-	Rating           uint8
-	Env              string `gorm:"type:tinytext"`
-	Category         string `gorm:"type:tinytext"`
-	Platform         string `gorm:"type:tinytext"`
-	Build            string `gorm:"type:tinytext"`
-	Commit           string `gorm:"type:tinytext"`
-	Resolved         bool   `gorm:"type:boolean;default:false"`
-	SavegameID       uint   `gorm:"-"`
-	DisplayAuthor    string `gorm:"-" json:",omitempty"`
-	SavegameFilename string `gorm:"-"`
+	ParentFeedbackID         *uint      `gorm:"index" json:"-"`
+	ThreadActivityAt         *time.Time `json:",omitempty"`
+	Replies                  []Feedback `gorm:"-" json:",omitempty"`
+	TriageState              string     `gorm:"type:varchar(16)"`
+	TriageNote               string     `gorm:"type:text"`
+	TriageAt                 *time.Time
+	SourceKey                *string `gorm:"type:char(64);uniqueIndex" json:"-"`
+	Source                   string  `gorm:"type:varchar(32)"`
+	SourceID                 string  `gorm:"type:varchar(255)"`
+	SourceURL                string  `gorm:"type:varchar(1024)"`
+	IngestedAt               *time.Time
+	PID                      string `gorm:"type:tinytext"`
+	Project                  string `gorm:"type:tinytext"`
+	Message                  string `gorm:"type:text"`
+	Markdown                 string `gorm:"type:mediumtext" json:",omitempty"`
+	Translated               string `gorm:"type:text"`
+	Rating                   uint8
+	Env                      string     `gorm:"type:tinytext"`
+	Category                 string     `gorm:"type:tinytext"`
+	Platform                 string     `gorm:"type:tinytext"`
+	Build                    string     `gorm:"type:tinytext"`
+	Commit                   string     `gorm:"type:tinytext"`
+	Resolved                 bool       `gorm:"type:boolean;default:false"`
+	ClosureDisposition       string     `gorm:"type:varchar(16)" json:",omitempty"`
+	CompletionReactionDue    *time.Time `gorm:"index" json:"-"`
+	CompletionReactionSentAt *time.Time `json:"-"`
+	SavegameID               uint       `gorm:"-"`
+	DisplayAuthor            string     `gorm:"-" json:",omitempty"`
+	SavegameFilename         string     `gorm:"-"`
 }
 
 func UpdateFeedbackTranslation(id string, translated string) (*Feedback, error) {
@@ -77,6 +89,8 @@ func AddFeedback(fb Feedback) (*Feedback, error) {
 	fb.TriageState = ""
 	fb.TriageNote = ""
 	fb.TriageAt = nil
+	fb.ClosureDisposition = ""
+	fb.CompletionReactionDue, fb.CompletionReactionSentAt = nil, nil
 	fb.SourceKey = nil
 	fb.Source = ""
 	fb.SourceID = ""
@@ -124,7 +138,20 @@ func SelectFeedback(id string) (*Feedback, error) {
 	return &feedback, nil
 }
 
+// ResolveFeedback preserves the legacy non-notifying path used after ticket creation.
 func ResolveFeedback(id string) (*Feedback, error) {
+	return closeFeedback(id, FeedbackResolved, false)
+}
+
+// CloseFeedback is the explicit player-feedback action in the Admin portal.
+func CloseFeedback(id, disposition string) (*Feedback, error) {
+	return closeFeedback(id, disposition, true)
+}
+
+func closeFeedback(id, disposition string, notifyDiscord bool) (*Feedback, error) {
+	if disposition != FeedbackResolved && disposition != FeedbackIgnored {
+		return nil, ErrFeedbackDisposition
+	}
 	var existingFeedback Feedback
 	err := AnalyticsDB.Transaction(func(tx *gorm.DB) error {
 		result := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&existingFeedback)
@@ -135,8 +162,20 @@ func ResolveFeedback(id string) (*Feedback, error) {
 			return result.Error
 		}
 
+		if existingFeedback.Resolved {
+			return nil
+		}
 		existingFeedback.Resolved = true
-		if err := tx.Model(&existingFeedback).Update("resolved", true).Error; err != nil {
+		existingFeedback.ClosureDisposition = disposition
+		updates := map[string]interface{}{"resolved": true, "closure_disposition": disposition}
+		if notifyDiscord && disposition == FeedbackResolved {
+			if _, ok := existingFeedback.DiscordCompletionTarget(); ok {
+				now := time.Now().UTC()
+				existingFeedback.CompletionReactionDue = &now
+				updates["completion_reaction_due"] = now
+			}
+		}
+		if err := tx.Model(&existingFeedback).Updates(updates).Error; err != nil {
 			return err
 		}
 
@@ -182,4 +221,26 @@ func attachSavegameMetadata(feedback []Feedback) error {
 	}
 
 	return nil
+}
+
+// DiscordCompletionTarget uses trusted source provenance, never the message text
+// or a user-supplied URL. All Discord ingestion paths create this tuple.
+func (f Feedback) DiscordCompletionTarget() ([3]string, bool) {
+	var target [3]string
+	parts := strings.Split(f.SourceID, ":")
+	if f.Source != "discord" || len(parts) != len(target) {
+		return target, false
+	}
+	for i, id := range parts {
+		if len(id) == 0 || len(id) > 22 {
+			return target, false
+		}
+		for _, c := range id {
+			if c < '0' || c > '9' {
+				return target, false
+			}
+		}
+		target[i] = id
+	}
+	return target, true
 }

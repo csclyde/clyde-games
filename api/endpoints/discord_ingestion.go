@@ -201,6 +201,8 @@ func discordIntake(s discordSnapshot, manual ...bool) (*models.Feedback, error) 
 	fb := s.Payload
 	fb.ID = 0
 	fb.Resolved = false
+	fb.ClosureDisposition = ""
+	fb.CompletionReactionDue, fb.CompletionReactionSentAt = nil, nil
 	fb.DeletedAt = gorm.DeletedAt{}
 	fb.Translated = ""
 	fb.SourceKey = nil

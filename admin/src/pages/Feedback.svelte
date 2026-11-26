@@ -42,6 +42,7 @@
 	let feedbackError = '';
 	let helperStatus = {};
 	let resolvingFeedback = {};
+	let closeErrors = {};
 	let translatingFeedback = {};
 	let showingOriginalFeedback = {};
 	let syncingSources = false;
@@ -118,18 +119,25 @@
 		}
 	}
 
-	async function resolveFeedback(id) {
-		resolvingFeedback = { ...resolvingFeedback, [id]: true };
+	async function closeFeedback(id, disposition = '') {
+		if (!$canWrite || resolvingFeedback[id]) return;
+		resolvingFeedback = { ...resolvingFeedback, [id]: disposition || 'ticket' };
+		closeErrors = { ...closeErrors, [id]: '' };
 
 		try {
-			const res = await fetch(`/api/resolvefeedback?id=` + id, {
-				method: 'POST'
+			const url = disposition ? '/api/feedback/close?id=' : '/api/resolvefeedback?id=';
+			const res = await fetch(url + encodeURIComponent(id), {
+				method: 'POST',
+				...(disposition ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ disposition }) } : {})
 			});
-
-			if (res.ok) {
-				feedback = feedback.filter(comment => comment.ID !== id);
-				await refreshFeedback();
+			if (!res.ok) {
+				const result = await res.json().catch(() => ({}));
+				throw new Error(result.error || 'Feedback could not be closed.');
 			}
+			feedback = feedback.filter(comment => comment.ID !== id);
+			await refreshFeedback();
+		} catch (error) {
+			closeErrors = { ...closeErrors, [id]: error.message };
 		} finally {
 			const nextResolvingFeedback = { ...resolvingFeedback };
 			delete nextResolvingFeedback[id];
@@ -176,7 +184,7 @@
 
 		helperStatus = { ...helperStatus, [comment.ID]: { status: 'Planka ticket created', error: '' } };
 		ticketComment = null;
-		await resolveFeedback(comment.ID);
+		await closeFeedback(comment.ID);
 	}
 
 	function downloadSavegame(comment) {
@@ -557,10 +565,14 @@
 							<button type="button" disabled={!comment.SavegameID || resolvingFeedback[comment.ID]} on:click={() => downloadSavegame(comment)}>
 								Download Save
 							</button>
-							<button type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => resolveFeedback(comment.ID)}>
-								{resolvingFeedback[comment.ID] ? 'Resolving...' : 'Resolve'}
+							<button class="resolve-action" type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => closeFeedback(comment.ID, 'resolved')}>
+								{resolvingFeedback[comment.ID] === 'resolved' ? 'Resolving...' : 'Resolve'}
+							</button>
+							<button class="ignore-action" type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => closeFeedback(comment.ID, 'ignored')}>
+								{resolvingFeedback[comment.ID] === 'ignored' ? 'Ignoring...' : 'Ignore'}
 							</button>
 						</div>
+						{#if closeErrors[comment.ID]}<p class="state-message error" role="alert">{closeErrors[comment.ID]}</p>{/if}
 					</div>
 				</div>
 				{#if comment.Replies && comment.Replies.length}
@@ -925,5 +937,20 @@
 			grid-template-columns: 1fr;
 		}
 	}
+
+	.actions button.resolve-action {
+		color: white;
+		background: #23633e;
+		border-color: #23633e;
+	}
+
+	.actions button.ignore-action {
+		color: white;
+		background: #a03538;
+		border-color: #a03538;
+	}
+
+	.actions button.resolve-action:not(:disabled):hover { background: #194a2e; }
+	.actions button.ignore-action:not(:disabled):hover { background: #7f252a; }
 
 </style>

@@ -24,3 +24,27 @@ test("disabled/unconfigured manual channels cannot be guessed into a project",as
 test("bridge fails closed without credential",()=>{assert.equal(startFeedbackBridge({}, {}, {}, {error(){}}),null)});
 
 test("selected marker checks force a fresh REST message rather than cached reactions",async()=>{const m=message(baseline+1000);bug(m);let checked=false;const channel={id:text.id,guildId:guild,type:0,permissionsFor:()=>({has:()=>true}),messages:{fetch:async options=>{assert.equal(options.message,m.id);assert.equal(options.force,true);assert.equal(options.cache,false);checked=true;return m}}};const api={syncSources:async()=>catalog([text]),intakeStatus:async()=>({scope_id:text.id,project:text.projectId,guild_id:guild,channel_id:text.id,durable:false})};assert.equal((await preflightSelected(client(channel),api,m.id)).handled,true);assert(checked)});
+
+test("completion only reacts on the canonical message with the distinct tool emoji", async () => {
+ const {markFeedbackCompleted, COMPLETION_EMOJI}=require("../src/feedbackBridge");
+ const {t,root}=thread(baseline+1000,[message(baseline+2000,5)]);
+ const reactions=[];
+ t.messages.fetch=async options=>{assert.deepEqual(options,{message:root.id,force:true,cache:false});return root};
+ root.react=async emoji=>{reactions.push(emoji);root.reactions.cache.set("completed",{me:true,emoji:{name:"\u{1F6E0}"}})};
+ assert.notEqual(COMPLETION_EMOJI,SUCCESS_EMOJI);
+ assert.deepEqual(await markFeedbackCompleted(client(t),guild,t.id,root.id),{applied:true});
+ assert.deepEqual(await markFeedbackCompleted(client(t),guild,t.id,root.id),{applied:true});
+ assert.deepEqual(reactions,["\u{1F6E0}\uFE0F"]);
+});
+
+test("completion leaves archived and mismatched targets untouched", async () => {
+ const {markFeedbackCompleted}=require("../src/feedbackBridge");
+ const {t,root}=thread(baseline+1000);
+ root.react=async()=>assert.fail("unexpected reaction");
+ t.archived=true;
+ await assert.rejects(markFeedbackCompleted(client(t),guild,t.id,root.id),/unavailable/);
+ t.archived=false;
+ await assert.rejects(markFeedbackCompleted(client(t),"1",t.id,root.id),/channel identity/);
+ t.messages.fetch=async()=>({...root,id:"7"});
+ await assert.rejects(markFeedbackCompleted(client(t),guild,t.id,root.id),/message identity/);
+});

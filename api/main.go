@@ -101,6 +101,7 @@ func main() {
 
 	endpoints.StartSteamReviewImporter()
 	endpoints.StartDiscordFeedbackImporter()
+	endpoints.StartDiscordCompletionWorker()
 
 	router.Run(":9990")
 }
@@ -116,6 +117,7 @@ func registerRoutes(router *gin.Engine) {
 	router.POST("/feedback", endpoints.AddFeedback)
 	router.PUT("/feedback/translation", endpoints.AdminAuth, endpoints.UpdateFeedbackTranslation)
 	router.POST("/resolvefeedback", endpoints.AdminAuth, endpoints.ResolveFeedback)
+	router.POST("/feedback/close", endpoints.AdminAuth, endpoints.CloseFeedback)
 	router.GET("/planka/hierarchy", endpoints.AdminAuth, endpoints.GetPlankaHierarchy)
 	router.POST("/planka/tickets", endpoints.AdminAuth, endpoints.CreatePlankaTicket)
 	router.POST("/steamreviews/import", endpoints.AdminAuth, endpoints.ImportSteamReviewsNow)

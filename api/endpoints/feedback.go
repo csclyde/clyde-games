@@ -95,3 +95,27 @@ func ResolveFeedback(c *gin.Context) {
 	}
 	c.IndentedJSON(http.StatusOK, feedback)
 }
+
+type feedbackCloseRequest struct {
+	Disposition string `json:"disposition"`
+}
+
+func CloseFeedback(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1024)
+	var request feedbackCloseRequest
+	if c.ShouldBindJSON(&request) != nil ||
+		(request.Disposition != models.FeedbackResolved && request.Disposition != models.FeedbackIgnored) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Choose resolved or ignored"})
+		return
+	}
+	feedback, err := models.CloseFeedback(c.Query("id"), request.Disposition)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Feedback could not be closed"})
+		return
+	}
+	if feedback == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Feedback not found"})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, feedback)
+}
