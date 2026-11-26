@@ -84,7 +84,7 @@ func TestMarketingHTTPAndSteamworks(t *testing.T) {
 	}
 	beat := list.Beats[0]
 	path := fmt.Sprintf("%s/beats/%d", base, beat.ID)
-	call("POST", path+"/generate", map[string]any{"version": beat.Version}, true, 503, nil)
+
 	beat.Brief = "Updated hook"
 	beat.CallToAction = "purchase"
 	call("PUT", path, beat, true, 200, &beat)
@@ -100,51 +100,114 @@ func TestMarketingHTTPAndSteamworks(t *testing.T) {
 	}
 
 	t.Setenv("CURSEMARK_OPENAI_API_KEY", "mock-secret")
+	t.Setenv("CURSEMARK_OPENAI_MODEL", "gpt-6.2-sol")
 	oldClient := marketingAIClient
 	t.Cleanup(func() { marketingAIClient = oldClient })
+	const rules = "https://www.reddit.com/r/roguelites/about/rules/"
+	const example = "https://www.reddit.com/r/roguelites/comments/abcdef/promo/"
+	researchCalls, postCalls := 0, 0
 	marketingAIClient = &http.Client{Transport: marketingTransport(func(r *http.Request) (*http.Response, error) {
 		if r.URL.String() != "https://api.openai.com/v1/responses" || r.Header.Get("Authorization") != "Bearer mock-secret" {
 			t.Fatal("Unexpected OpenAI request")
 		}
 		raw, _ := io.ReadAll(r.Body)
 		var request struct {
-			Input string `json:"input"`
+			Input string
+			Model string
+			Tools []any
+			Text  struct{ Format struct{ Name string } }
 		}
-		var input map[string]string
-		if json.Unmarshal(raw, &request) != nil || json.Unmarshal([]byte(request.Input), &input) != nil ||
-			len(input) != 3 || input["brief"] != "Updated hook" || input["name"] != beat.Name || input["call_to_action"] != "purchase" ||
-			!bytes.Contains(raw, []byte("untrusted evidence")) || !bytes.Contains(raw, []byte(`"store":false`)) {
-			t.Fatalf("Unexpected research context: %s", raw)
+		if json.Unmarshal(raw, &request) != nil || request.Model != "gpt-6.2-sol" ||
+			!bytes.Contains(raw, []byte("untrusted evidence")) {
+			t.Fatalf("Unexpected request: %s", raw)
 		}
-		primary := "https://example.org/community/rules"
-		first := marketingOpportunity{Platform: "Forum", Community: "Roguelites", AudienceFit: "Video fits", Timing: "Friday 18:00 UTC",
-			Title: "A rune build", Copy: "Clip {steam_link}", AssetNotes: "Native video", RulesURL: primary, RuleEvidence: "Disclosure is required", Clear: true}
-		second := first
-		second.Community, second.RulesURL = "Other forum", "https://example.net/invented-rules"
-		answer, _ := json.Marshal(map[string]any{"opportunities": []marketingOpportunity{first, second}})
-		response, _ := json.Marshal(map[string]any{"status": "completed", "output": []any{
-			map[string]any{"type": "web_search_call", "status": "completed", "action": map[string]any{"sources": []any{map[string]string{"url": primary}}}},
-			map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": string(answer)}}},
-		}})
+		var items []any
+		var answer any
+		switch request.Text.Format.Name {
+		case "cursemark_target_research":
+			researchCalls++
+			if len(request.Tools) != 1 || !strings.Contains(request.Input, "reddit.com/r/roguelites/") ||
+				strings.Contains(request.Input, "Updated hook") {
+				t.Fatalf("Target research did not isolate the public destination: %s", raw)
+			}
+			answer = marketingResearch{
+				Rules:   marketingRules{Links: "May include Steam link", SelfPromotion: "Allowed if affiliated", AI: "Disclose AI", Flair: "Promotion", Cadence: "Monthly"},
+				Sources: []string{rules, "https://www.reddit.com/r/others/about/rules/"},
+				Examples: []marketingExample{
+					{Title: "Recent example", URL: example, Date: time.Now().UTC().AddDate(0, -2, 0).Format(marketingDay)},
+					{Title: "Old example", URL: example + "/old", Date: "2020-01-01"},
+				},
+				Takeaway: "Lead with gameplay",
+			}
+			items = append(items, map[string]any{"type": "web_search_call", "status": "completed", "action": map[string]any{"sources": []any{
+				map[string]string{"url": rules}, map[string]string{"url": example}, map[string]string{"url": example + "/old"},
+				map[string]string{"url": "https://www.reddit.com/r/others/about/rules/"},
+			}}})
+		case "cursemark_target_post":
+			postCalls++
+			var input struct {
+				Beat     marketingBeatDraft
+				Research *marketingResearch `json:"saved_research"`
+			}
+			if len(request.Tools) != 0 || json.Unmarshal([]byte(request.Input), &input) != nil || input.Beat.Brief != "Updated hook" ||
+				input.Beat.CallToAction != "purchase" || input.Research == nil || len(input.Research.Examples) != 1 ||
+				strings.Contains(request.Input, "private-token") {
+				t.Fatalf("Drafting did not use only the Beat and saved research: %s", raw)
+			}
+			answer = map[string]string{"title": "A rune build", "copy": "Clip {steam_link}", "timing": "Friday 18:00 UTC", "asset_notes": "Native video"}
+		default:
+			t.Fatal("Unknown OpenAI operation")
+		}
+		payload, _ := json.Marshal(answer)
+		items = append(items, map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": string(payload)}}})
+		response, _ := json.Marshal(map[string]any{"status": "completed", "output": items})
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(response)), Header: make(http.Header)}, nil
 	})}
-	call("POST", path+"/generate", map[string]any{"version": beat.Version}, true, 201, nil)
+	const targetsPath = base + "/targets"
+	var target, other marketingTargetView
+	call("POST", targetsPath, map[string]string{"name": "Roguelites", "url": "https://old.reddit.com/r/RogueLites/?utm_source=test"}, true, 201, &target)
+	call("POST", targetsPath, map[string]string{"name": "Second target", "url": "https://x.com/"}, true, 201, &other)
+	call("POST", targetsPath, map[string]string{"name": "Duplicate", "url": "https://www.reddit.com/r/roguelites"}, true, 409, nil)
+	call("GET", "/marketing/necrovale/targets", nil, true, 404, nil)
+	targetPath := fmt.Sprintf("%s/%d", targetsPath, target.ID)
+	linkPath := fmt.Sprintf("%s/targets/%d", path, target.ID)
+	otherPath := fmt.Sprintf("%s/targets/%d", path, other.ID)
+	version := map[string]any{"version": beat.Version}
+	call("POST", linkPath+"/generate", version, true, 409, nil)
+	call("PUT", linkPath, nil, true, 204, nil)
+	call("PUT", linkPath, nil, true, 204, nil)
+	call("PUT", otherPath, nil, true, 204, nil)
+	call("POST", linkPath+"/generate", version, true, 409, nil)
+	if researchCalls != 0 || postCalls != 0 || target.Research != nil {
+		t.Fatal("Saving, attaching or reading triggered paid research")
+	}
+	call("POST", targetPath+"/research", map[string]any{"version": target.Version}, true, 200, &target)
+	if researchCalls != 1 || target.Research == nil || target.Research.Hold || len(target.Research.Sources) != 1 || len(target.Research.Examples) != 1 ||
+		target.Research.Examples[0].Engagement != "" || target.CheckedAt == nil {
+		t.Fatalf("Unexpected stored research: %+v", target.Research)
+	}
+	call("PUT", targetPath, map[string]any{"name": "Roguelites edited", "url": target.URL, "version": target.Version}, true, 200, &target)
+	if researchCalls != 1 || target.Research == nil {
+		t.Fatal("Editing a name lost or refreshed research")
+	}
+	var generated marketingPost
+	call("POST", linkPath+"/generate", version, true, 201, &generated)
 	var detail struct {
 		Beat       marketingBeatView `json:"beat"`
 		Placements []marketingPost   `json:"placements"`
 		Result     marketingSummary  `json:"result"`
+		TargetIDs  []uint            `json:"target_ids"`
 	}
 	call("GET", path, nil, true, 200, &detail)
-	if len(detail.Placements) != 2 || detail.Placements[0].Decision != "candidate" ||
-		!detail.Placements[0].SourceCited || detail.Placements[0].Rank != 1 ||
-		detail.Placements[1].Decision != "hold" || detail.Placements[1].RulesURL != "" {
-		t.Fatalf("Missing ranked drafts with source gating: %+v", detail.Placements)
+	if researchCalls != 1 || postCalls != 1 || len(detail.TargetIDs) != 2 || len(detail.Placements) != 1 || generated.TargetID == nil ||
+		*generated.TargetID != target.ID || !generated.SourceCited || generated.Decision != "candidate" {
+		t.Fatalf("Draft was not linked to the target: %+v", generated)
 	}
-	post, held := detail.Placements[0], detail.Placements[1]
+	post := detail.Placements[0]
 	link, _ := url.Parse(post.SteamURL)
 	content := link.Query().Get("utm_content")
-	if !regexp.MustCompile("^[0-9a-f]{32}$").MatchString(content) || post.SteamURL == held.SteamURL {
-		t.Fatal("Placements must have unique Steam links")
+	if !regexp.MustCompile("^[0-9a-f]{32}$").MatchString(content) {
+		t.Fatal("Missing placement tracking ID")
 	}
 	at := time.Date(2025, 1, 1, 11, 0, 0, 0, time.UTC)
 	post.PublishedAt, post.PublishedURL = &at, "https://example.org/post/123"
@@ -195,6 +258,14 @@ func TestMarketingHTTPAndSteamworks(t *testing.T) {
 	call("GET", path, nil, true, 200, &detail)
 	if result = detail.Result; result.Observed != 1 || result.Expected != 2 || result.Wishlists == nil || *result.Wishlists != 3 {
 		t.Fatalf("Suppressed row should be missing: %+v", result)
+	}
+
+	call("DELETE", linkPath, nil, true, 204, nil)
+	call("POST", linkPath+"/generate", version, true, 409, nil)
+	call("GET", path, nil, true, 200, &detail)
+	if len(detail.TargetIDs) != 1 || len(detail.Placements) != 1 || detail.Placements[0].SteamURL != link.String() ||
+		detail.Placements[0].PublishedAt == nil || detail.Result.Wishlists == nil || *detail.Result.Wishlists != 3 {
+		t.Fatal("Unlinking a target removed a published post or its metrics")
 	}
 
 	var wg sync.WaitGroup

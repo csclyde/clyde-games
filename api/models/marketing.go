@@ -45,6 +45,7 @@ type MarketingPlacementDraft struct {
 type MarketingPlacement struct {
 	ID            uint       `json:"id" gorm:"primaryKey"`
 	BeatID        uint       `json:"beat_id" gorm:"index;not null"`
+	TargetID      *uint      `json:"target_id"`
 	Project       string     `json:"-" gorm:"type:varchar(64);index;not null"`
 	Version       uint       `json:"version" gorm:"not null"`
 	Rank          uint       `json:"rank" gorm:"not null"`
@@ -89,6 +90,24 @@ type MarketingResult struct {
 	MarketingCounts
 }
 
+type MarketingTarget struct {
+	ID          uint   `gorm:"primaryKey"`
+	Project     string `gorm:"type:varchar(64);uniqueIndex:marketing_target_identity;not null"`
+	URLKey      string `gorm:"type:char(64);uniqueIndex:marketing_target_identity;not null"`
+	Name        string `gorm:"type:varchar(160);not null"`
+	URL         string `gorm:"type:varchar(1000);not null"`
+	Version     uint   `gorm:"not null"`
+	ResearchURL string `gorm:"type:varchar(1000);not null"`
+	Research    string `gorm:"type:mediumtext;not null"`
+	CheckedAt   *time.Time
+}
+
+type MarketingBeatTarget struct {
+	BeatID   uint `gorm:"primaryKey;autoIncrement:false"`
+	TargetID uint `gorm:"primaryKey;autoIncrement:false;index"`
+}
+
 func MigrateMarketing(db *gorm.DB) error {
-	return db.AutoMigrate(&MarketingBeat{}, &MarketingPlacement{}, &MarketingReport{}, &MarketingImport{}, &MarketingResult{})
+	return db.AutoMigrate(&MarketingBeat{}, &MarketingPlacement{}, &MarketingReport{}, &MarketingImport{},
+		&MarketingResult{}, &MarketingTarget{}, &MarketingBeatTarget{})
 }

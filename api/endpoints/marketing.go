@@ -37,9 +37,15 @@ func RegisterMarketingRoutes(router *gin.Engine) {
 	g.POST("/beats", saveMarketingBeat)
 	g.GET("/beats/:beat", getMarketingBeat)
 	g.PUT("/beats/:beat", saveMarketingBeat)
-	g.POST("/beats/:beat/generate", generateMarketing)
 	g.POST("/beats/:beat/placements", saveMarketingPlacement)
 	g.PUT("/beats/:beat/placements/:placement", saveMarketingPlacement)
+	g.PUT("/beats/:beat/targets/:target", setMarketingBeatTarget)
+	g.DELETE("/beats/:beat/targets/:target", setMarketingBeatTarget)
+	g.POST("/beats/:beat/targets/:target/generate", generateMarketingPost)
+	g.GET("/targets", listMarketingTargets)
+	g.POST("/targets", saveMarketingTarget)
+	g.PUT("/targets/:target", saveMarketingTarget)
+	g.POST("/targets/:target/research", updateMarketingResearch)
 	g.GET("/reports", listMarketingReports)
 	g.POST("/reports", importMarketingReport)
 }
@@ -241,7 +247,12 @@ func getMarketingBeat(c *gin.Context) {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"beat": marketingBeatDetails(b), "placements": posts, "result": result})
+	ids := []uint{}
+	if err := db.Model(&models.MarketingBeatTarget{}).Where("beat_id = ?", id).Order("target_id").Pluck("target_id", &ids).Error; err != nil {
+		marketingDBError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"beat": marketingBeatDetails(b), "placements": posts, "result": result, "target_ids": ids})
 }
 
 func checkMarketingDraft(d *models.MarketingPlacementDraft) bool {

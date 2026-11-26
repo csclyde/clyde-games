@@ -4,19 +4,24 @@
  import MarketingBeatDialog from '../components/MarketingBeatDialog.svelte';
  import MarketingPlacement from '../components/MarketingPlacement.svelte';
  import MarketingResults from '../components/MarketingResults.svelte';
+ import MarketingTargets from '../components/MarketingTargets.svelte';
 
  const base='/marketing/cursemark';
- const tabs=[{id:'beats',label:'Beats'},{id:'imports',label:'Steamworks Imports'}];
+ const tabs=[{id:'beats',label:'Beats'},{id:'targets',label:'Targets'},{id:'imports',label:'Steamworks Imports'}];
  const ctaLabels={wishlist:'Wishlist',purchase:'Purchase'};
  const today=new Date().toISOString().slice(0,10);
  const tabButtons=[];
  let section='beats',beats=[],reports=[],posts=[],result=null;
  let selected=0,requestID=0,aiEnabled=false,loading=true,detailLoading=false,generating=false;
+ let targets=[],linked=[],targetsLoading=true,targetsError='',updatingTarget=false;
  let error='',notice='',editor=null,saving=false,editorError='',detailHeading;
  let start='',end='',confirmed=false,file,importing=false,importMessage='',importError='',reportsLoaded=false,reportsLoading=false;
  $: beat=beats.find(item=>item.id===selected);
+ $: attached=targets.filter(target=>linked.includes(target.id));
+ $: available=targets.filter(target=>!linked.includes(target.id));
 
  onMount(async()=>{
+  loadTargets();
   try{
    const plan=await portalRequest(base+'/beats','GET');
    beats=plan.beats;aiEnabled=plan.ai_enabled;
@@ -24,6 +29,18 @@
   }catch(e){error=e.message;}
   finally{loading=false;}
  });
+
+ async function loadTargets(){
+  targetsLoading=true;targetsError='';
+  try{targets=(await portalRequest(base+'/targets','GET')).targets;}
+  catch(e){targetsError=e.message;}
+  finally{targetsLoading=false;}
+ }
+
+ function savedTarget(event){
+  const saved=event.detail;
+  targets=[...targets.filter(target=>target.id!==saved.id),saved].sort((a,b)=>a.name.localeCompare(b.name));
+ }
 
  function selectTab(id){
   section=id;
@@ -46,7 +63,7 @@
 
  async function choose(id){
   const ticket=++requestID;
-  selected=id;posts=[];result=null;notice='';error='';detailLoading=true;
+  selected=id;posts=[];result=null;linked=[];notice='';error='';detailLoading=true;
   await refreshBeat(id,ticket);
   if(ticket===requestID)detailLoading=false;
  }
@@ -56,7 +73,7 @@
    const detail=await portalRequest(base+'/beats/'+id,'GET');
    if(ticket!==requestID)return;
    beats=beats.map(item=>item.id===id?detail.beat:item);
-   posts=detail.placements;result=detail.result;
+   posts=detail.placements;result=detail.result;linked=detail.target_ids??[];
   }catch(e){if(ticket===requestID)error=e.message;}
  }
 
@@ -84,14 +101,26 @@
   finally{saving=false;}
  }
 
- async function generate(){
+ async function setTarget(target, link){
   const ticket=requestID,id=selected;
-  generating=true;notice='';error='';
+  updatingTarget=true;error='';
   try{
-   const data=await portalRequest(base+'/beats/'+id+'/generate','POST',{version:beat.version});
+   await portalRequest(base+'/beats/'+id+'/targets/'+target.id,link?'PUT':'DELETE');
+   if(ticket===requestID){
+    linked=link?[...linked,target.id]:linked.filter(value=>value!==target.id);
+   }
+  }catch(e){if(ticket===requestID)error=e.message;}
+  finally{updatingTarget=false;}
+ }
+
+ async function generate(target){
+  const ticket=requestID,id=selected;
+  generating=target.id;notice='';error='';
+  try{
+   await portalRequest(base+'/beats/'+id+'/targets/'+target.id+'/generate','POST',{version:beat.version});
    if(ticket!==requestID)return;
    await refreshBeat(id,ticket);
-   notice=data.placements.length?('Saved '+data.placements.length+' suggested placements. Review each one before posting.'):'No useful opportunities were found.';
+   notice='Draft saved for '+target.name+'.';
   }catch(e){if(ticket===requestID)error=e.message;}
   finally{generating=false;}
  }
@@ -158,10 +187,27 @@
        </div>
        {#if beat.brief}<p class="brief">{beat.brief}</p>{/if}
        <p class="cta"><strong>Call to Action</strong> {ctaLabels[beat.call_to_action]||'Choose Wishlist or Purchase'}</p>
-       <button type="button" disabled={!aiEnabled||generating||!beat.call_to_action||!beat.brief.trim()} on:click={generate}>{generating?'Researching…':'Research and draft posts'}</button>
        {#if !aiEnabled}<p>OpenAI research and drafting require a server-side key.</p>
        {:else if !beat.call_to_action||!beat.brief.trim()}<p>Complete the brief and call to action to draft posts.</p>{/if}
        {#if notice}<p role="status">{notice}</p>{/if}
+      </section>
+      <section class="card" aria-label="Beat targets">
+       <div class="beat-title"><h3>Targets</h3><button type="button" class="secondary" on:click={()=>selectTab('targets')}>Manage targets</button></div>
+       {#if targetsError}<p class="error" role="alert">{targetsError} <button type="button" class="secondary" on:click={loadTargets}>Retry</button></p>
+       {:else if !targetsLoading&&!targets.length}<p>Add destinations in Targets to draft posts for this Beat.</p>{/if}
+       <div class="pills" aria-label="Available targets">
+        {#each available as target (target.id)}
+         <button type="button" class="pill" aria-label={'Attach '+target.name} disabled={updatingTarget} on:click={()=>setTarget(target,true)}>+ {target.name}</button>
+        {/each}
+       </div>
+       {#each attached as target (target.id)}
+        {@const current=target.research&&target.research_url===target.url}
+        <div class="target-row">
+         <div class="attached-label"><span>{target.name}</span><button type="button" aria-label={'Remove '+target.name+' from Beat'} disabled={updatingTarget} on:click={()=>setTarget(target,false)}>×</button></div>
+         <small>{!current?'Research needed':target.research.hold?'Hold':'Research saved'}</small>
+         <button type="button" class="secondary" aria-label={'Generate Post for '+target.name} disabled={!aiEnabled||!!generating||!current||!beat.call_to_action||!beat.brief.trim()} on:click={()=>generate(target)}>{generating===target.id?'Drafting…':'Generate Post'}</button>
+        </div>
+       {/each}
       </section>
       <section class="card" aria-label="Beat results">
        <h3>Beat results</h3>
@@ -177,6 +223,12 @@
     </div>
    </div>
   {/if}
+ </div>
+
+ <div role="tabpanel" id="marketing-panel-targets" aria-labelledby="marketing-tab-targets" hidden={section!=='targets'}>
+  {#if targetsError}<p class="error" role="alert">{targetsError} <button type="button" class="secondary" on:click={loadTargets}>Retry</button></p>{/if}
+  {#if !aiEnabled&&!loading}<p>OpenAI research requires a server-side key.</p>{/if}
+  <MarketingTargets {targets} {aiEnabled} pending={targetsLoading} on:saved={savedTarget}/>
  </div>
 
  <div role="tabpanel" id="marketing-panel-imports" aria-labelledby="marketing-tab-imports" hidden={section!=='imports'}>
@@ -215,11 +267,13 @@
  .subtabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
  .subtabs button{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 12px;color:var(--text);font-size:.8rem;font-weight:400}
  .subtabs button[aria-selected=true]{color:var(--surface);background:var(--forest);border-color:var(--forest)}
- .work{display:grid;grid-template-columns:minmax(150px,230px) minmax(0,1fr);gap:1rem;align-items:start}
+ .work{display:grid;grid-template-columns:minmax(280px,min(34%,365px)) minmax(0,1fr);gap:1rem;align-items:start}
  .card{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:1rem;margin:0 0 1rem;min-width:0}
+ .beat-list{position:sticky;top:.6rem}
  .beat-list>button{width:100%;margin-bottom:.55rem}
- .beat-choices{display:grid;gap:.35rem}
- .beat-choices button{width:100%;text-align:left;overflow-wrap:anywhere;color:var(--text);background:var(--surface);border-color:var(--line)}
+ .beat-choices{display:grid;gap:.25rem;max-height:max(16rem,calc(100vh - 15rem));overflow:auto;scrollbar-gutter:stable;padding:3px}
+ .beat-choices button{width:100%;min-height:38px;text-align:left;overflow-wrap:anywhere;color:var(--text);background:var(--surface);border-color:transparent;font-weight:500}
+ .beat-choices button:hover{background:var(--paper-warm)}
  .beat-choices button[aria-pressed=true]{background:var(--paper-warm);border-color:var(--forest)}
  .beat-title{display:flex;justify-content:space-between;align-items:center;gap:.65rem}
  .beat-title h2{margin:0;font-size:1.15rem}
@@ -227,6 +281,12 @@
  .brief{white-space:pre-wrap;overflow-wrap:anywhere}
  .cta{margin-bottom:.8rem}
  .cta strong{margin-right:.25rem}
+ .pills{display:flex;gap:.35rem;flex-wrap:wrap;margin:.55rem 0}
+ .pill,.attached-label{border-radius:999px;background:var(--paper-warm);border:1px solid var(--line);color:var(--forest)}
+ .target-row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.4rem 0}
+ .attached-label{display:inline-flex;align-items:center;overflow-wrap:anywhere;padding-left:.7rem}
+ .attached-label button{border:0;background:transparent;color:var(--forest);width:44px;flex:none;padding:0;font-size:1.2rem}
+ small{color:var(--text-muted)}
  .imports{max-width:760px}
  .imports h3{margin-top:1rem}
  .imports ul{padding-left:1.25rem}
@@ -242,6 +302,6 @@
  .confirm input{width:auto}
  .imports button{justify-self:start}
  .error{color:var(--rust)}
- @media(max-width:860px){.work{grid-template-columns:1fr;gap:.65rem}.beat-list{margin-bottom:0}.beat-list>button{width:auto}.beat-choices{display:flex;overflow:auto;padding:3px}.beat-choices button{width:auto;flex:none;max-width:210px}}
+ @media(max-width:860px){.work{grid-template-columns:1fr;gap:.65rem}.beat-list{position:static;margin-bottom:0}.beat-list>button{width:auto}.beat-choices{max-height:9rem}.beat-choices button{min-height:44px}}
  @media(max-width:520px){.fields{grid-template-columns:1fr}.marketing{padding:0 8px}.card{padding:.7rem}}
 </style>
