@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"net/http"
+
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -23,7 +23,7 @@ func TestMarketingCreatorImportAndPrivacy(t *testing.T) {
 	}
 	t.Setenv("PORTAL_AUTH_MODE", "legacy")
 	t.Setenv("ADMIN_API_TOKEN", strings.Repeat("a", 36))
-	t.Setenv("CURSEMARK_OPENAI_API_KEY", "test-key")
+
 	router := gin.New()
 	RegisterMarketingRoutes(router)
 	const path = "/marketing/cursemark/targets"
@@ -82,46 +82,40 @@ func TestMarketingCreatorImportAndPrivacy(t *testing.T) {
 		len(detail.Creator.ChannelURLs) != 1 || detail.Creator.ChannelURLs[0] != "https://www.youtube.com/@fixture" {
 		t.Fatal("Private detail or channel canonicalization was incorrect")
 	}
-	old := marketingAIClient
-	t.Cleanup(func() { marketingAIClient = old })
-	calls := 0
-	marketingAIClient = &http.Client{Transport: marketingTransport(func(req *http.Request) (*http.Response, error) {
-		calls++
-		var body struct{ Input string }
-		if json.NewDecoder(req.Body).Decode(&body) != nil {
-			t.Fatal("Bad provider request")
-		}
-		for _, secret := range []string{"mock-contact", "secret@", "Private display name", "Manually noted game", "correspondence"} {
-			if strings.Contains(body.Input, secret) {
-				t.Fatal("Private data reached the OpenAI request")
-			}
-		}
-		if !strings.Contains(body.Input, "https://www.youtube.com/@fixture") {
-			t.Fatal("Missing public channel")
-		}
-		official := "https://www.youtube.com/@fixture"
-		post := "https://www.youtube.com/watch?v=public"
-		answer, _ := json.Marshal(marketingResearch{Sources: []string{official},
-			Examples: []marketingExample{{Title: "Public coverage", URL: post, Date: time.Now().UTC().Format(marketingDay), WhatWorked: "private-leak@example.invalid"}},
-			Games:    []string{"Into the Necrovale", "fake-contact@example.invalid"}})
-		output, _ := json.Marshal(map[string]any{"status": "completed", "output": []any{
-			map[string]any{"type": "web_search_call", "status": "completed", "action": map[string]any{"sources": []any{map[string]string{"url": official}, map[string]string{"url": post}}}},
-			map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": string(answer)}}},
-		}})
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(output)), Header: make(http.Header)}, nil
-	})}
-	if calls != 0 {
-		t.Fatal("Import unexpectedly triggered paid research")
+	t.Setenv("MCP_UPSTREAM_TOKEN", strings.Repeat("m", 36))
+	RegisterMCPRoutes(router)
+	// The signed-in portal reads the private contact; the MCP role gets the
+	// record and evidence with the address removed.
+	coverage := `{"version":0,"coverage":{"status":"covered","checked_at":"2025-01-02","items":[{"title":"Cursemark gameplay","url":"https://www.youtube.com/watch?v=example","date":"2025-01-01","format":"video"}]},"reply":{"status":"no_reply_found","checked_at":"2025-01-02","note":"No verified reply found."}}`
+	raw = route("PUT", one+"/creator-evidence", strings.NewReader(coverage), "application/json", admin, 200)
+	if bytes.Contains(raw, []byte("mock-contact")) || !bytes.Contains(raw, []byte("Cursemark gameplay")) {
+		t.Fatal("Private evidence response undisclosed or invalid")
 	}
-	raw = route("POST", one+"/research", strings.NewReader(`{"version":1}`), "application/json", admin, 200)
-	if calls != 1 || json.Unmarshal(raw, &detail) != nil || !detail.ResearchReady || len(detail.Research.Examples) != 1 ||
-		len(detail.Research.Games) != 1 || bytes.Contains(raw, []byte("private-leak")) || bytes.Contains(raw, []byte("fake-contact")) {
-		t.Fatal("Creator research did not sanitize and persist the public evidence")
+	route("PUT", one+"/creator-evidence", strings.NewReader(coverage), "application/json", admin, 409)
+	route("PUT", one+"/creator-evidence", strings.NewReader(`{"version":1,"reply":{"status":"no_reply_found","checked_at":"2025-01-02","note":"private@example.invalid"}}`), "application/json", admin, 400)
+	official := "https://www.youtube.com/@fixture"
+	data, _ := json.Marshal(map[string]any{"version": 1, "research": marketingResearch{Sources: []string{official},
+		Examples: []marketingExample{{Title: "Public coverage", URL: "https://www.youtube.com/watch?v=public", Date: time.Now().UTC().Format(marketingDay), WhatWorked: "private-leak@example.invalid"}},
+		Games:    []string{"Into the Necrovale", "fake-contact@example.invalid"}}})
+	raw = route("PUT", one+"/research", bytes.NewReader(data), "application/json", admin, 200)
+	if json.Unmarshal(raw, &detail) != nil || !detail.ResearchReady || len(detail.Research.Examples) != 1 ||
+		len(detail.Research.Games) != 1 || detail.Evidence == nil || detail.Evidence.Version != 1 ||
+		bytes.Contains(raw, []byte("private-leak")) || bytes.Contains(raw, []byte("fake-contact")) {
+		t.Fatal("Manual research replaced separate evidence or leaked private fields")
+	}
+	mcpPath := "/internal/mcp" + one
+	req := httptest.NewRequest("GET", mcpPath, nil)
+	req.Header.Set("Authorization", "Bearer "+strings.Repeat("m", 36))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, req)
+	if response.Code != 200 || !strings.Contains(response.Body.String(), "creator_evidence") || strings.Contains(response.Body.String(), "mock-contact") {
+		t.Fatal("MCP creator detail improperly scoped")
 	}
 	var stored models.MarketingCreator
 	if db.First(&stored, target.ID).Error != nil || stored.Email != "mock-contact@example.invalid" {
 		t.Fatal("Research altered the private address")
 	}
+
 }
 
 func TestMarketingPrivateDraftPolicy(t *testing.T) {

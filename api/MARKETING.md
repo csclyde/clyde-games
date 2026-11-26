@@ -1,31 +1,29 @@
-# Cursemark marketing
+# Cursemark Marketing
 
-Open **Cursemark → Marketing → Targets** with an admin account. Add or edit public destinations. Use **Update Research** on a target to save dated official rules and recent, linked game promotion examples. Engagement is shown only when available. A **Hold** marks unclear or restricted posting. Updating the target URL retains the old research and requires a refresh before drafting for the new destination.
+Open **Cursemark → Marketing** with a portal administrator account. Create a Beat with its brief and CTA. Attach targets, then save or edit placements in the Beat. The Steam tracking link is stable. Record publication details only after publishing elsewhere. Archiving a Beat, target, or placement preserves its links, research, and attributed results.
 
-In **Beats**, create a Beat with a name, a brief that serves as the hook, and a Wishlist or Purchase call to action. Attach any catalog targets you want to use and choose **Generate Post** per target. Drafting uses the saved research, and research older than 90 days puts the draft on Hold. Removing a target from a Beat preserves its posts and results. Placements are editable and publication is manual. After publishing, record the live URL, date and details on the placement. The Steam link stays stable as the draft is edited. The editor can copy draft text with its `{steam_link}` placeholder filled in.
+Research and draft writing take place in Codex. The portal and Marketing MCP store structured reports and edited drafts. An OpenAI key and server-side generation are unnecessary. Research is editable under **Targets → Edit research** and describes the exact public destination or creator channels. Review the saved rules before publishing. Private drafting alone does not trigger a Hold or insert disclosure text.
 
-## Private creator contacts
+## Creator records
 
-Use **New Target → Creator contact** to save a creator's name, private email, and primary platform. You can add public channels and games covered now or later. The catalog list omits private addresses. The authenticated selected detail displays the address. Creator research uses only the public channel URLs and platform.
+Use **New Target → Creator contact** to save a creator's name, private email, and primary platform. The creator address is available in the authenticated portal detail. Broad lists and Marketing MCP responses omit addresses. **Cursemark coverage and outreach** records the checked date, verified public examples, and categorized reply facts as a separate report. Updating general target research preserves this report. Save summarized facts only. Keep mail text, addresses, and private mail links out of evidence notes and external research.
 
-Use **Import creators** to upload a private UTF-8 CSV with the exact headers `name,email,platform,channel_urls,games_covered`. Use `youtube`, `twitch` or `other` for the platform and separate multiple channels or games with `|`. Leave optional cells blank when unknown. The upload accepts 200 rows and 512 KB, skips existing addresses case-insensitively, and reports counts only. The authenticated endpoint is `POST /api/marketing/cursemark/targets/import-creators` with multipart field `csv`. Supply the file in the request body. Keep addresses and correspondence out of shared storage, URLs, commands, chat and logs.
-
-## OpenAI setup
-
-Provision a key belonging to the Cursemark marketing OpenAI project. Set `CURSEMARK_OPENAI_API_KEY` in a root-owned, mode-0600 environment file loaded by the existing Clyde Games API service, then restart that service. Use the existing service secret management workflow. Production sets `CURSEMARK_OPENAI_MODEL` to `gpt-6.2-sol`. The API default is `gpt-6.1-terra` when the setting is absent. The API sends the key directly to OpenAI. The browser receives only a configuration flag. The model receives the Beat name, brief, and call to action. Enter only Beat text that can be shared with the provider. Research calls are initiated by admins and may incur OpenAI charges.
-
-Target research uses the Responses API with `web_search`, a structured schema, and `store: false`. Only an explicit **Update Research** runs web search. Only an explicit **Generate Post** drafts for an attached target using the Beat and saved research. Sources must appear in the search evidence and belong to the relevant destination. The checked date records when the service ran the research. A Candidate still needs human review. See the official [web search guide](https://developers.openai.com/api/docs/guides/tools-web-search) and [structured outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
-
-The editor rewrites and finalizes public posts. Private drafting alone does not cause a Hold or add a disclosure line. Review the sourced policy before publishing, especially when a rule covers AI-assisted submissions or applies to the final public content. The portal preserves self-promotion, routing, links, flair, cadence and approval requirements.
+Use **Import creators** to upload a private UTF-8 CSV with headers `name,email,platform,channel_urls,games_covered`. Platform values are `youtube`, `twitch` and `other`. Separate multiple channels or games with `|`. The upload accepts up to 200 rows and 512 KB. It skips duplicate addresses and returns counts.
 
 ## Steamworks imports
 
-In **Marketing → Steamworks Imports**, upload the full English-language UTM Analytics breakdown for **Cursemark (3219180)**, including the source, medium, campaign and content fields. The user importing must have the Steamworks permission to retrieve the file and portal admin access to upload it. Select the exact inclusive start and end dates used in Steamworks. If the export contains an App ID column, the API verifies it. Matching needs the full UTM identity from a Cursemark placement. Unmatched Steam rows are excluded. CSV files are processed in memory with a 4 MB limit and only matching aggregate counts and file hashes are persisted.
+Upload the full English UTM Analytics breakdown for Cursemark, app 3219180, in **Steamworks Imports**. Include source, medium, campaign and content fields. Enter the exact inclusive dates. Imports match existing placement tracking links. A new file for the same dates replaces that window. Identical retries are idempotent. Partial overlaps are rejected. Missing values remain unavailable. Base-game UTM reports do not attribute demo downloads. [Steamworks UTM Analytics](https://partner.steamgames.com/doc/marketing/utm_analytics)
 
-Use disjoint date ranges for additive results. To refresh a range, download a new export for the exact same dates. The new snapshot replaces that window, including clearing entries Steam no longer includes. Reimporting a file already seen for that range has no effect. A partial overlap is rejected without altering any results. Steam sometimes omits low-traffic rows. Blank and suppressed values are displayed as unavailable, while reported zeroes remain zero.
+## Clyde Games MCP
 
-Results summarize all available Steamworks metrics in imported windows for manually recorded posts. The call to action informs the draft copy. Base-game Steam UTM reports do not attribute demo downloads. See the official [Steamworks UTM documentation](https://partner.steamgames.com/doc/marketing/utm_analytics).
+Use the existing authenticated Clyde Games MCP. Pass `project: "cursemark"` on every call.
 
-## Release and rollback
+- `marketing_list_beats`, `marketing_get_beat`, `marketing_save_beat` list, read or save Beat briefs.
+- `marketing_list_targets`, `marketing_get_target`, `marketing_save_target` manage destinations and creator records. Keep an existing creator email by omitting it from an edit.
+- `marketing_set_target_attachment` attaches or detaches a target while keeping existing placements.
+- `marketing_save_target_research` stores a sourced report from research done in Codex. `marketing_save_creator_evidence` stores the separate checked coverage or reply facts using its own version.
+- `marketing_save_placement`, `marketing_get_placement` manage manually authored drafts, add already-published details, and read tracking results.
+- `marketing_set_archived` archives or restores a Beat, target, or placement.
+- `marketing_list_steamworks_reports`, `marketing_import_steamworks_csv` manage report windows. Supply a base64 CSV up to 42 KiB through MCP and confirm the full export. The portal accepts larger files up to 4 MB.
 
-The simplified editor adds a call-to-action column to `marketing_beats`. Target support adds two catalog and attachment tables plus an optional placement target ID. Existing Beat metadata, placements and imported reports remain stored. When a legacy Beat has no brief, the editor uses its old hook. If the old CTA wording gives a clear choice, the editor displays it. Otherwise an editor can choose one. Store a restorable backup before activation. Reverting the API binary and portal index leaves Beat, target, placement and import history in place.
+List calls return up to 50 records. Continue with the last ID while `has_more` is true. Beat placement pages use the same ID cursor. Editing calls require the current version. Creator evidence starts at version 0. Publishing and sending remain manual.

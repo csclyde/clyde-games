@@ -27,6 +27,10 @@ func RegisterMCPRoutes(router *gin.Engine) {
 	bot.POST("/messages/:id/mark-result", botMarkResult)
 	bot.GET("/messages/:id/status", mcpDiscordIntakeStatus)
 	g := router.Group("/internal/mcp", MCPAuth)
+	registerMarketingHandlers(g.Group("/marketing/:project", func(c *gin.Context) {
+		c.Set("marketing_mcp", true)
+		c.Next()
+	}, marketingScope))
 	registerReportNoteRoutes(g)
 	registerCrashWorkRoutes(g)
 	g.POST("/crash-investigation/:id/claim", claimCrashInvestigation)

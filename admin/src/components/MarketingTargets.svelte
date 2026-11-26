@@ -1,21 +1,22 @@
 <script>
  import {createEventDispatcher} from 'svelte';
  import {portalRequest} from '../portal-auth.mjs';
+ import MarketingCreatorEvidence from './MarketingCreatorEvidence.svelte';
+ import MarketingResearchEditor from './MarketingResearchEditor.svelte';
  export let targets=[];
- export let aiEnabled=false;
  export let pending=false;
  const change=createEventDispatcher();
  const base='/marketing/cursemark/targets';
  const policies={links:'Links',self_promotion:'Self-promotion',ai:'AI rules for publication',flair:'Flair',cadence:'Cadence'};
  const platforms={youtube:'YouTube',twitch:'Twitch',other:'Other'};
  let query='',filter='all',selection=0,readID=0,detail=null,detailLoading=false;
- let form=null,editing=null,busy=false,researching=0,error='',notice='';
+ let form=null,editing=null,busy=false,editingResearch=false,showArchived=false,error='',notice='';
  let importOpen=false,file,uploading=false,receipt='';
  $: terms=query.trim().toLowerCase().split(/\s+/);
- $: filtered=targets.filter(t=>(filter==='all'||filter==='destination'&&t.kind==='destination'||
+ $: filtered=targets.filter(t=>(showArchived||!t.archived_at)&&(filter==='all'||filter==='destination'&&t.kind==='destination'||
    filter==='creator'&&t.kind==='creator'||t.kind==='creator'&&t.creator_platform===filter)&&
    terms.every(term=>[t.name,t.url,platforms[t.creator_platform]||''].some(text=>text?.toLowerCase().includes(term))));
- $: if(!selection&&targets.length&&!form)select(targets[0].id,false);
+ $: if(!selection&&filtered.length&&!form)select(filtered[0].id,false);
  function open(target=null){
   editing=target;
   form={kind:target?.kind||'destination',name:target?.name||'',url:target?.url||'',email:target?.creator?.email||'',
@@ -24,7 +25,7 @@
  }
  async function select(id,clear=true){
   const ticket=++readID;
-  selection=id;detail=null;detailLoading=true;form=null;editing=null;
+  selection=id;detail=null;detailLoading=true;form=null;editing=null;editingResearch=false;
   if(clear){error='';notice='';}
   try{
    const data=await portalRequest(base+'/'+id,'GET');
@@ -33,7 +34,7 @@
   finally{if(ticket===readID)detailLoading=false;}
  }
  function publish(target){
-  const {creator,research,...summary}=target;
+  const {creator,research,creator_evidence,...summary}=target;
   change('saved',summary);
  }
  async function save(){
@@ -53,14 +54,22 @@
   }catch(e){error=e.message;}
   finally{busy=false;}
  }
- async function research(target){
-  researching=target.id;error='';notice='';
+ async function archive(){
+  const target=detail;
+  busy=true;error='';notice='';
   try{
-   const saved=await portalRequest(base+'/'+target.id+'/research','POST',{version:target.version});
-   publish(saved);
-   if(selection===target.id){detail=saved;notice='Research updated for '+target.name+'.';}
+   const saved=await portalRequest(base+'/'+target.id+'/archive','PUT',{version:target.version,archived:!target.archived_at});
+   detail={...target,...saved};
+   publish(detail);
+   notice=saved.archived_at?'Target archived.':'Target restored.';
   }catch(e){if(selection===target.id)error=e.message;}
-  finally{researching=0;}
+  finally{busy=false;}
+ }
+ function researchSaved(event){
+  detail=event.detail;
+  publish(detail);
+  editingResearch=false;
+  notice='Research saved.';
  }
  async function upload(event){
   const uploadForm=event.currentTarget;
@@ -90,12 +99,13 @@
    <label>Target type<select bind:value={filter}><option value="all">All</option><option value="destination">Public destinations</option><option value="creator">All creators</option>
     <option value="youtube">YouTube</option><option value="twitch">Twitch</option><option value="other">Other creators</option></select></label>
   </div>
+  <label class="check"><input type="checkbox" bind:checked={showArchived}/> Show archived targets</label>
   <p class="count">{filtered.length} of {targets.length} targets</p>
   {#if pending}<p role="status">Loading targets…</p>{:else if !filtered.length}<p>No matching targets.</p>{/if}
   <div class="choices">
    {#each filtered as target (target.id)}
     <button type="button" disabled={busy} aria-pressed={selection===target.id&&!form} on:click={()=>select(target.id)}>
-     <span>{target.name}</span><small>{target.kind==='creator'?platforms[target.creator_platform]||'Creator':'Public destination'}</small>
+     <span>{target.name}</span><small>{target.kind==='creator'?platforms[target.creator_platform]||'Creator':'Public destination'}{target.archived_at?' · Archived':''}</small>
     </button>
    {/each}
   </div>
@@ -136,10 +146,9 @@
     <header>
      <h2>{detail.name}</h2>
      <div class="buttons">
-      <button type="button" class="secondary" aria-label={'Edit '+detail.name} disabled={researching===detail.id} on:click={()=>open(detail)}>Edit</button>
-      <button type="button" aria-label={'Update Research for '+detail.name}
-       disabled={!aiEnabled||!!researching||(detail.kind==='creator'&&!detail.creator?.channel_urls.length)}
-       on:click={()=>research(detail)}>{researching===detail.id?'Researching…':'Update Research'}</button>
+      <button type="button" class="secondary" aria-label={'Edit '+detail.name} disabled={busy} on:click={()=>open(detail)}>Edit</button>
+      <button type="button" class="secondary" disabled={busy} on:click={archive}>{detail.archived_at?'Restore target':'Archive target'}</button>
+      <button type="button" disabled={editingResearch} on:click={()=>editingResearch=true}>Edit research</button>
      </div>
     </header>
     {#if detail.creator}
@@ -149,12 +158,15 @@
       <div><dt>Public channels</dt><dd>{#each detail.creator.channel_urls as link}<a href={link} rel="noreferrer" target="_blank">{link}</a>{:else}None saved{/each}</dd></div>
       <div><dt>Games covered</dt><dd>{detail.creator.games_covered.join(' · ')||'None saved'}</dd></div>
      </dl>
+     {#key detail.id}<MarketingCreatorEvidence target={detail} on:saved={event=>detail={...detail,creator_evidence:event.detail}}/>{/key}
     {:else if detail.url}<a href={detail.url} rel="noreferrer" target="_blank">{detail.url}</a>{/if}
-    {#if detail.research}
+    {#if editingResearch}
+     {#key detail.id}<MarketingResearchEditor target={detail} on:saved={researchSaved} on:cancel={()=>editingResearch=false}/>{/key}
+    {:else if detail.research}
      {@const snapshot=detail.research}
      <h3>Research</h3>
      <p>{snapshot.hold?'Hold · ':''}Checked {new Date(detail.checked_at).toISOString().slice(0,10)}</p>
-     {#if !detail.research_ready}<p>Update research for the current destination or channels before drafting.</p>{/if}
+     {#if !detail.research_ready}<p>This research predates a change to the destination or channels.</p>{/if}
      {#if snapshot.hold}<p>{snapshot.hold_reason}</p>{/if}
      {#if snapshot.takeaway}<p>{snapshot.takeaway}</p>{/if}
      {#if detail.creator}
@@ -196,6 +208,8 @@
  header{justify-content:space-between;margin-bottom:.55rem}
  .filters,form{display:grid;gap:.6rem}
  .filters{margin-top:.65rem}
+ .check{display:flex;align-items:center;margin-top:.35rem}
+ .check input{width:auto}
  form button{justify-self:start}
  label{display:grid;gap:.25rem;font-size:.88rem;font-weight:600}
  input,textarea,select,button{box-sizing:border-box;font:inherit;min-width:0;min-height:44px}

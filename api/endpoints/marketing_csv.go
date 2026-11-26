@@ -134,11 +134,17 @@ func readMarketingCSV(data []byte) ([]marketingCSVRow, error) {
 
 func listMarketingReports(c *gin.Context) {
 	var reports []models.MarketingReport
-	if err := marketingDB(c).Where("project = ?", marketingProject).Order("start_date DESC").Find(&reports).Error; err != nil {
+	q := marketingDB(c).Where("project = ?", marketingProject)
+	if marketingMCP(c) {
+		q = q.Where("id > ?", c.DefaultQuery("after_id", "0")).Order("id ASC").Limit(marketingPageLimit + 1)
+	} else {
+		q = q.Order("start_date DESC")
+	}
+	if err := q.Find(&reports).Error; err != nil {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"reports": reports})
+	c.JSON(200, marketingListResult(c, "reports", reports))
 }
 
 var errMarketingOverlap = errors.New("overlapping Steamworks report")

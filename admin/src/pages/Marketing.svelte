@@ -12,27 +12,29 @@
  const today=new Date().toISOString().slice(0,10);
  const tabButtons=[];
  let section='beats',beats=[],reports=[],posts=[],result=null;
- let selected=0,requestID=0,aiEnabled=false,loading=true,detailLoading=false,generating=false;
+ let selected=0,requestID=0,loading=true,detailLoading=false,showArchivedBeats=false,archiving=false;
  let targets=[],linked=[],targetsLoading=true,targetsError='',updatingTarget=false;
  let error='',notice='',editor=null,saving=false,editorError='',detailHeading;
  let start='',end='',confirmed=false,file,importing=false,importMessage='',importError='',reportsLoaded=false,reportsLoading=false;
  $: beat=beats.find(item=>item.id===selected);
  $: attached=targets.filter(target=>linked.includes(target.id));
- $: available=targets.filter(target=>!linked.includes(target.id));
+ $: available=targets.filter(target=>!target.archived_at&&!linked.includes(target.id));
+ $: visibleBeats=beats.filter(item=>showArchivedBeats||!item.archived_at);
 
  onMount(async()=>{
   loadTargets();
   try{
-   const plan=await portalRequest(base+'/beats','GET');
-   beats=plan.beats;aiEnabled=plan.ai_enabled;
-   if(beats.length)await choose(beats[0].id);
+   const plan=await portalRequest(base+'/beats?include_archived=1','GET');
+   beats=plan.beats;
+   const current=beats.find(item=>!item.archived_at);
+   if(current)await choose(current.id);
   }catch(e){error=e.message;}
   finally{loading=false;}
  });
 
  async function loadTargets(){
   targetsLoading=true;targetsError='';
-  try{targets=(await portalRequest(base+'/targets','GET')).targets;}
+  try{targets=(await portalRequest(base+'/targets?include_archived=1','GET')).targets;}
   catch(e){targetsError=e.message;}
   finally{targetsLoading=false;}
  }
@@ -113,16 +115,16 @@
   finally{updatingTarget=false;}
  }
 
- async function generate(target){
-  const ticket=requestID,id=selected;
-  generating=target.id;notice='';error='';
+ async function archiveBeat(){
+  const ticket=requestID,id=selected,current=beat;
+  archiving=true;notice='';error='';
   try{
-   await portalRequest(base+'/beats/'+id+'/targets/'+target.id+'/generate','POST',{version:beat.version});
+   const saved=await portalRequest(base+'/beats/'+id+'/archive','PUT',{version:current.version,archived:!current.archived_at});
+   beats=beats.map(item=>item.id===id?{...item,...saved}:item);
    if(ticket!==requestID)return;
-   await refreshBeat(id,ticket);
-   notice='Draft saved for '+target.name+'.';
+   notice=saved.archived_at?'Beat archived.':'Beat restored.';
   }catch(e){if(ticket===requestID)error=e.message;}
-  finally{generating=false;}
+  finally{archiving=false;}
  }
 
  function placementSaved(event){
@@ -171,9 +173,10 @@
    <div class="work">
     <aside class="card beat-list" aria-label="Beats">
      <button type="button" on:click={()=>openEditor()}>New Beat</button>
+     <label class="confirm"><input type="checkbox" bind:checked={showArchivedBeats}/> Show archived Beats</label>
      <div class="beat-choices">
-      {#each beats as item (item.id)}
-       <button type="button" aria-pressed={item.id===selected} on:click={()=>choose(item.id)}>{item.name}</button>
+      {#each visibleBeats as item (item.id)}
+       <button type="button" aria-pressed={item.id===selected} on:click={()=>choose(item.id)}>{item.name}{item.archived_at?' · Archived':''}</button>
       {/each}
      </div>
     </aside>
@@ -183,12 +186,10 @@
       <section class="card" aria-label="Beat brief">
        <div class="beat-title">
         <h2 tabindex="-1" bind:this={detailHeading}>{beat.name}</h2>
-        <button type="button" class="secondary" disabled={generating} on:click={()=>openEditor(beat)}>Edit Beat</button>
+        <div class="buttons"><button type="button" class="secondary" on:click={()=>openEditor(beat)}>Edit Beat</button><button type="button" class="secondary" disabled={archiving} on:click={archiveBeat}>{beat.archived_at?'Restore Beat':'Archive Beat'}</button></div>
        </div>
        {#if beat.brief}<p class="brief">{beat.brief}</p>{/if}
        <p class="cta"><strong>Call to Action</strong> {ctaLabels[beat.call_to_action]||'Choose Wishlist or Purchase'}</p>
-       {#if !aiEnabled}<p>OpenAI research and drafting require a server-side key.</p>
-       {:else if !beat.call_to_action||!beat.brief.trim()}<p>Complete the brief and call to action to draft posts.</p>{/if}
        {#if notice}<p role="status">{notice}</p>{/if}
       </section>
       <section class="card" aria-label="Beat targets">
@@ -197,15 +198,14 @@
        {:else if !targetsLoading&&!targets.length}<p>Add destinations in Targets to draft posts for this Beat.</p>{/if}
        <div class="pills" aria-label="Available targets">
         {#each available as target (target.id)}
-         <button type="button" class="pill" aria-label={'Attach '+target.name} disabled={updatingTarget} on:click={()=>setTarget(target,true)}>+ {target.name}</button>
+         <button type="button" class="pill" aria-label={'Attach '+target.name} disabled={updatingTarget||!!beat.archived_at} on:click={()=>setTarget(target,true)}>+ {target.name}</button>
         {/each}
        </div>
        {#each attached as target (target.id)}
         {@const current=target.research_ready}
         <div class="target-row">
          <div class="attached-label"><span>{target.name}</span><button type="button" aria-label={'Remove '+target.name+' from Beat'} disabled={updatingTarget} on:click={()=>setTarget(target,false)}>×</button></div>
-         <small>{!current?'Research needed':target.research_hold?'Hold':'Research saved'}</small>
-         <button type="button" class="secondary" aria-label={(target.kind==='creator'?'Generate draft for ':'Generate Post for ')+target.name} disabled={!aiEnabled||!!generating||!current||!beat.call_to_action||!beat.brief.trim()} on:click={()=>generate(target)}>{generating===target.id?'Drafting…':target.kind==='creator'?'Generate draft':'Generate Post'}</button>
+         <small>{target.archived_at?'Archived':!current?'Research needed':target.research_hold?'Hold':'Research saved'}</small>
         </div>
        {/each}
       </section>
@@ -217,7 +217,9 @@
        <h3>Placements</h3>
        {#each posts as post (post.id)}<MarketingPlacement beatID={selected} {post} on:saved={placementSaved}/>{/each}
        {#if !posts.length}<p>No placements yet.</p>{/if}
-       {#key selected}<MarketingPlacement beatID={selected} on:saved={placementSaved}/>{/key}
+       {#if !beat.archived_at}
+        {#key selected}<MarketingPlacement beatID={selected} targets={attached.filter(target=>!target.archived_at)} on:saved={placementSaved}/>{/key}
+       {/if}
       </section>
      {:else}<p>No Beats yet.</p>{/if}
     </div>
@@ -227,8 +229,7 @@
 
  <div role="tabpanel" id="marketing-panel-targets" aria-labelledby="marketing-tab-targets" hidden={section!=='targets'}>
   {#if targetsError}<p class="error" role="alert">{targetsError} <button type="button" class="secondary" on:click={loadTargets}>Retry</button></p>{/if}
-  {#if !aiEnabled&&!loading}<p>OpenAI research requires a server-side key.</p>{/if}
-  <MarketingTargets {targets} {aiEnabled} pending={targetsLoading} on:saved={savedTarget} on:imported={loadTargets}/>
+  <MarketingTargets {targets} pending={targetsLoading} on:saved={savedTarget} on:imported={loadTargets}/>
  </div>
 
  <div role="tabpanel" id="marketing-panel-imports" aria-labelledby="marketing-tab-imports" hidden={section!=='imports'}>
@@ -278,6 +279,7 @@
  .beat-title{display:flex;justify-content:space-between;align-items:center;gap:.65rem}
  .beat-title h2{margin:0;font-size:1.15rem}
  .beat-title button{flex:none}
+ .buttons{display:flex;gap:.35rem;flex-wrap:wrap}
  .brief{white-space:pre-wrap;overflow-wrap:anywhere}
  .cta{margin-bottom:.8rem}
  .cta strong{margin-right:.25rem}

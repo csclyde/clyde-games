@@ -22,7 +22,7 @@ import (
 )
 
 type marketingCreatorFields struct {
-	Email       string   `json:"email"`
+	Email       string   `json:"email,omitempty"`
 	Platform    string   `json:"platform"`
 	ChannelURLs []string `json:"channel_urls"`
 	Games       []string `json:"games_covered"`
@@ -39,14 +39,18 @@ type marketingTargetInput struct {
 var contactPattern = regexp.MustCompile("(?i)[a-z0-9.!#$%&'*+/=^_`{|}~-]+@[a-z0-9-]+(?:\\.[a-z0-9-]+)+")
 var twitchChannel = regexp.MustCompile("^[a-zA-Z0-9_]{2,30}$")
 
-const creatorResearchInstructions = `Research the supplied public creator channel URLs for potential fit with Cursemark. Search those channels only. Cite the actual channel and up to four recent dated videos, clips, or articles visibly authored by the creator, with exact links and visible engagement when available. Return titles of games verified by the cited recent coverage in games_covered. Keep game titles and coverage evidence separate from inference about fit. Do not search for or return names supplied outside these channels, contact details, emails, correspondence, private profiles, or guessed industry relationships. Never claim an invitation or consent to contact. Return empty rule fields and ai_restriction. If public coverage cannot be verified, say so and set hold=true. Use plain text.`
-
 func safeResearchURL(link string) bool {
 	if !marketingLink(link) {
 		return false
 	}
 	decoded, err := url.PathUnescape(link)
-	return err == nil && !contactPattern.MatchString(decoded)
+	u, parseErr := url.Parse(link)
+	if err != nil || parseErr != nil || contactPattern.MatchString(decoded) {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host != "mail.google.com" && !domain(host, "gmail.com") && host != "outlook.office.com" &&
+		host != "outlook.office365.com" && host != "outlook.live.com" && !strings.HasSuffix(host, ".internal") && !strings.HasSuffix(host, ".local")
 }
 
 func withoutContact(value string) string {
@@ -239,6 +243,26 @@ func creatorResearchKey(c models.MarketingCreator) string {
 var errCreatorVersion = errors.New("creator contact version changed")
 
 func saveMarketingCreator(c *gin.Context, in marketingTargetInput) {
+	if c.Request.Method == http.MethodPut && strings.TrimSpace(in.Email) == "" {
+		id, ok := marketingID(c, "target")
+		if !ok {
+			return
+		}
+		target, err := readTarget(marketingDB(c), id)
+		if err != nil || !target.IsCreator {
+			if err == nil {
+				err = gorm.ErrRecordNotFound
+			}
+			marketingTargetError(c, err)
+			return
+		}
+		prior, err := readMarketingCreator(marketingDB(c), id)
+		if err != nil {
+			marketingDBError(c, err)
+			return
+		}
+		in.Email = prior.Email
+	}
 	target, person, err := prepareCreator(in)
 	if err != nil {
 		marketingError(c, 400, err.Error())
@@ -292,7 +316,7 @@ func saveMarketingCreator(c *gin.Context, in marketingTargetInput) {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(status, out)
+	marketingTargetResponse(c, status, out)
 }
 
 type creatorImportRow struct {

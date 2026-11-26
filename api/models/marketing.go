@@ -24,6 +24,7 @@ type MarketingBeat struct {
 	Version      uint   `gorm:"not null"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	ArchivedAt   *time.Time
 	CallToAction string `gorm:"type:varchar(16);not null;default:''"`
 	MarketingBrief
 }
@@ -55,6 +56,7 @@ type MarketingPlacement struct {
 	PublishedAt   *time.Time `json:"published_at"`
 	PublishedURL  string     `json:"published_url" gorm:"type:varchar(1000);not null"`
 	PublishedNote string     `json:"published_note" gorm:"type:text;not null"`
+	ArchivedAt    *time.Time `json:"archived_at"`
 	MarketingPlacementDraft
 }
 
@@ -101,6 +103,15 @@ type MarketingTarget struct {
 	ResearchURL string `gorm:"type:varchar(1000);not null"`
 	Research    string `gorm:"type:mediumtext;not null"`
 	CheckedAt   *time.Time
+	ArchivedAt  *time.Time
+}
+
+type MarketingCreatorEvidence struct {
+	TargetID  uint   `gorm:"primaryKey;autoIncrement:false"`
+	Version   uint   `gorm:"not null"`
+	Coverage  string `gorm:"type:mediumtext;not null"`
+	Reply     string `gorm:"type:text;not null"`
+	UpdatedAt time.Time
 }
 
 // Creator contacts are read only on the authenticated target detail route.
@@ -119,5 +130,5 @@ type MarketingBeatTarget struct {
 
 func MigrateMarketing(db *gorm.DB) error {
 	return db.AutoMigrate(&MarketingBeat{}, &MarketingPlacement{}, &MarketingReport{}, &MarketingImport{},
-		&MarketingResult{}, &MarketingTarget{}, &MarketingBeatTarget{}, &MarketingCreator{})
+		&MarketingResult{}, &MarketingTarget{}, &MarketingBeatTarget{}, &MarketingCreator{}, &MarketingCreatorEvidence{})
 }

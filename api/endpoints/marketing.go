@@ -1,10 +1,12 @@
 package endpoints
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/url"
-	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -21,35 +23,66 @@ const marketingProject = "cursemark"
 const marketingDay = "2006-01-02"
 
 func RegisterMarketingRoutes(router *gin.Engine) {
-	g := router.Group("/marketing/:project", AdminAuth, func(c *gin.Context) {
-		if c.Param("project") != marketingProject {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Marketing is available for Cursemark."})
-			return
-		}
+	registerMarketingHandlers(router.Group("/marketing/:project", AdminAuth, func(c *gin.Context) {
 		if account, ok := portalAccount(c); ok && account.Role != "admin" {
 			c.AbortWithStatusJSON(403, gin.H{"error": "An administrator account is required."})
 			return
 		}
-		c.Header("Cache-Control", "no-store")
 		c.Next()
-	})
+	}, marketingScope))
+}
+
+func marketingScope(c *gin.Context) {
+	if c.Param("project") != marketingProject {
+		c.AbortWithStatusJSON(404, gin.H{"error": "Marketing is available for Cursemark."})
+		return
+	}
+	if marketingMCP(c) && c.Query("after_id") != "" {
+		if _, err := strconv.ParseUint(c.Query("after_id"), 10, 32); err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Use a valid numeric cursor."})
+			return
+		}
+	}
+	c.Header("Cache-Control", "no-store")
+	c.Next()
+}
+
+func registerMarketingHandlers(g *gin.RouterGroup) {
 	g.GET("/beats", listMarketingBeats)
 	g.POST("/beats", saveMarketingBeat)
 	g.GET("/beats/:beat", getMarketingBeat)
 	g.PUT("/beats/:beat", saveMarketingBeat)
+	g.PUT("/beats/:beat/archive", archiveMarketingBeat)
 	g.POST("/beats/:beat/placements", saveMarketingPlacement)
+	g.GET("/beats/:beat/placements/:placement", getMarketingPlacement)
 	g.PUT("/beats/:beat/placements/:placement", saveMarketingPlacement)
+	g.PUT("/beats/:beat/placements/:placement/archive", archiveMarketingPlacement)
 	g.PUT("/beats/:beat/targets/:target", setMarketingBeatTarget)
 	g.DELETE("/beats/:beat/targets/:target", setMarketingBeatTarget)
-	g.POST("/beats/:beat/targets/:target/generate", generateMarketingPost)
 	g.GET("/targets", listMarketingTargets)
 	g.POST("/targets", saveMarketingTarget)
-	g.POST("/targets/import-creators", importMarketingCreators)
+	g.POST("/targets/import-creators", func(c *gin.Context) {
+		if marketingMCP(c) {
+			marketingError(c, 404, "Use the authenticated portal to bulk import private creator contacts.")
+			return
+		}
+		importMarketingCreators(c)
+	})
 	g.GET("/targets/:target", getMarketingTarget)
 	g.PUT("/targets/:target", saveMarketingTarget)
-	g.POST("/targets/:target/research", updateMarketingResearch)
+	g.PUT("/targets/:target/archive", archiveMarketingTarget)
+	g.PUT("/targets/:target/research", saveMarketingResearch)
+	g.PUT("/targets/:target/creator-evidence", saveCreatorEvidence)
 	g.GET("/reports", listMarketingReports)
 	g.POST("/reports", importMarketingReport)
+}
+
+func marketingToken() string {
+	var token [16]byte
+	if _, err := rand.Read(token[:]); err != nil {
+		panic("marketing identifier generation failed")
+	}
+	return hex.EncodeToString(token[:])
 }
 
 func marketingDB(c *gin.Context) *gorm.DB {
@@ -117,8 +150,9 @@ type marketingBeatDraft struct {
 }
 
 type marketingBeatView struct {
-	ID      uint `json:"id"`
-	Version uint `json:"version"`
+	ID         uint       `json:"id"`
+	Version    uint       `json:"version"`
+	ArchivedAt *time.Time `json:"archived_at"`
 	marketingBeatDraft
 }
 
@@ -127,7 +161,7 @@ func (b marketingBeatDraft) validCTA() bool {
 }
 
 func marketingBeatDetails(b models.MarketingBeat) marketingBeatView {
-	detail := marketingBeatView{ID: b.ID, Version: b.Version, marketingBeatDraft: marketingBeatDraft{
+	detail := marketingBeatView{ID: b.ID, Version: b.Version, ArchivedAt: b.ArchivedAt, marketingBeatDraft: marketingBeatDraft{
 		Name: b.Name, Brief: b.Brief, CallToAction: b.CallToAction,
 	}}
 	if strings.TrimSpace(detail.Brief) == "" {
@@ -162,7 +196,7 @@ func readMarketingBeat(db *gorm.DB, id uint) (models.MarketingBeat, error) {
 
 func listMarketingBeats(c *gin.Context) {
 	var beats []models.MarketingBeat
-	if err := marketingDB(c).Where("project = ?", marketingProject).Order("id DESC").Find(&beats).Error; err != nil {
+	if err := marketingListQuery(c, "id DESC").Find(&beats).Error; err != nil {
 		marketingDBError(c, err)
 		return
 	}
@@ -170,7 +204,7 @@ func listMarketingBeats(c *gin.Context) {
 	for _, beat := range beats {
 		list = append(list, marketingBeatDetails(beat))
 	}
-	c.JSON(200, gin.H{"beats": list, "ai_enabled": strings.TrimSpace(os.Getenv("CURSEMARK_OPENAI_API_KEY")) != ""})
+	c.JSON(200, marketingListResult(c, "beats", list))
 }
 
 func saveMarketingBeat(c *gin.Context) {
@@ -254,7 +288,49 @@ func getMarketingBeat(c *gin.Context) {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"beat": marketingBeatDetails(b), "placements": posts, "result": result, "target_ids": ids})
+	out := gin.H{"beat": marketingBeatDetails(b), "placements": posts, "result": result, "target_ids": ids}
+	if marketingMCP(c) {
+		after, err := strconv.ParseUint(c.DefaultQuery("after_id", "0"), 10, 32)
+		if err != nil {
+			marketingError(c, 400, "Use a valid placement cursor.")
+			return
+		}
+		sort.Slice(posts, func(i, j int) bool { return posts[i].ID < posts[j].ID })
+		start := sort.Search(len(posts), func(i int) bool { return uint64(posts[i].ID) > after })
+		page := marketingListResult(c, "placements", posts[start:])
+		out["placements"] = page["placements"]
+		out["has_more_placements"] = page["has_more"]
+		out["placements_limit"] = page["limit"]
+	}
+	c.JSON(200, out)
+}
+
+func getMarketingPlacement(c *gin.Context) {
+	beat, ok := marketingID(c, "beat")
+	if !ok {
+		return
+	}
+	id, ok := marketingID(c, "placement")
+	if !ok {
+		return
+	}
+	db := marketingDB(c)
+	if _, err := readMarketingBeat(db, beat); err != nil {
+		marketingDBError(c, err)
+		return
+	}
+	posts, _, err := marketingResults(db, beat)
+	if err != nil {
+		marketingDBError(c, err)
+		return
+	}
+	for _, post := range posts {
+		if post.ID == id {
+			c.JSON(200, post)
+			return
+		}
+	}
+	marketingError(c, 404, "That placement was not found for this Beat.")
 }
 
 func checkMarketingDraft(d *models.MarketingPlacementDraft) bool {
@@ -277,6 +353,7 @@ func saveMarketingPlacement(c *gin.Context) {
 	}
 	var in struct {
 		models.MarketingPlacementDraft
+		TargetID      *uint      `json:"target_id"`
 		Version       uint       `json:"version"`
 		PublishedAt   *time.Time `json:"published_at"`
 		PublishedURL  string     `json:"published_url"`
@@ -295,7 +372,8 @@ func saveMarketingPlacement(c *gin.Context) {
 		return
 	}
 	db := marketingDB(c)
-	if _, err := readMarketingBeat(db, id); err != nil {
+	beat, err := readMarketingBeat(db, id)
+	if err != nil {
 		marketingDBError(c, err)
 		return
 	}
@@ -303,8 +381,30 @@ func saveMarketingPlacement(c *gin.Context) {
 		MarketingPlacementDraft: in.MarketingPlacementDraft, PublishedAt: in.PublishedAt,
 		PublishedURL: in.PublishedURL, PublishedNote: in.PublishedNote}
 	if c.Request.Method == "POST" {
+		if beat.ArchivedAt != nil {
+			marketingError(c, 409, "Restore the Beat before adding a draft.")
+			return
+		}
+		p.TargetID = in.TargetID
 		p.UTM = marketingToken()
-		if err := db.Create(&p).Error; err != nil {
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if in.TargetID != nil {
+				var target models.MarketingTarget
+				if err := tx.Where("id = ? AND project = ? AND archived_at IS NULL", *in.TargetID, marketingProject).Take(&target).Error; err != nil {
+					return err
+				}
+				var link models.MarketingBeatTarget
+				if err := tx.Where("beat_id = ? AND target_id = ?", id, target.ID).Take(&link).Error; err != nil {
+					return err
+				}
+			}
+			return tx.Create(&p).Error
+		})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			marketingError(c, 409, "Attach an active target before adding a linked draft.")
+			return
+		}
+		if err != nil {
 			marketingDBError(c, err)
 			return
 		}

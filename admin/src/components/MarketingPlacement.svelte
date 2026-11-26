@@ -5,6 +5,7 @@
 
  export let beatID;
  export let post=null;
+ export let targets=[];
  const dispatch=createEventDispatcher();
  const blank=()=>({platform:'',community:'',audience_fit:'',timing:'',title:'',copy:'',asset_notes:'',rule_evidence:'',rules_url:'',rules_checked:'',decision:'hold',published_url:'',published_note:''});
  const datestring=value=>{
@@ -15,6 +16,7 @@
  let draft=post?{...post}:blank(),publication=datestring(post?.published_at);
  let open=false,busy=false,error='',notice='';
  let showPublication=!!post?.published_at;
+ let targetChoice='';
  const today=new Date().toISOString().slice(0,10);
 
  async function save(){
@@ -23,14 +25,27 @@
   try{
    const date=publication===datestring(draft.published_at)?draft.published_at:new Date(publication);
    const body={...draft,published_at:showPublication&&publication?new Date(date).toISOString():null};
+   if(!id&&targetChoice)body.target_id=targetChoice;
    if(!showPublication){
     body.published_url='';body.published_note='';
    }
    const saved=await portalRequest('/marketing/cursemark/beats/'+beatID+'/placements'+(id?'/'+id:''),id?'PUT':'POST',body);
    if(id){draft={...saved};publication=datestring(saved.published_at);}
-   else {draft=blank();publication='';showPublication=false;open=false;}
+   else {draft=blank();publication='';targetChoice='';showPublication=false;open=false;}
    notice=id?'Placement saved.':'Placement added.';
    dispatch('saved',saved);
+  }catch(e){error=e.message;}
+  finally{busy=false;}
+ }
+
+ async function archive(){
+  busy=true;error='';
+  try{
+   const path='/marketing/cursemark/beats/'+beatID+'/placements/'+post.id+'/archive';
+   const saved=await portalRequest(path,'PUT',{version:draft.version,archived:!post.archived_at});
+   draft={...draft,...saved};
+   notice=saved.archived_at?'Placement archived.':'Placement restored.';
+   dispatch('saved',draft);
   }catch(e){error=e.message;}
   finally{busy=false;}
  }
@@ -47,6 +62,7 @@
    {#if post.rank}<span class="rank">#{post.rank}</span>{/if}
    <strong>{post.community}</strong> <span class="subtle">· {post.platform}</span>
    <span class:hold={post.decision==='hold'&&!post.published_at} class="state">{post.published_at?'Published':post.decision==='hold'?'Hold':'Candidate'}</span>
+   {#if post.archived_at}<span class="state">Archived</span>{/if}
   {:else}<strong>Add a placement</strong>{/if}
  </summary>
  {#if open}
@@ -55,9 +71,13 @@
     <a href={post.steam_url} target="_blank" rel="noreferrer">Steam tracking link</a>
     <button type="button" class="secondary" on:click={()=>copy(post.steam_url,'Steam link copied.')}>Copy Steam link</button>
     {#if post.published_url}<a href={post.published_url} target="_blank" rel="noreferrer">Open published post</a>{/if}
+    <button type="button" class="secondary" disabled={busy} on:click={archive}>{post.archived_at?'Restore placement':'Archive placement'}</button>
    </div>
   {/if}
   <form on:submit|preventDefault={save}>
+   {#if !post&&targets.length}
+    <label>Attached target<select bind:value={targetChoice}><option value="">Manual placement</option>{#each targets as target}<option value={target.id}>{target.name}</option>{/each}</select></label>
+   {/if}
    <div class="fields">
     <label>Platform<input bind:value={draft.platform} required maxlength="80"/></label>
     <label>Community<input bind:value={draft.community} required maxlength="160"/></label>

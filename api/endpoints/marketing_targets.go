@@ -46,18 +46,20 @@ type marketingResearch struct {
 }
 
 type marketingTargetView struct {
-	ID              uint                    `json:"id"`
-	Version         uint                    `json:"version"`
-	Name            string                  `json:"name"`
-	URL             string                  `json:"url"`
-	ResearchURL     string                  `json:"research_url"`
-	CheckedAt       *time.Time              `json:"checked_at"`
-	Research        *marketingResearch      `json:"research"`
-	Kind            string                  `json:"kind"`
-	ResearchReady   bool                    `json:"research_ready"`
-	ResearchHold    bool                    `json:"research_hold"`
-	CreatorPlatform string                  `json:"creator_platform,omitempty"`
-	Creator         *marketingCreatorFields `json:"creator,omitempty"`
+	ID              uint                          `json:"id"`
+	Version         uint                          `json:"version"`
+	Name            string                        `json:"name"`
+	URL             string                        `json:"url"`
+	ResearchURL     string                        `json:"research_url"`
+	CheckedAt       *time.Time                    `json:"checked_at"`
+	Research        *marketingResearch            `json:"research"`
+	Kind            string                        `json:"kind"`
+	ResearchReady   bool                          `json:"research_ready"`
+	ResearchHold    bool                          `json:"research_hold"`
+	CreatorPlatform string                        `json:"creator_platform,omitempty"`
+	Creator         *marketingCreatorFields       `json:"creator,omitempty"`
+	ArchivedAt      *time.Time                    `json:"archived_at"`
+	Evidence        *marketingCreatorEvidenceView `json:"creator_evidence,omitempty"`
 }
 
 var subredditName = regexp.MustCompile("^[a-zA-Z0-9_]{2,30}$")
@@ -120,7 +122,7 @@ func marketingSourceKey(value string) string {
 
 func targetDetails(target models.MarketingTarget) marketingTargetView {
 	out := marketingTargetView{ID: target.ID, Version: target.Version, Name: target.Name, URL: target.URL,
-		ResearchURL: target.ResearchURL, CheckedAt: target.CheckedAt, Kind: "destination"}
+		ResearchURL: target.ResearchURL, CheckedAt: target.CheckedAt, Kind: "destination", ArchivedAt: target.ArchivedAt}
 	if target.IsCreator {
 		out.Kind = "creator"
 		out.ResearchURL = ""
@@ -147,6 +149,11 @@ func targetPrivateDetails(db *gorm.DB, target models.MarketingTarget) (marketing
 		out.Creator = &fields
 		out.CreatorPlatform = fields.Platform
 		out.ResearchReady = out.Research != nil && target.CheckedAt != nil && target.ResearchURL == creatorResearchKey(person)
+		evidence, err := creatorEvidenceView(db, target.ID)
+		if err != nil {
+			return out, err
+		}
+		out.Evidence = &evidence
 	}
 	return out, nil
 }
@@ -167,7 +174,14 @@ func getMarketingTarget(c *gin.Context) {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(200, out)
+	marketingTargetResponse(c, 200, out)
+}
+
+func marketingTargetResponse(c *gin.Context, status int, out marketingTargetView) {
+	if marketingMCP(c) && out.Creator != nil {
+		out.Creator.Email = ""
+	}
+	c.JSON(status, out)
 }
 
 func readTarget(db *gorm.DB, id uint) (models.MarketingTarget, error) {
@@ -191,7 +205,7 @@ func marketingTargetError(c *gin.Context, err error) {
 
 func listMarketingTargets(c *gin.Context) {
 	var targets []models.MarketingTarget
-	if err := marketingDB(c).Where("project = ?", marketingProject).Order("name ASC, id ASC").Find(&targets).Error; err != nil {
+	if err := marketingListQuery(c, "name ASC, id ASC").Find(&targets).Error; err != nil {
 		marketingDBError(c, err)
 		return
 	}
@@ -217,7 +231,7 @@ func listMarketingTargets(c *gin.Context) {
 		summary.Research = nil
 		out = append(out, summary)
 	}
-	c.JSON(200, gin.H{"targets": out})
+	c.JSON(200, marketingListResult(c, "targets", out))
 }
 
 func saveMarketingTarget(c *gin.Context) {
@@ -283,35 +297,34 @@ func setMarketingBeatTarget(c *gin.Context) {
 	}
 	link := models.MarketingBeatTarget{BeatID: beatID, TargetID: targetID}
 	err := marketingDB(c).Transaction(func(tx *gorm.DB) error {
-		if _, err := readMarketingBeat(tx.Clauses(clause.Locking{Strength: "UPDATE"}), beatID); err != nil {
+		beat, err := readMarketingBeat(tx.Clauses(clause.Locking{Strength: "UPDATE"}), beatID)
+		if err != nil {
 			return err
 		}
-		if _, err := readTarget(tx, targetID); err != nil {
+		target, err := readTarget(tx.Clauses(clause.Locking{Strength: "UPDATE"}), targetID)
+		if err != nil {
 			return err
 		}
 		if c.Request.Method == "DELETE" {
 			return tx.Where("beat_id = ? AND target_id = ?", beatID, targetID).Delete(&link).Error
 		}
+		if beat.ArchivedAt != nil || target.ArchivedAt != nil {
+			return errMarketingArchived
+		}
 		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&link).Error
 	})
 	if err != nil {
+		if errors.Is(err, errMarketingArchived) {
+			marketingError(c, 409, "Restore the Beat and target before attaching.")
+			return
+		}
 		marketingTargetError(c, err)
 		return
 	}
 	c.Status(204)
 }
 
-const targetResearchInstructions = `Research only the exact public destination URL for Cursemark, a dark fantasy action roguelite. Find up to four actual game-promotion posts from the past twelve months, favoring six months, with exact permalinks, YYYY-MM-DD dates, and visible engagement. Leave engagement empty when unavailable. Distinguish observed patterns from inference; past posts are not permission. Find current official rules for links, self-promotion, flair, cadence, approval and AI restrictions. Use Unclear when a rule cannot be confirmed. Cite official sources separately. An editor personally rewrites and finalizes the private first draft. Unknown AI rules or a private first draft alone are not a Hold. Set hold=true only for genuine publishing restrictions, unresolved publishing permission, approval requirements, or conflicting guidance. In ai_restriction use assisted_submissions for explicit coverage of AI-assisted submissions or drafting, final_content for a stated rule applying to the public content, or unspecified when not confirmed. Describe applicable AI rules accurately. Do not collect contact details. Return games_covered as an empty array. Use plain text.`
-
-func marketingResearchSchema() map[string]any {
-	props := marketingTextFields("takeaway", "hold_reason", "ai_restriction")
-	props["hold"] = map[string]string{"type": "boolean"}
-	props["sources"] = map[string]any{"type": "array", "items": map[string]string{"type": "string"}}
-	props["games_covered"] = map[string]any{"type": "array", "items": map[string]string{"type": "string"}}
-	props["rules"] = marketingObject(marketingTextFields("links", "self_promotion", "ai", "flair", "cadence"))
-	props["examples"] = map[string]any{"type": "array", "items": marketingObject(marketingTextFields("title", "url", "date", "engagement", "what_worked"))}
-	return marketingObject(props)
-}
+var errMarketingArchived = errors.New("marketing record is archived")
 
 func researchLinkMatches(target, source string, official bool) bool {
 	if !safeResearchURL(source) {
@@ -436,15 +449,20 @@ func validateResearch(target string, raw []byte, evidence map[string]bool, check
 	return research, nil
 }
 
-func updateMarketingResearch(c *gin.Context) {
+func saveMarketingResearch(c *gin.Context) {
 	id, ok := marketingID(c, "target")
 	if !ok {
 		return
 	}
 	var in struct {
-		Version uint `json:"version"`
+		Version  uint               `json:"version"`
+		Research *marketingResearch `json:"research"`
 	}
 	if !marketingJSON(c, &in) {
+		return
+	}
+	if in.Version == 0 || in.Research == nil || len(in.Research.Sources) > 6 || len(in.Research.Examples) > 4 || len(in.Research.Games) > 15 {
+		marketingError(c, 400, "Provide the current target version and bounded research with public sources.")
 		return
 	}
 	db := marketingDB(c)
@@ -454,54 +472,40 @@ func updateMarketingResearch(c *gin.Context) {
 		return
 	}
 	if target.Version != in.Version {
-		marketingError(c, 409, "This target changed. Reload before researching.")
+		marketingError(c, 409, "This target changed. Read it before saving research.")
 		return
 	}
 	researchURL := target.URL
-	instructions := targetResearchInstructions
-	input := map[string]any{"destination": target.URL}
-	var links []string
-	if !target.IsCreator && !safeResearchURL(target.URL) {
-		marketingError(c, 400, "Save a public destination URL before researching.")
-		return
-	}
+	links := []string{}
 	if target.IsCreator {
-		person, err := readMarketingCreator(db, target.ID)
+		person, err := readMarketingCreator(db, id)
 		if err != nil {
 			marketingDBError(c, err)
 			return
 		}
-		fields := creatorFields(person)
-		for _, link := range fields.ChannelURLs {
-			if canonical, ok := creatorChannel(link); ok {
-				links = append(links, canonical)
-			}
-		}
-		if len(links) == 0 {
-			marketingError(c, 400, "Add a verified public channel URL before researching this creator.")
+		links = creatorFields(person).ChannelURLs
+		researchURL = creatorResearchKey(person)
+	}
+	evidence := map[string]bool{}
+	for _, link := range in.Research.Sources {
+		if !safeResearchURL(link) {
+			marketingError(c, 400, "Use public HTTPS research sources without contact details.")
 			return
 		}
-		// Keep the public provider request an allowlist. No contact fields or
-		// correspondence enter either the model context or web search.
-		input = map[string]any{"platform": fields.Platform, "public_channel_urls": links}
-		researchURL = creatorResearchKey(person)
-		instructions = creatorResearchInstructions
+		evidence[marketingSourceKey(link)] = true
 	}
-	key, ok := startMarketingAI(c)
-	if !ok {
-		return
+	for _, example := range in.Research.Examples {
+		if !safeResearchURL(example.URL) {
+			marketingError(c, 400, "Use public HTTPS example URLs without contact details.")
+			return
+		}
+		evidence[marketingSourceKey(example.URL)] = true
 	}
-	defer marketingGeneration.Unlock()
 	checked := time.Now().UTC()
-	input["today"] = checked.Format(marketingDay)
-	raw, evidence, err := marketingAsk(c.Request.Context(), key, "cursemark_target_research", instructions, input, marketingResearchSchema(), true)
-	if err != nil {
-		marketingError(c, 502, "OpenAI did not return usable target research. The previous research was kept.")
-		return
-	}
+	raw, _ := json.Marshal(in.Research)
 	research, err := validateResearch(target.URL, raw, evidence, checked, links...)
-	if err != nil {
-		marketingError(c, 502, "OpenAI returned invalid target research. The previous research was kept.")
+	if err != nil || len(research.Sources) != len(in.Research.Sources) || len(research.Examples) != len(in.Research.Examples) {
+		marketingError(c, 400, "Research sources and dated examples must match the target. Remove duplicates and review links before saving.")
 		return
 	}
 	saved, _ := json.Marshal(research)
@@ -512,7 +516,7 @@ func updateMarketingResearch(c *gin.Context) {
 		return
 	}
 	if update.RowsAffected != 1 {
-		marketingError(c, 409, "The target changed during research. No results were saved.")
+		marketingError(c, 409, "The target changed before the research was saved.")
 		return
 	}
 	target.Version++
@@ -524,5 +528,5 @@ func updateMarketingResearch(c *gin.Context) {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(200, out)
+	marketingTargetResponse(c, 200, out)
 }
