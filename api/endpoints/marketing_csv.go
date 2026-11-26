@@ -248,9 +248,8 @@ func importMarketingReport(c *gin.Context) {
 
 type marketingSummary struct {
 	models.MarketingCounts
-	Expected int      `json:"expected"`
-	Observed int      `json:"observed"`
-	Score    *float64 `json:"score"`
+	Expected int `json:"expected"`
+	Observed int `json:"observed"`
 }
 
 func addMarketingCount(dst **uint64, n *uint64) {
@@ -271,21 +270,7 @@ func (s *marketingSummary) add(n models.MarketingCounts) {
 	addMarketingCount(&s.Activations, n.Activations)
 }
 
-func marketingGoalCount(goal string, n models.MarketingCounts) *uint64 {
-	switch goal {
-	case "traffic":
-		return n.Tracked
-	case "wishlists":
-		return n.Wishlists
-	case "purchases":
-		return n.Purchases
-	case "activations":
-		return n.Activations
-	}
-	return nil
-}
-
-func marketingResults(db *gorm.DB, beat models.MarketingBeat) ([]marketingPost, marketingSummary, error) {
+func marketingResults(db *gorm.DB, beatID uint) ([]marketingPost, marketingSummary, error) {
 	var posts []models.MarketingPlacement
 	var reports []models.MarketingReport
 	var results []models.MarketingResult
@@ -293,7 +278,7 @@ func marketingResults(db *gorm.DB, beat models.MarketingBeat) ([]marketingPost, 
 	// Keep report metadata and result rows in the same consistent snapshot
 	// when an import is refreshing an existing range.
 	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("project = ? AND beat_id = ?", marketingProject, beat.ID).
+		if err := tx.Where("project = ? AND beat_id = ?", marketingProject, beatID).
 			Order("rank = 0, rank ASC, id ASC").Find(&posts).Error; err != nil {
 			return err
 		}
@@ -303,7 +288,7 @@ func marketingResults(db *gorm.DB, beat models.MarketingBeat) ([]marketingPost, 
 		if err := tx.Where("project = ?", marketingProject).Find(&reports).Error; err != nil {
 			return err
 		}
-		query := tx.Model(&models.MarketingPlacement{}).Select("id").Where("project = ? AND beat_id = ?", marketingProject, beat.ID)
+		query := tx.Model(&models.MarketingPlacement{}).Select("id").Where("project = ? AND beat_id = ?", marketingProject, beatID)
 		return tx.Where("placement_id IN (?)", query).Find(&results).Error
 	})
 	if err != nil {
@@ -313,7 +298,6 @@ func marketingResults(db *gorm.DB, beat models.MarketingBeat) ([]marketingPost, 
 	for _, r := range results {
 		resultByID[[2]uint{r.PlacementID, r.ReportID}] = r.MarketingCounts
 	}
-	complete := true
 	out := make([]marketingPost, 0, len(posts))
 	for _, post := range posts {
 		summary := marketingSummary{}
@@ -329,26 +313,12 @@ func marketingResults(db *gorm.DB, beat models.MarketingBeat) ([]marketingPost, 
 					summary.Observed++
 					summary.add(counts)
 				}
-				// Steam attribution may still change shortly after the report
-				// window ends. ImportedAt must already be at least four days
-				// after its last day.
-				end, _ := time.Parse(marketingDay, report.EndDate)
-				complete = complete && ok && marketingGoalCount(beat.Goal, counts) != nil &&
-					counts.Tracked != nil && !report.ImportedAt.UTC().Before(end.AddDate(0, 0, 5))
-			}
-			if summary.Expected == 0 {
-				complete = false
 			}
 			aggregate.add(summary.MarketingCounts)
 			aggregate.Expected += summary.Expected
 			aggregate.Observed += summary.Observed
 		}
 		out = append(out, marketingPost{MarketingPlacement: post, SteamURL: marketingUTM(post), Result: summary})
-	}
-	if goal := marketingGoalCount(beat.Goal, aggregate.MarketingCounts); complete && goal != nil &&
-		beat.GoalTarget > 0 && aggregate.Tracked != nil && *aggregate.Tracked >= 20 {
-		score := float64(*goal) / float64(beat.GoalTarget) * 100
-		aggregate.Score = &score
 	}
 	return out, aggregate, nil
 }

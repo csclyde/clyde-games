@@ -102,23 +102,48 @@ func marketingDate(s string) bool {
 	return err == nil && t.Format(marketingDay) == s
 }
 
-func checkMarketingBrief(b *models.MarketingBrief) bool {
-	if !marketingStrings(map[*string]int{&b.Name: 160, &b.AssetKind: 24, &b.Asset: 1000, &b.Brief: 3000,
-		&b.Hook: 1000, &b.WhyNow: 1000, &b.CTA: 1000, &b.Goal: 24}) || b.Name == "" || b.Asset == "" {
-		return false
+type marketingBeatDraft struct {
+	Name         string `json:"name"`
+	Brief        string `json:"brief"`
+	CallToAction string `json:"call_to_action"`
+}
+
+type marketingBeatView struct {
+	ID      uint `json:"id"`
+	Version uint `json:"version"`
+	marketingBeatDraft
+}
+
+func (b marketingBeatDraft) validCTA() bool {
+	return b.CallToAction == "wishlist" || b.CallToAction == "purchase"
+}
+
+func marketingBeatDetails(b models.MarketingBeat) marketingBeatView {
+	detail := marketingBeatView{ID: b.ID, Version: b.Version, marketingBeatDraft: marketingBeatDraft{
+		Name: b.Name, Brief: b.Brief, CallToAction: b.CallToAction,
+	}}
+	if strings.TrimSpace(detail.Brief) == "" {
+		detail.Brief = b.Hook
 	}
-	switch b.AssetKind {
-	case "video", "image", "gif", "trailer", "other":
-	default:
-		return false
+	if detail.CallToAction == "" {
+		// Display a clear legacy CTA without rewriting the original wording.
+		var wish, buy bool
+		for _, word := range strings.FieldsFunc(strings.ToLower(b.CTA), func(r rune) bool { return !unicode.IsLetter(r) }) {
+			switch word {
+			case "wishlist", "wishlists":
+				wish = true
+			case "buy", "purchase", "purchases":
+				buy = true
+			}
+		}
+		if wish && !buy {
+			detail.CallToAction = "wishlist"
+		}
+		if buy && !wish {
+			detail.CallToAction = "purchase"
+		}
 	}
-	switch b.Goal {
-	case "traffic", "wishlists", "purchases", "activations":
-		return b.GoalTarget <= 1000000
-	case "demo", "awareness":
-		return b.GoalTarget == 0
-	}
-	return false
+	return detail
 }
 
 func readMarketingBeat(db *gorm.DB, id uint) (models.MarketingBeat, error) {
@@ -133,29 +158,34 @@ func listMarketingBeats(c *gin.Context) {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"beats": beats, "ai_enabled": strings.TrimSpace(os.Getenv("CURSEMARK_OPENAI_API_KEY")) != ""})
+	list := make([]marketingBeatView, 0, len(beats))
+	for _, beat := range beats {
+		list = append(list, marketingBeatDetails(beat))
+	}
+	c.JSON(200, gin.H{"beats": list, "ai_enabled": strings.TrimSpace(os.Getenv("CURSEMARK_OPENAI_API_KEY")) != ""})
 }
 
 func saveMarketingBeat(c *gin.Context) {
 	var in struct {
-		models.MarketingBrief
+		marketingBeatDraft
 		Version uint `json:"version"`
 	}
 	if !marketingJSON(c, &in) {
 		return
 	}
-	if !checkMarketingBrief(&in.MarketingBrief) {
-		marketingError(c, 400, "Enter a Beat name, one asset and a valid goal. Targets are available for Steam-measured goals.")
+	if !marketingStrings(map[*string]int{&in.Name: 160, &in.Brief: 3000}) || in.Name == "" || in.Brief == "" || !in.validCTA() {
+		marketingError(c, 400, "Enter a Beat name and brief, then choose Wishlist or Purchase.")
 		return
 	}
 	db := marketingDB(c)
-	out := models.MarketingBeat{Project: marketingProject, Version: 1, MarketingBrief: in.MarketingBrief}
+	out := models.MarketingBeat{Project: marketingProject, Version: 1, CallToAction: in.CallToAction,
+		MarketingBrief: models.MarketingBrief{Name: in.Name, Brief: in.Brief}}
 	if c.Request.Method == "POST" {
 		if err := db.Create(&out).Error; err != nil {
 			marketingDBError(c, err)
 			return
 		}
-		c.JSON(201, out)
+		c.JSON(201, marketingBeatDetails(out))
 		return
 	}
 	id, ok := marketingID(c, "beat")
@@ -163,8 +193,8 @@ func saveMarketingBeat(c *gin.Context) {
 		return
 	}
 	update := db.Model(&models.MarketingBeat{}).Where("id = ? AND project = ? AND version = ?", id, marketingProject, in.Version).
-		Select("Name", "AssetKind", "Asset", "Brief", "Hook", "WhyNow", "CTA", "Goal", "GoalTarget", "Version", "UpdatedAt").
-		Updates(models.MarketingBeat{MarketingBrief: in.MarketingBrief, Version: in.Version + 1})
+		Select("Name", "Brief", "CallToAction", "Version", "UpdatedAt").
+		Updates(models.MarketingBeat{MarketingBrief: out.MarketingBrief, CallToAction: in.CallToAction, Version: in.Version + 1})
 	if update.Error != nil {
 		marketingDBError(c, update.Error)
 		return
@@ -178,7 +208,7 @@ func saveMarketingBeat(c *gin.Context) {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(200, out)
+	c.JSON(200, marketingBeatDetails(out))
 }
 
 func marketingUTM(p models.MarketingPlacement) string {
@@ -206,12 +236,12 @@ func getMarketingBeat(c *gin.Context) {
 		marketingDBError(c, err)
 		return
 	}
-	posts, result, err := marketingResults(db, b)
+	posts, result, err := marketingResults(db, b.ID)
 	if err != nil {
 		marketingDBError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"beat": b, "placements": posts, "result": result})
+	c.JSON(200, gin.H{"beat": marketingBeatDetails(b), "placements": posts, "result": result})
 }
 
 func checkMarketingDraft(d *models.MarketingPlacementDraft) bool {

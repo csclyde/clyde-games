@@ -1,75 +1,94 @@
 <script>
- import {onMount} from 'svelte';
+ import {onMount,tick} from 'svelte';
  import {portalRequest} from '../portal-auth.mjs';
+ import MarketingBeatDialog from '../components/MarketingBeatDialog.svelte';
  import MarketingPlacement from '../components/MarketingPlacement.svelte';
  import MarketingResults from '../components/MarketingResults.svelte';
 
  const base='/marketing/cursemark';
- const goals={traffic:'Tracked Steam visits',wishlists:'Wishlists',purchases:'Purchases',activations:'Activations',demo:'Demo interest',awareness:'Awareness'};
- const measured=['traffic','wishlists','purchases','activations'];
- const emptyBeat=()=>({name:'',asset_kind:'video',asset:'',brief:'',hook:'',why_now:'',cta:'',goal:'wishlists',goal_target:0});
- let beats=[],reports=[],posts=[],draft=emptyBeat(),result=null;
- let aiEnabled=false,loading=true,busy=false,generating=false,selected=0,requestID=0;
- let notice='',error='',showImport=false,importing=false,importMessage='',importError='';
- let start='',end='',confirmed=false,file;
+ const tabs=[{id:'beats',label:'Beats'},{id:'imports',label:'Steamworks Imports'}];
+ const ctaLabels={wishlist:'Wishlist',purchase:'Purchase'};
  const today=new Date().toISOString().slice(0,10);
- $: savedBeat=beats.find(beat=>beat.id===selected);
- $: modified=savedBeat&&Object.keys(emptyBeat()).some(key=>draft[key]!==savedBeat[key]);
-
- async function reloadOverview(){
-  const [plan,history]=await Promise.all([portalRequest(base+'/beats','GET'),portalRequest(base+'/reports','GET')]);
-  beats=plan.beats;
-  aiEnabled=plan.ai_enabled;
-  reports=history.reports;
- }
+ const tabButtons=[];
+ let section='beats',beats=[],reports=[],posts=[],result=null;
+ let selected=0,requestID=0,aiEnabled=false,loading=true,detailLoading=false,generating=false;
+ let error='',notice='',editor=null,saving=false,editorError='',detailHeading;
+ let start='',end='',confirmed=false,file,importing=false,importMessage='',importError='',reportsLoaded=false,reportsLoading=false;
+ $: beat=beats.find(item=>item.id===selected);
 
  onMount(async()=>{
-  try{await reloadOverview();if(beats.length)await choose(beats[0].id);}
-  catch(e){error=e.message;}
+  try{
+   const plan=await portalRequest(base+'/beats','GET');
+   beats=plan.beats;aiEnabled=plan.ai_enabled;
+   if(beats.length)await choose(beats[0].id);
+  }catch(e){error=e.message;}
   finally{loading=false;}
  });
 
- async function choose(id){
-  const ticket=++requestID;
-  selected=id;
-  draft=id?{...beats.find(beat=>beat.id===id)}:emptyBeat();
-  posts=[];result=null;notice='';error='';
-  if(!id)return;
-  await refreshBeat(id,ticket,true);
+ function selectTab(id){
+  section=id;
+  if(id==='imports'&&!reportsLoaded&&!reportsLoading)loadReports();
  }
 
- async function refreshBeat(id=selected,ticket=requestID,reset=false){
+ function navigateTabs(event,index){
+  let next;
+  switch(event.key){
+   case 'ArrowLeft': next=(index+tabs.length-1)%tabs.length;break;
+   case 'ArrowRight': next=(index+1)%tabs.length;break;
+   case 'Home': next=0;break;
+   case 'End': next=tabs.length-1;break;
+   default:return;
+  }
+  event.preventDefault();
+  selectTab(tabs[next].id);
+  tabButtons[next].focus();
+ }
+
+ async function choose(id){
+  const ticket=++requestID;
+  selected=id;posts=[];result=null;notice='';error='';detailLoading=true;
+  await refreshBeat(id,ticket);
+  if(ticket===requestID)detailLoading=false;
+ }
+
+ async function refreshBeat(id=selected,ticket=requestID){
   try{
    const detail=await portalRequest(base+'/beats/'+id,'GET');
    if(ticket!==requestID)return;
-   if(reset)draft={...detail.beat};
-   beats=beats.map(beat=>beat.id===id?detail.beat:beat);
-   posts=detail.placements;
-   result=detail.result;
+   beats=beats.map(item=>item.id===id?detail.beat:item);
+   posts=detail.placements;result=detail.result;
   }catch(e){if(ticket===requestID)error=e.message;}
  }
 
- async function saveBeat(){
-  const ticket=requestID,id=selected;
-  busy=true;notice='';error='';
+ function openEditor(current=null){
+  editor={current};editorError='';
+ }
+
+ async function saveBeat(event){
+  const current=editor.current;
+  saving=true;editorError='';
   try{
-   const body={...draft,goal_target:measured.includes(draft.goal)?(draft.goal_target||0):0};
-   const saved=await portalRequest(base+'/beats'+(id?'/'+id:''),id?'PUT':'POST',body);
-   beats=id?beats.map(beat=>beat.id===id?saved:beat):[saved,...beats];
-   if(ticket!==requestID)return;
-   draft={...saved};
-   selected=saved.id;
-   await refreshBeat(saved.id,ticket);
-   notice='Beat saved.';
-  }catch(e){if(ticket===requestID)error=e.message;}
-  finally{busy=false;}
+   const saved=await portalRequest(base+'/beats'+(current?'/'+current.id:''),current?'PUT':'POST',
+    {...event.detail,version:current?.version});
+   editor=null;
+   if(current){
+    beats=beats.map(item=>item.id===current.id?saved:item);
+   }else{
+    beats=[saved,...beats];
+    await choose(saved.id);
+   }
+   notice=current?'Beat saved.':'Beat created.';
+   await tick();
+   detailHeading?.focus();
+  }catch(e){editorError=e.message;}
+  finally{saving=false;}
  }
 
  async function generate(){
   const ticket=requestID,id=selected;
   generating=true;notice='';error='';
   try{
-   const data=await portalRequest(base+'/beats/'+id+'/generate','POST',{version:draft.version});
+   const data=await portalRequest(base+'/beats/'+id+'/generate','POST',{version:beat.version});
    if(ticket!==requestID)return;
    await refreshBeat(id,ticket);
    notice=data.placements.length?('Saved '+data.placements.length+' suggested placements. Review each one before posting.'):'No useful opportunities were found.';
@@ -78,9 +97,16 @@
  }
 
  function placementSaved(event){
-  const post=event.detail;
-  if(selected!==post.beat_id)return;
-  refreshBeat();
+  if(selected===event.detail.beat_id)refreshBeat();
+ }
+
+ async function loadReports(){
+  reportsLoading=true;importError='';
+  try{
+   const history=await portalRequest(base+'/reports','GET');
+   reports=history.reports;reportsLoaded=true;
+  }catch(e){importError=e.message;}
+  finally{reportsLoading=false;}
  }
 
  async function upload(){
@@ -94,8 +120,7 @@
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw Error(data.error||'The import failed. Check the file size and try again.');
    importMessage=data.duplicate?'This file was already imported. Current results were kept.':('Imported '+data.matched+' matching placements.');
-   const history=await portalRequest(base+'/reports','GET');
-   reports=history.reports;
+   await loadReports();
    if(selected)await refreshBeat();
   }catch(e){importError=e.message;}
   finally{importing=false;}
@@ -103,14 +128,61 @@
 </script>
 
 <section class="marketing" aria-label="Cursemark marketing">
- <header class="heading">
-  <div><h2>Beats</h2><p>Plan one asset at a time and track the posts you publish.</p></div>
-  <button type="button" class="secondary" aria-expanded={showImport} aria-controls="steamworks-import" on:click={()=>showImport=!showImport}>Steamworks imports</button>
- </header>
- {#if showImport}
-  <section class="card imports" id="steamworks-import" aria-label="Steamworks imports">
-   <h3>Import the Cursemark UTM breakdown</h3>
-   <p>Export the full breakdown in English for app 3219180. Enter the export’s inclusive dates. A new file for the same range refreshes that range. Other ranges must be disjoint.</p>
+ <div class="subtabs" role="tablist" aria-label="Marketing sections">
+  {#each tabs as tab,index (tab.id)}
+   <button type="button" role="tab" id={'marketing-tab-'+tab.id} aria-selected={section===tab.id}
+    aria-controls={'marketing-panel-'+tab.id} tabindex={section===tab.id?0:-1} bind:this={tabButtons[index]}
+    on:click={()=>selectTab(tab.id)} on:keydown={event=>navigateTabs(event,index)}>{tab.label}</button>
+  {/each}
+ </div>
+
+ <div role="tabpanel" id="marketing-panel-beats" aria-labelledby="marketing-tab-beats" hidden={section!=='beats'}>
+  {#if error}<p class="error" role="alert">{error}</p>{/if}
+  {#if loading}<p role="status">Loading Beats…</p>{:else}
+   <div class="work">
+    <aside class="card beat-list" aria-label="Beats">
+     <button type="button" on:click={()=>openEditor()}>New Beat</button>
+     <div class="beat-choices">
+      {#each beats as item (item.id)}
+       <button type="button" aria-pressed={item.id===selected} on:click={()=>choose(item.id)}>{item.name}</button>
+      {/each}
+     </div>
+    </aside>
+    <div class="detail">
+     {#if detailLoading}<p role="status">Loading Beat…</p>
+     {:else if beat}
+      <section class="card" aria-label="Beat brief">
+       <div class="beat-title">
+        <h2 tabindex="-1" bind:this={detailHeading}>{beat.name}</h2>
+        <button type="button" class="secondary" disabled={generating} on:click={()=>openEditor(beat)}>Edit Beat</button>
+       </div>
+       {#if beat.brief}<p class="brief">{beat.brief}</p>{/if}
+       <p class="cta"><strong>Call to Action</strong> {ctaLabels[beat.call_to_action]||'Choose Wishlist or Purchase'}</p>
+       <button type="button" disabled={!aiEnabled||generating||!beat.call_to_action||!beat.brief.trim()} on:click={generate}>{generating?'Researching…':'Research and draft posts'}</button>
+       {#if !aiEnabled}<p>OpenAI research and drafting require a server-side key.</p>
+       {:else if !beat.call_to_action||!beat.brief.trim()}<p>Complete the brief and call to action to draft posts.</p>{/if}
+       {#if notice}<p role="status">{notice}</p>{/if}
+      </section>
+      <section class="card" aria-label="Beat results">
+       <h3>Beat results</h3>
+       <MarketingResults {result}/>
+      </section>
+      <section aria-label="Placements">
+       <h3>Placements</h3>
+       {#each posts as post (post.id)}<MarketingPlacement beatID={selected} {post} on:saved={placementSaved}/>{/each}
+       {#if !posts.length}<p>No placements yet.</p>{/if}
+       {#key selected}<MarketingPlacement beatID={selected} on:saved={placementSaved}/>{/key}
+      </section>
+     {:else}<p>No Beats yet.</p>{/if}
+    </div>
+   </div>
+  {/if}
+ </div>
+
+ <div role="tabpanel" id="marketing-panel-imports" aria-labelledby="marketing-tab-imports" hidden={section!=='imports'}>
+  <section class="card imports" aria-label="Steamworks upload">
+   <h2>Import the Cursemark UTM breakdown</h2>
+   <p>Export the full English breakdown for app 3219180 and enter its inclusive dates. A new file for the same dates refreshes that range. Choose non-overlapping dates for additional reports.</p>
    <form on:submit|preventDefault={upload}>
     <div class="fields">
      <label>Start date<input type="date" bind:value={start} required max={today}/></label>
@@ -122,96 +194,54 @@
    </form>
    {#if importMessage}<p role="status">{importMessage}</p>{/if}
    {#if importError}<p class="error" role="alert">{importError}</p>{/if}
-   {#if reports.length}
-    <details><summary>{reports.length} imported {reports.length===1?'range':'ranges'}</summary>
-     <ul>{#each reports as report (report.id)}<li>{report.start_date} through {report.end_date} · updated {new Date(report.imported_at).toLocaleDateString()}</li>{/each}</ul>
-    </details>
-   {/if}
+   {#if reportsLoading}<p role="status">Loading imports…</p>
+   {:else if !reportsLoaded}<button type="button" class="secondary" on:click={loadReports}>Retry loading imports</button>
+   {:else if reports.length}
+    <h3>Imported ranges</h3>
+    <ul>{#each reports as report (report.id)}<li>{report.start_date} through {report.end_date} · updated {new Date(report.imported_at).toLocaleDateString()}</li>{/each}</ul>
+   {:else}<p>No reports imported yet.</p>{/if}
   </section>
- {/if}
- {#if loading}<p role="status">Loading Beats…</p>{/if}
- {#if error}<p class="error" role="alert">{error}</p>{/if}
- {#if !loading}
-  <div class="work">
-   <aside class="card beat-list" aria-label="Beats">
-    <button type="button" class="new" aria-pressed={!selected} disabled={busy} on:click={()=>choose(0)}>New Beat</button>
-    {#each beats as beat (beat.id)}
-     <button type="button" class:chosen={beat.id===selected} aria-pressed={beat.id===selected} disabled={busy} on:click={()=>choose(beat.id)}>
-      <strong>{beat.name}</strong><small>{beat.asset_kind} · {goals[beat.goal]}</small>
-     </button>
-    {/each}
-   </aside>
-   <div class="detail">
-    <section class="card" aria-label="Beat brief">
-     <h3>{selected?'Beat brief':'New Beat'}</h3>
-     <form on:submit|preventDefault={saveBeat}>
-      <label>Beat name<input maxlength="160" bind:value={draft.name} required/></label>
-      <div class="fields">
-       <label>Asset type<select bind:value={draft.asset_kind}><option>video</option><option>image</option><option value="gif">GIF</option><option>trailer</option><option>other</option></select></label>
-       <label>Asset link or filename<input maxlength="1000" bind:value={draft.asset} required/></label>
-      </div>
-      <label>Brief<textarea rows="3" maxlength="3000" bind:value={draft.brief}></textarea></label>
-      <div class="fields">
-       <label>Hook<textarea rows="2" maxlength="1000" bind:value={draft.hook}></textarea></label>
-       <label>Why now<textarea rows="2" maxlength="1000" bind:value={draft.why_now}></textarea></label>
-      </div>
-      <label>Call to action<input maxlength="1000" bind:value={draft.cta}/></label>
-      <div class="fields">
-       <label>Goal<select bind:value={draft.goal}>{#each Object.entries(goals) as [id,label]}<option value={id}>{label}</option>{/each}</select></label>
-       {#if measured.includes(draft.goal)}<label>Goal target (optional)<input type="number" min="0" max="1000000" bind:value={draft.goal_target}/></label>{/if}
-      </div>
-      <div class="buttons">
-       <button type="submit" disabled={busy||generating}>{busy?'Saving…':'Save Beat'}</button>
-       {#if selected}<button type="button" class="secondary" disabled={!aiEnabled||busy||generating||modified} on:click={generate}>{generating?'Researching…':'Research and draft posts'}</button>{/if}
-      </div>
-     </form>
-     {#if !aiEnabled}<p>OpenAI research and drafting require a server-side key.</p>{:else if modified}<p>Save the Beat to use these edits for research.</p>{:else if selected}<p>Research uses the Beat text and asset type. It appends editable drafts.</p>{/if}
-     {#if notice}<p role="status">{notice}</p>{/if}
-    </section>
-    {#if selected}
-     <section class="card" aria-label="Beat results">
-      <h3>Beat results</h3>
-      <MarketingResults {result}/>
-      {#if result?.score!=null}<p><strong>{Math.round(result.score)}%</strong> of the {goals[draft.goal].toLowerCase()} target</p>
-      {:else if measured.includes(draft.goal)&&draft.goal_target>0}<p>Scoring requires mature Steamworks results for the reported ranges and at least 20 tracked visits.</p>
-      {:else if draft.goal==='demo'}<p>Steamworks base-game UTM reports don’t attribute demo downloads.</p>{/if}
-     </section>
-     <section aria-label="Placements">
-      <h3>Placements</h3>
-      {#each posts as post (post.id)}<MarketingPlacement beatID={selected} {post} on:saved={placementSaved}/>{/each}
-      {#if !posts.length}<p>No placements yet. Research suggestions or add a draft.</p>{/if}
-      {#key selected}<MarketingPlacement beatID={selected} on:saved={placementSaved}/>{/key}
-     </section>
-    {/if}
-   </div>
-  </div>
- {/if}
+ </div>
 </section>
 
+{#if editor}
+ <MarketingBeatDialog beat={editor.current} busy={saving} error={editorError} on:save={saveBeat} on:dismiss={()=>editor=null}/>
+{/if}
+
 <style>
- .marketing{max-width:1260px;margin:auto;padding:1rem;text-align:left;color:var(--text)}
- .marketing p{text-align:left;color:var(--text-muted);margin:.55rem 0;line-height:1.45}
- h2,h3{margin:0 0 .55rem;text-align:left}
- .heading,.buttons{display:flex;flex-wrap:wrap;gap:.65rem;align-items:center}
- .heading{justify-content:space-between;margin-bottom:1rem}
+ .marketing{max-width:1368px;margin:12px auto 32px;padding:0 16px;text-align:left;color:var(--text)}
+ p{text-align:left;color:var(--text-muted);margin:.55rem 0;line-height:1.45}
+ h2,h3{margin:0 0 .55rem;text-align:left;font-size:1rem;overflow-wrap:anywhere}
+ .subtabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+ .subtabs button{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 12px;color:var(--text);font-size:.8rem;font-weight:400}
+ .subtabs button[aria-selected=true]{color:var(--surface);background:var(--forest);border-color:var(--forest)}
  .work{display:grid;grid-template-columns:minmax(150px,230px) minmax(0,1fr);gap:1rem;align-items:start}
  .card{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:1rem;margin:0 0 1rem;min-width:0}
- .beat-list button{display:block;width:100%;text-align:left;margin:0 0 .45rem;overflow-wrap:anywhere;color:var(--text);background:var(--surface);border-color:var(--line)}
- .beat-list small{display:block;font-weight:normal;margin-top:.15rem}
- .beat-list .chosen,.beat-list .new[aria-pressed=true]{background:var(--paper-warm);border-color:var(--forest)}
- form{display:grid;gap:.65rem}
+ .beat-list>button{width:100%;margin-bottom:.55rem}
+ .beat-choices{display:grid;gap:.35rem}
+ .beat-choices button{width:100%;text-align:left;overflow-wrap:anywhere;color:var(--text);background:var(--surface);border-color:var(--line)}
+ .beat-choices button[aria-pressed=true]{background:var(--paper-warm);border-color:var(--forest)}
+ .beat-title{display:flex;justify-content:space-between;align-items:center;gap:.65rem}
+ .beat-title h2{margin:0;font-size:1.15rem}
+ .beat-title button{flex:none}
+ .brief{white-space:pre-wrap;overflow-wrap:anywhere}
+ .cta{margin-bottom:.8rem}
+ .cta strong{margin-right:.25rem}
+ .imports{max-width:760px}
+ .imports h3{margin-top:1rem}
+ .imports ul{padding-left:1.25rem}
+ form{display:grid;gap:.65rem;margin-top:.75rem}
  .fields{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
  label{display:grid;min-width:0;gap:.25rem;font-size:.9rem;font-weight:600}
- input,select,textarea,button{box-sizing:border-box;font:inherit;min-width:0;min-height:44px}
- input,select,textarea{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--line-strong);border-radius:4px;padding:.45rem .55rem}
- textarea{resize:vertical}
+ input,button{box-sizing:border-box;font:inherit;min-width:0;min-height:44px}
+ input{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--line-strong);border-radius:4px;padding:.45rem .55rem}
  button{border:1px solid var(--forest);border-radius:5px;background:var(--forest);color:white;padding:.4rem .75rem;cursor:pointer;font-weight:650}
  button.secondary{color:var(--forest);background:var(--surface)}
  button:disabled{opacity:.6;cursor:default}
  .confirm{display:flex;align-items:center;gap:.5rem}
  .confirm input{width:auto}
  .imports button{justify-self:start}
- .marketing .error{color:#9d302b}
- @media(max-width:860px){.work{grid-template-columns:1fr}.beat-list{display:flex;gap:.4rem;overflow:auto}.beat-list button{width:auto;flex:none;max-width:210px;margin:0}}
- @media(max-width:490px){.fields{grid-template-columns:1fr}.marketing,.card{padding:.7rem}}
+ .error{color:var(--rust)}
+ @media(max-width:860px){.work{grid-template-columns:1fr;gap:.65rem}.beat-list{margin-bottom:0}.beat-list>button{width:auto}.beat-choices{display:flex;overflow:auto;padding:3px}.beat-choices button{width:auto;flex:none;max-width:210px}}
+ @media(max-width:520px){.fields{grid-template-columns:1fr}.marketing{padding:0 8px}.card{padding:.7rem}}
 </style>

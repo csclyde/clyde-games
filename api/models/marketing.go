@@ -19,11 +19,12 @@ type MarketingBrief struct {
 }
 
 type MarketingBeat struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	Project   string    `json:"-" gorm:"type:varchar(64);index;not null"`
-	Version   uint      `json:"version" gorm:"not null"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           uint   `gorm:"primaryKey"`
+	Project      string `gorm:"type:varchar(64);index;not null"`
+	Version      uint   `gorm:"not null"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	CallToAction string `gorm:"type:varchar(16);not null;default:''"`
 	MarketingBrief
 }
 

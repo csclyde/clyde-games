@@ -59,18 +59,45 @@ func TestMarketingHTTPAndSteamworks(t *testing.T) {
 	call("GET", base+"/beats", nil, false, 401, nil)
 	call("GET", "/marketing/necrovale/beats", nil, true, 404, nil)
 	call("POST", "/marketing/farm-builder/reports", nil, true, 404, nil)
-	var beat models.MarketingBeat
-	brief := models.MarketingBrief{Name: "Storm runes", AssetKind: "video", Asset: "https://assets.example/private-token",
-		Brief: "A rune changes the spell.", Hook: "Initial hook", Goal: "wishlists", GoalTarget: 10}
-	call("POST", base+"/beats", brief, true, 201, &beat)
+	const beatsPath = base + "/beats"
+	call("POST", beatsPath, map[string]any{"name": "Missing CTA", "brief": "Example"}, true, 400, nil)
+	call("POST", beatsPath, map[string]any{"name": "Wrong CTA", "brief": "Example", "call_to_action": "demo"}, true, 400, nil)
+	var fresh marketingBeatView
+	call("POST", beatsPath, marketingBeatDraft{Name: "New Beat", Brief: "A changed spell", CallToAction: "wishlist"}, true, 201, &fresh)
+	if fresh.ID == 0 || fresh.CallToAction != "wishlist" || fresh.Version != 1 {
+		t.Fatalf("Three-field creation did not persist: %+v", fresh)
+	}
+	legacy := models.MarketingBeat{Project: marketingProject, Version: 1, MarketingBrief: models.MarketingBrief{
+		Name: "Storm runes", AssetKind: "video", Asset: "https://assets.example/private-token",
+		Hook: "Initial hook", WhyNow: "A legacy occasion", CTA: "Wishlist Cursemark on Steam", Goal: "wishlists", GoalTarget: 10,
+	}}
+	if err := db.Create(&legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	var list struct {
+		Beats []marketingBeatView `json:"beats"`
+	}
+	call("GET", beatsPath, nil, true, 200, &list)
+	if len(list.Beats) != 2 || list.Beats[0].ID != legacy.ID || list.Beats[0].Brief != legacy.Hook ||
+		list.Beats[0].CallToAction != "wishlist" {
+		t.Fatalf("Legacy hook and CTA fallback are unavailable: %+v", list)
+	}
+	beat := list.Beats[0]
 	path := fmt.Sprintf("%s/beats/%d", base, beat.ID)
 	call("POST", path+"/generate", map[string]any{"version": beat.Version}, true, 503, nil)
-	beat.Hook = "Updated hook"
+	beat.Brief = "Updated hook"
+	beat.CallToAction = "purchase"
 	call("PUT", path, beat, true, 200, &beat)
-	if beat.Hook != "Updated hook" || beat.Version != 2 {
+	if beat.Brief != "Updated hook" || beat.Version != 2 || beat.CallToAction != "purchase" {
 		t.Fatalf("Beat update did not persist: %+v", beat)
 	}
-	call("PUT", path, map[string]any{"name": brief.Name, "asset_kind": "video", "asset": "a", "goal": "wishlists", "version": 1}, true, 409, nil)
+	call("PUT", path, map[string]any{"name": beat.Name, "brief": "old", "call_to_action": "wishlist", "version": 1}, true, 409, nil)
+	stored, err := readMarketingBeat(db, legacy.ID)
+	expectedBrief := legacy.MarketingBrief
+	expectedBrief.Brief = beat.Brief
+	if err != nil || stored.MarketingBrief != expectedBrief {
+		t.Fatalf("Editing the new Beat fields changed legacy metadata: %+v %v", stored.MarketingBrief, err)
+	}
 
 	t.Setenv("CURSEMARK_OPENAI_API_KEY", "mock-secret")
 	oldClient := marketingAIClient
@@ -80,8 +107,13 @@ func TestMarketingHTTPAndSteamworks(t *testing.T) {
 			t.Fatal("Unexpected OpenAI request")
 		}
 		raw, _ := io.ReadAll(r.Body)
-		if bytes.Contains(raw, []byte("private-token")) || !bytes.Contains(raw, []byte("untrusted evidence")) ||
-			!bytes.Contains(raw, []byte("Updated hook")) || !bytes.Contains(raw, []byte(`"store":false`)) {
+		var request struct {
+			Input string `json:"input"`
+		}
+		var input map[string]string
+		if json.Unmarshal(raw, &request) != nil || json.Unmarshal([]byte(request.Input), &input) != nil ||
+			len(input) != 3 || input["brief"] != "Updated hook" || input["name"] != beat.Name || input["call_to_action"] != "purchase" ||
+			!bytes.Contains(raw, []byte("untrusted evidence")) || !bytes.Contains(raw, []byte(`"store":false`)) {
 			t.Fatalf("Unexpected research context: %s", raw)
 		}
 		primary := "https://example.org/community/rules"
@@ -98,9 +130,9 @@ func TestMarketingHTTPAndSteamworks(t *testing.T) {
 	})}
 	call("POST", path+"/generate", map[string]any{"version": beat.Version}, true, 201, nil)
 	var detail struct {
-		Beat       models.MarketingBeat `json:"beat"`
-		Placements []marketingPost      `json:"placements"`
-		Result     marketingSummary     `json:"result"`
+		Beat       marketingBeatView `json:"beat"`
+		Placements []marketingPost   `json:"placements"`
+		Result     marketingSummary  `json:"result"`
 	}
 	call("GET", path, nil, true, 200, &detail)
 	if len(detail.Placements) != 2 || detail.Placements[0].Decision != "candidate" ||
@@ -155,14 +187,14 @@ func TestMarketingHTTPAndSteamworks(t *testing.T) {
 	call("GET", path, nil, true, 200, &detail)
 	result := detail.Result
 	if result.Wishlists == nil || *result.Wishlists != 7 || result.Purchases == nil || *result.Purchases != 0 ||
-		result.Activations != nil || result.Score == nil || *result.Score != 70 || result.Observed != 2 {
+		result.Activations != nil || result.Tracked == nil || *result.Tracked != 50 || result.Observed != 2 {
 		t.Fatalf("Unexpected reconciled results: %+v", result)
 	}
 	importFile("2025-01-08", "2025-01-12", headers, 200, false)
 	detail.Result = marketingSummary{}
 	call("GET", path, nil, true, 200, &detail)
-	if result = detail.Result; result.Score != nil || result.Observed != 1 || result.Expected != 2 || result.Wishlists == nil || *result.Wishlists != 3 {
-		t.Fatalf("Suppressed row should be missing and hide score: %+v", result)
+	if result = detail.Result; result.Observed != 1 || result.Expected != 2 || result.Wishlists == nil || *result.Wishlists != 3 {
+		t.Fatalf("Suppressed row should be missing: %+v", result)
 	}
 
 	var wg sync.WaitGroup
