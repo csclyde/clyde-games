@@ -40,6 +40,9 @@ No crash operation closes or moves Planka cards.
 
 `POST /resolvecrash?id=<report id>` and MCP `resolve_crash(id)` resolve every
 currently stored, non-deleted member with that group key, including legacy rows.
+The portal's `POST /crash/ignore?id=<report id>` closes the same open groups
+with an `ignored` disposition. The reports and their investigation history stay
+available. A later occurrence can appear in the open queue.
 MCP lists index individual active reports; detail returns `group_report_ids`
 including resolved members so each can be fetched with `get_crash`.
 The complete membership index fails explicitly above 100,000 members.

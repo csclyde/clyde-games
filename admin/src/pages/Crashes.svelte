@@ -5,6 +5,7 @@
  import CrashInvestigation from '../components/CrashInvestigation.svelte';
 	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
 	import Panel from '../components/Panel.svelte';
+ import ReportActions from '../components/ReportActions.svelte';
  import CrashHealth from '../components/CrashHealth.svelte';
 	import { groupCrashList, crashResolutionIDs } from '../crash-groups.mjs';
 
@@ -243,13 +244,15 @@
 		return project === 'all' || (item.Project || '').toLowerCase() === project.toLowerCase();
 	}
 
-	async function resolveCrash(crash) {
+	async function closeCrashGroup(crash, action) {
 		const key = getCrashKey(crash);
-		resolvingCrashes = { ...resolvingCrashes, [key]: true };
+		if (resolvingCrashes[key] || resolvingAllCrashes) return;
+		resolvingCrashes = { ...resolvingCrashes, [key]: action };
+		const route = action === 'ignore' ? '/api/crash/ignore' : '/api/resolvecrash';
 
 		try {
-   const results = await Promise.all(crashResolutionIDs(crash).map(id => fetch(`/api/resolvecrash?id=${id}`, {method:'POST'})));
-   if (results.some(res => !res.ok)) throw new Error('Some reports could not be resolved. Remaining reports are shown below.');
+   const results = await Promise.all(crashResolutionIDs(crash).map(id => fetch(`${route}?id=${id}`, {method:'POST'})));
+   if (results.some(res => !res.ok)) throw new Error(`Some reports could not be ${action === 'ignore' ? 'ignored' : 'resolved'}. Remaining reports are shown below.`);
 			await refreshCrashLists();
 		} catch (error) {
    await refreshCrashLists();
@@ -311,6 +314,7 @@
 	}
 
 	async function resolveAllCrashes() {
+		if (resolvingAllCrashes || Object.keys(resolvingCrashes).length) return;
 		resolvingAllCrashes = true;
 
 		try {
@@ -349,7 +353,7 @@
  <div class="incident-overview"><div><span>Open incidents</span><b>{loadingCrashes ? '…' : new Set(visibleCrashes.map(r=>`${r.Project}:${r.GroupKey||r.ID}`)).size}</b></div><div><span>Stored reports</span><b>{loadingCrashes ? '…' : visibleCrashes.length}</b></div><div><span>Returned incidents</span><b>{health?.returned_open_groups ?? '—'}</b></div></div>
  <div class="queue-controls">
   <label class="search-control"><span>Search issues</span><input aria-label="Search crash issues" bind:value={queueSearch} placeholder="Error, stack, build or client ID"/></label>
-  <label><span>Show</span><select aria-label="Crash issue view" bind:value={queueView}><option value="all">All open issues</option><option value="returned">Returned after resolution</option><option value="detailed">With detailed reports</option><option value="legacy">Legacy only</option></select></label>
+  <label><span>Show</span><select aria-label="Crash issue view" bind:value={queueView}><option value="all">All open issues</option><option value="returned">Returned after closure</option><option value="detailed">With detailed reports</option><option value="legacy">Legacy only</option></select></label>
   <label><span>Sort</span><select aria-label="Crash issue sort" bind:value={queueSort}><option value="recent">Latest detailed receipt</option><option value="reports">Recent report count</option><option value="ids">Recent reporting IDs</option></select></label>
 			<label class="build-cutoff-control" for="oldest-crash-build">
 				<span>Oldest Build</span>
@@ -370,9 +374,13 @@
 					<span>Saved</span>
 				{/if}
 			</div>
-			<button type="button" disabled={!$canWrite || resolvingAllCrashes || visibleRegularCrashes.length === 0} on:click={resolveAllCrashes}>
-				{resolvingAllCrashes ? 'Closing...' : 'Close All'}
-			</button>
+ </div>
+ <div class="queue-bulk">
+    <button type="button" aria-label="Close all visible crash groups"
+        disabled={!$canWrite || resolvingAllCrashes || Object.keys(resolvingCrashes).length || visibleRegularCrashes.length === 0}
+        on:click={resolveAllCrashes}>
+        {resolvingAllCrashes ? 'Closing...' : 'Close All'}
+    </button>
  </div>
  {#if buildFilter}<p class="build-filter">Open issues with build <b>{buildFilter.build||'Unknown'}</b> in {buildFilter.project||'untagged clients'} <button on:click={()=>buildFilter=null}>Clear build filter</button></p>{/if}
 	{#if crashSettingsError}
@@ -414,7 +422,7 @@
          <div><dt>Recent reports</dt><dd title={`Detailed receipts in the selected ${health?.days || 30}-day analysis window`}>{healthFor(crash,health)?.reports ?? 'Unavailable'}</dd></div>
          <div><dt>Reporting IDs</dt><dd title="Distinct installation identifiers in the selected analysis window; not verified people">{healthFor(crash,health)?.reporting_ids ?? 'Unavailable'}</dd></div>
          <div><dt>First received</dt><dd title="Earliest retained detailed receipt, across all time; legacy timestamps are unknown">{healthFor(crash,health)?.first_received ? formatDate(healthFor(crash,health).first_received) : (!health ? 'Unavailable' : 'Unknown / legacy')}</dd></div>
-         {#if healthFor(crash,health)?.last_resolution}<div><dt>Recorded resolution</dt><dd>{formatDate(healthFor(crash,health).last_resolution)}</dd></div>{/if}
+         {#if healthFor(crash,health)?.last_resolution}<div><dt>Recorded closure</dt><dd>{formatDate(healthFor(crash,health).last_resolution)}</dd></div>{/if}
          <div><dt>Open occurrences</dt><dd title="Includes aggregate counts from legacy reports">{crash.Count}</dd></div>
         </dl>
        </section>
@@ -446,14 +454,21 @@
 					<div class="comment-side">
       <div class="stats primary-stats"><p><span>Reports</span>{crash.Reports.length}</p><p><span>Last received</span>{healthFor(crash,health)?.last_received || crash.LastIngestedAt ? formatDate(healthFor(crash,health)?.last_received || crash.LastIngestedAt) : 'Legacy: unknown'}</p></div>
 
-						<div class="actions">
-							<button type="button" disabled={!$canWrite || resolvingCrashes[getCrashKey(crash)] || resolvingAllCrashes} on:click={() => openTicketModal(crash)}>
-								Make Ticket
-							</button>
-							<button type="button" disabled={!$canWrite || resolvingCrashes[getCrashKey(crash)] || resolvingAllCrashes} on:click={() => resolveCrash(crash)}>
-								{resolvingCrashes[getCrashKey(crash)] ? 'Resolving...' : 'Resolve group'}
-							</button>
-						</div>
+						<ReportActions label="Crash group actions">
+							<svelte:fragment slot="primary">
+								<button class="resolve-action" type="button" disabled={!$canWrite || resolvingCrashes[getCrashKey(crash)] || resolvingAllCrashes} on:click={() => closeCrashGroup(crash, 'resolve')}>
+									{resolvingCrashes[getCrashKey(crash)] === 'resolve' ? 'Resolving...' : 'Resolve group'}
+								</button>
+								<button class="ignore-action" type="button" disabled={!$canWrite || resolvingCrashes[getCrashKey(crash)] || resolvingAllCrashes} on:click={() => closeCrashGroup(crash, 'ignore')}>
+									{resolvingCrashes[getCrashKey(crash)] === 'ignore' ? 'Ignoring...' : 'Ignore group'}
+								</button>
+							</svelte:fragment>
+							<svelte:fragment slot="secondary">
+								<button type="button" disabled={!$canWrite || resolvingCrashes[getCrashKey(crash)] || resolvingAllCrashes} on:click={() => openTicketModal(crash)}>
+									Make Ticket
+								</button>
+							</svelte:fragment>
+						</ReportActions>
 					</div>
 				</div>
 			</Panel>
@@ -475,6 +490,9 @@
 <style>
  .incident-overview{display:flex;flex-wrap:wrap;gap:24px;padding:10px 0 18px}.incident-overview div{display:flex;align-items:baseline;gap:9px}.incident-overview span{font-size:.75rem;color:var(--text-soft)}.incident-overview b{font:700 1.15rem var(--font-mono);color:var(--forest)}.stats.primary-stats{grid-template-columns:repeat(2,minmax(90px,max-content))}.queue-heading{scroll-margin-top:60px}
 
+ .queue-bulk { display: flex; justify-content: flex-end; margin: 0 0 16px; }
+ .queue-bulk button { min-height: 34px; font-size: .8rem; }
+ @media (max-width: 820px), (pointer: coarse) { .queue-bulk button { min-height: 44px; } }
  .queue-controls{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin-bottom:16px}.queue-controls label{display:flex;flex-direction:column;gap:5px;font-size:.7rem;font-weight:700;color:var(--text-soft);min-width:0}.queue-controls select{min-width:0}.queue-controls .search-control{flex:1;min-width:190px}.search-control input{box-sizing:border-box;width:100%;padding:7px 9px;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface);color:var(--text);font:inherit;font-size:.82rem}.issue-state{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.legacy-badge,.build-filter{font-size:.76rem;text-align:left;overflow-wrap:anywhere}.build-filter button{font-size:.74rem;margin-left:8px}@media(max-width:550px){.queue-controls label{width:100%}.queue-controls select{width:100%}}
 
 	main {
@@ -748,13 +766,6 @@
 		padding: 7px 10px;
 	}
 
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		justify-content: flex-end;
-	}
-
 	button:hover:not(:disabled) {
 		background: var(--paper-warm);
 		border-color: var(--charcoal);
@@ -872,15 +883,6 @@
 			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 			justify-content: stretch;
 			width: 100%;
-		}
-
-		.actions {
-			justify-content: flex-start;
-			width: 100%;
-		}
-
-		.actions button {
-			flex: 1 1 96px;
 		}
 
 		.stack {

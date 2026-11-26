@@ -12,6 +12,7 @@ import (
 
 	"api.clyde.games/models"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func GetCrash(c *gin.Context) {
@@ -182,4 +183,22 @@ func ResolveCrash(c *gin.Context) {
 
 	c.JSON(http.StatusOK, crash)
 
+}
+
+func IgnoreCrash(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Query("id"), 10, 32)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report id"})
+		return
+	}
+	crash, err := models.IgnoreCrashID(models.AnalyticsDB.WithContext(c.Request.Context()), id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Crash report not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Crash group could not be ignored"})
+		return
+	}
+	c.JSON(http.StatusOK, crash)
 }

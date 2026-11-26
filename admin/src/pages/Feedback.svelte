@@ -4,6 +4,7 @@
  import ReportNotes from "../components/ReportNotes.svelte";
  import {loadInvestigationStatuses,statusKey} from "../investigation-status.mjs";
  import Panel from '../components/Panel.svelte';
+ import ReportActions from '../components/ReportActions.svelte';
  import FeedbackMarkdown from '../components/FeedbackMarkdown.svelte';
  import {feedbackPresentation} from '../feedback-presentation.mjs';
 	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
@@ -555,23 +556,27 @@
 							<p><span>Created</span>{formatDate(comment.CreatedAt)}</p>
 							<p><span>Build</span>{formatBuildDate(comment.Build)}</p>
 						</div>
-						<div class="actions">
-							<button type="button" disabled={!$canWrite || translatingFeedback[comment.ID] || resolvingFeedback[comment.ID]} on:click={() => translateFeedback(comment)}>
-								{translatingFeedback[comment.ID] ? 'Translating...' : 'Translate'}
-							</button>
-							<button type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => openTicketModal(comment)}>
-								Make Ticket
-							</button>
-							<button type="button" disabled={!comment.SavegameID || resolvingFeedback[comment.ID]} on:click={() => downloadSavegame(comment)}>
-								Download Save
-							</button>
-							<button class="resolve-action" type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => closeFeedback(comment.ID, 'resolved')}>
-								{resolvingFeedback[comment.ID] === 'resolved' ? 'Resolving...' : 'Resolve'}
-							</button>
-							<button class="ignore-action" type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => closeFeedback(comment.ID, 'ignored')}>
-								{resolvingFeedback[comment.ID] === 'ignored' ? 'Ignoring...' : 'Ignore'}
-							</button>
-						</div>
+						<ReportActions label="Feedback actions">
+							<svelte:fragment slot="primary">
+								<button class="resolve-action" type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => closeFeedback(comment.ID, 'resolved')}>
+									{resolvingFeedback[comment.ID] === 'resolved' ? 'Resolving...' : 'Resolve'}
+								</button>
+								<button class="ignore-action" type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => closeFeedback(comment.ID, 'ignored')}>
+									{resolvingFeedback[comment.ID] === 'ignored' ? 'Ignoring...' : 'Ignore'}
+								</button>
+							</svelte:fragment>
+							<svelte:fragment slot="secondary">
+								<button type="button" disabled={!$canWrite || translatingFeedback[comment.ID] || resolvingFeedback[comment.ID]} on:click={() => translateFeedback(comment)}>
+									{translatingFeedback[comment.ID] ? 'Translating...' : 'Translate'}
+								</button>
+								<button type="button" disabled={!$canWrite || resolvingFeedback[comment.ID]} on:click={() => openTicketModal(comment)}>
+									Make Ticket
+								</button>
+								<button type="button" disabled={!comment.SavegameID || resolvingFeedback[comment.ID]} on:click={() => downloadSavegame(comment)}>
+									Download Save
+								</button>
+							</svelte:fragment>
+						</ReportActions>
 						{#if closeErrors[comment.ID]}<p class="state-message error" role="alert">{closeErrors[comment.ID]}</p>{/if}
 					</div>
 				</div>
@@ -718,13 +723,6 @@
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
-	}
-
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		justify-content: flex-end;
 	}
 
 	.message-header {
@@ -921,15 +919,6 @@
 			width: 100%;
 		}
 
-		.actions {
-			justify-content: flex-start;
-			width: 100%;
-		}
-
-		.actions button {
-			flex: 1 1 96px;
-		}
-
 	}
 
 	@media (max-width: 480px) {
@@ -937,20 +926,5 @@
 			grid-template-columns: 1fr;
 		}
 	}
-
-	.actions button.resolve-action {
-		color: white;
-		background: #23633e;
-		border-color: #23633e;
-	}
-
-	.actions button.ignore-action {
-		color: white;
-		background: #a03538;
-		border-color: #a03538;
-	}
-
-	.actions button.resolve-action:not(:disabled):hover { background: #194a2e; }
-	.actions button.ignore-action:not(:disabled):hover { background: #7f252a; }
 
 </style>

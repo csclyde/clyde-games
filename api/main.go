@@ -134,6 +134,7 @@ func registerRoutes(router *gin.Engine) {
 	router.GET("/crash/settings", endpoints.AdminAuth, endpoints.GetCrashSettings)
 	router.PUT("/crash/settings", endpoints.AdminAuth, endpoints.UpdateCrashSettings)
 	router.POST("/resolvecrash", endpoints.AdminAuth, endpoints.ResolveCrash)
+	router.POST("/crash/ignore", endpoints.AdminAuth, endpoints.IgnoreCrash)
 	router.POST("/crash", endpoints.AddCrash)
 	router.GET("/savegame", endpoints.AdminAuth, endpoints.GetSavegames)
 	router.GET("/savegame/download-all", endpoints.AdminAuth, endpoints.DownloadAllSavegames)

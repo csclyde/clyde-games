@@ -186,7 +186,7 @@
 							{#if entry.item.Commit}<span>commit: {entry.item.Commit}</span>{/if}
 							{#if entry.item.SID}<span>session: {entry.item.SID}</span>{/if}
 							{#if entry.kind === 'Crash' && entry.item.Count}<span>{entry.item.Count} occurrence{entry.item.Count === 1 ? '' : 's'}</span>{/if}
-							{#if entry.item.Resolved}<span>Resolved</span>{/if}
+							{#if entry.item.Resolved}<span>{entry.item.ClosureDisposition === 'ignored' ? 'Ignored' : 'Resolved'}</span>{/if}
 						</div>
 					</div>
 					{#if entry.kind === 'Save game'}

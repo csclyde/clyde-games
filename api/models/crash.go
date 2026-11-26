@@ -29,12 +29,13 @@ type Crash struct {
 	Resolved bool   `gorm:"type:boolean;default:false"`
 	// Version 0 rows are original, possibly aggregated history. Their Count,
 	// metadata and timestamps must never be expanded into invented occurrences.
-	OccurrenceVersion uint `gorm:"not null;default:0"`
-	IngestedAt        *time.Time
-	ResolvedAt        *time.Time
-	GroupKey          string  `gorm:"type:varchar(67);index"`
-	GroupIdentity     string  `gorm:"type:longtext"`
-	ReceiptKey        *string `gorm:"type:char(64);uniqueIndex" json:"-"`
+	OccurrenceVersion  uint `gorm:"not null;default:0"`
+	IngestedAt         *time.Time
+	ResolvedAt         *time.Time
+	GroupKey           string  `gorm:"type:varchar(67);index"`
+	GroupIdentity      string  `gorm:"type:longtext"`
+	ReceiptKey         *string `gorm:"type:char(64);uniqueIndex" json:"-"`
+	ClosureDisposition string  `gorm:"type:varchar(16)" json:",omitempty"`
 }
 
 const CrashReportIDHeader = "X-Clyde-Crash-Report-ID"
@@ -197,6 +198,7 @@ func AddCrash(crash Crash) (*Crash, error) {
 
 func AddCrashWithReportID(crash Crash, reportID *string) (*Crash, error) {
 	crash.Project = NormalizeProjectName(crash.Project)
+	crash.ClosureDisposition = ""
 	crash.ReceiptKey = nil
 	if crash.Project == FarmBuilderProject && reportID != nil {
 		if !hex32Pattern.MatchString(*reportID) || strings.TrimSpace(crash.PID) == "" {
@@ -237,10 +239,10 @@ func AddCrashWithReportID(crash Crash, reportID *string) (*Crash, error) {
 		now := tx.NowFunc()
 		crash.CreatedAt, crash.UpdatedAt, crash.IngestedAt = now, now, &now
 		if crash.ReceiptKey == nil {
-			return tx.Omit("ReceiptKey").Create(&crash).Error
+			return tx.Omit("ReceiptKey", "ClosureDisposition").Create(&crash).Error
 		}
 		key := *crash.ReceiptKey
-		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&crash).Error; err != nil {
+		if err := tx.Omit("ClosureDisposition").Clauses(clause.OnConflict{DoNothing: true}).Create(&crash).Error; err != nil {
 			return err
 		}
 		// Use a current read so retries can see a simultaneous insert even
@@ -278,6 +280,16 @@ func ResolveCrash(hash string, project ...string) (*Crash, error) {
 }
 
 func ResolveCrashID(db *gorm.DB, id uint64) (*Crash, error) {
+	return closeCrashID(db, id, false)
+}
+
+// IgnoreCrashID records dismissal through the same group closure as Resolve.
+// Existing occurrences remain available for investigation and history.
+func IgnoreCrashID(db *gorm.DB, id uint64) (*Crash, error) {
+	return closeCrashID(db, id, true)
+}
+
+func closeCrashID(db *gorm.DB, id uint64, ignore bool) (*Crash, error) {
 	var item Crash
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Read identity before taking the group lock. Taking member locks first
@@ -292,7 +304,11 @@ func ResolveCrashID(db *gorm.DB, id uint64) (*Crash, error) {
 			return err
 		}
 		now := tx.NowFunc()
-		if err := tx.Model(&Crash{}).Where("group_key = ? AND resolved = ?", item.GroupKey, false).UpdateColumns(map[string]interface{}{"resolved": true, "resolved_at": now}).Error; err != nil {
+		updates := map[string]interface{}{"resolved": true, "resolved_at": now}
+		if ignore {
+			updates["closure_disposition"] = "ignored"
+		}
+		if err := tx.Model(&Crash{}).Where("group_key = ? AND resolved = ?", item.GroupKey, false).UpdateColumns(updates).Error; err != nil {
 			return err
 		}
 		// Refresh so repeated resolution returns its original resolution time.

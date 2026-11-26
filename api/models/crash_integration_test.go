@@ -66,14 +66,15 @@ func TestCrashMySQLMigrationConcurrencyAndRecurrence(t *testing.T) {
 	}
 	created, updated := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC), time.Date(2025, 1, 1, 1, 0, 0, 0, time.UTC)
 	legacy := Crash{Model: gorm.Model{CreatedAt: created, UpdatedAt: updated}, Project: "cursemark", PID: "original", Message: "failure", Stack: "game.Player.update Player.hx:10\ngame.Main.tick Main.hx:40\nGPU Model: old", Platform: "windows", Build: "2020-01-01", Commit: "original", Hash: "legacy-hash", Count: 42, Resolved: true}
-	if err := db.Omit("OccurrenceVersion", "IngestedAt", "ResolvedAt", "GroupKey", "GroupIdentity").Create(&legacy).Error; err != nil {
+	legacyFields := []string{"CreatedAt", "UpdatedAt", "DeletedAt", "PID", "Project", "Message", "Stack", "Env", "Category", "Platform", "Build", "Commit", "Hash", "Count", "Resolved"}
+	if err := db.Select(legacyFields).Create(&legacy).Error; err != nil {
 		t.Fatal(err)
 	}
 	// Include soft-deleted legacy history, without reviving it.
 	deleted := legacy
 	deleted.ID = 0
 	deleted.DeletedAt = gorm.DeletedAt{Time: updated, Valid: true}
-	if err := db.Omit("OccurrenceVersion", "IngestedAt", "ResolvedAt", "GroupKey", "GroupIdentity").Create(&deleted).Error; err != nil {
+	if err := db.Select(legacyFields).Create(&deleted).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.AutoMigrate(&Crash{}, &CrashGroup{}); err != nil {

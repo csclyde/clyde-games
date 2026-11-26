@@ -16,7 +16,7 @@
  $: unknownDays=firstDay?reportDays.filter(d=>d.day<firstDay).length:reportDays.length;
 </script>
 <details class="crash-health crash-analysis" aria-busy={loading}><summary class="analysis-toggle"><strong>Analysis</strong><span>Trends, builds and reporting IDs</span>{#if error}<small>Unavailable</small>{/if}</summary><div class="analysis-content">
- <Panel inset={false} title="Crash health" subtitle="Detailed reports by server receipt time. Resolved reports remain in these counts.">
+ <Panel inset={false} title="Crash health" subtitle="Detailed reports by server receipt time. Closed reports remain in these counts.">
   <div slot="actions"><label class="window-label">Receipt window<select aria-label="Crash receipt window" bind:value={days}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select></label></div>
   {#if loading}<p class="notice" role="status">Loading crash health…</p>
   {:else if error}<p class="notice error" role="alert">{error}</p>
@@ -27,7 +27,7 @@
     <article><span>Open issue groups</span><strong>{number(data.open_groups)}</strong><small>Exact identities · across stored history</small></article>
     <article class:returned={data.returned_open_groups>0}><span>Returned open groups</span><strong>{number(data.returned_open_groups)}</strong><small>{number(data.returned_reports)} recent reports · {number(data.returned_reporting_ids)} reporting IDs</small></article>
    </div>
-   <p class="definition">Distinct client PIDs, counted separately per project. These are not verified people; active-installation and session totals are unavailable. Returned groups received new reports after their latest recorded resolution.</p>
+   <p class="definition">Distinct client PIDs, counted separately per project. These are not verified people; active-installation and session totals are unavailable. Returned groups received new reports after their latest recorded closure.</p>
   {/if}
  </Panel>
  {#if data}
