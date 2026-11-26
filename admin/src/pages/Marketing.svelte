@@ -15,7 +15,7 @@
  const today=new Date().toISOString().slice(0,10);
  const tabButtons=[];
  let section='beats',beats=[],reports=[],posts=[],result=null;
- let selected=0,requestID=0,loading=true,detailLoading=false,showArchivedBeats=false,archiving=false;
+ let selected=0,requestID=0,beatRead=0,loading=true,detailLoading=false,showArchivedBeats=false,archiving=false;
  let targets=[],linked=[],targetsLoading=true,targetsError='',updatingTarget=false;
  let requestedTarget=null;
  let error='',notice='',editor=null,saving=false,editorError='',detailHeading;
@@ -76,12 +76,13 @@
  }
 
  async function refreshBeat(id=selected,ticket=requestID){
+  const read=++beatRead;
   try{
    const detail=await portalRequest(base+'/beats/'+id,'GET');
-   if(ticket!==requestID)return;
+   if(ticket!==requestID||read!==beatRead)return;
    beats=beats.map(item=>item.id===id?detail.beat:item);
    posts=detail.placements;result=detail.result;linked=detail.target_ids??[];
-  }catch(e){if(ticket===requestID)error=e.message;}
+  }catch(e){if(ticket===requestID&&read===beatRead)error=e.message;}
  }
 
  function openEditor(current=null){
@@ -133,7 +134,12 @@
  }
 
  function placementSaved(event){
-  if(selected===event.detail.beat_id)refreshBeat();
+  const saved=event.detail;
+  if(selected!==saved.beat_id)return;
+  const current=posts.find(post=>post.id===saved.id);
+  if(!current)posts=[...posts,saved];
+  else if(current.version<=saved.version)posts=posts.map(post=>post.id===saved.id?{...post,...saved}:post);
+  refreshBeat();
  }
 
  function viewTarget(event){

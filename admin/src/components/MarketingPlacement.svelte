@@ -9,6 +9,7 @@
  export let post=null;
  export let target=null;
  export let allowHandoff=true;
+ export let targetSaving=false;
  const dispatch=createEventDispatcher();
  const blank=()=>({platform:target?targetPlatform(target):'',community:target?.name||'',audience_fit:'',timing:'',title:'',copy:'',asset_notes:'',rule_evidence:'',rules_url:'',rules_checked:'',decision:'hold',published_url:'',published_note:''});
  const datestring=value=>{
@@ -18,6 +19,7 @@
  };
  let draft=post?{...post}:blank(),publication=datestring(post?.published_at);
  let open=false,busy=false,dirty=false,advancedDirty=false,error='',notice='';
+ let operation=null;
  let showPublication=!!post?.published_at;
  const today=new Date().toISOString().slice(0,10);
  $: path='/marketing/cursemark/beats/'+beatID+'/placements'+(post?'/'+post.id:'');
@@ -27,8 +29,23 @@
   showPublication=!!post.published_at;
  }
 
- async function save(event){
-  const textOnly=!!target&&event.submitter?.value!=='details';
+ function submit(event){
+  return save(!!target&&event.submitter?.value!=='details');
+ }
+
+ function save(textOnly){
+  if(!operation)operation=persist(textOnly).finally(()=>operation=null);
+  return operation;
+ }
+
+ export async function savePending(){
+  if(operation&&!(await operation))return false;
+  if(busy)return false;
+  if(!dirty||(!post&&!draft.title.trim()&&!draft.copy.trim()))return true;
+  return save(!advancedDirty);
+ }
+
+ async function persist(textOnly){
   busy=true;error='';notice='';
   try{
    let saved;
@@ -40,6 +57,7 @@
     if(target&&!post){
      body={...blank(),title:draft.title,copy:draft.copy,target_id:target.id};
     }else{
+     if(showPublication&&(!draft.published_url.trim()||!publication))throw Error('Enter the live URL and publication date before saving.');
      const date=publication===datestring(draft.published_at)?draft.published_at:new Date(publication);
      body={...draft,published_at:showPublication&&publication?new Date(date).toISOString():null};
      if(!showPublication){
@@ -54,7 +72,8 @@
    dirty=advancedDirty;
    notice=target&&textOnly?'Draft saved.':post?'Placement saved.':'Placement added.';
    dispatch('saved',saved);
-  }catch(e){error=e.message;}
+   return true;
+  }catch(e){error=e.message;return false;}
   finally{busy=false;}
  }
 
@@ -64,7 +83,7 @@
    const saved=await portalRequest(path+'/archive','PUT',{version:draft.version,archived:!post.archived_at});
    draft={...draft,...saved};
    notice=saved.archived_at?'Placement archived.':'Placement restored.';
-   dispatch('saved',draft);
+   dispatch('saved',{...post,...saved});
   }catch(e){error=e.message;}
   finally{busy=false;}
  }
@@ -94,7 +113,8 @@
   </div>
  {/if}
  {#if target||open}
-  <form on:submit|preventDefault={save} on:input={event=>{dirty=true;if(event.target.closest('.advanced'))advancedDirty=true;}}>
+  <form on:submit|preventDefault={submit} on:input={event=>{dirty=true;if(event.target.closest('.advanced'))advancedDirty=true;}}>
+  <fieldset disabled={targetSaving||busy}>
    {#if target}
     <label>Title<input bind:value={draft.title} maxlength="255"/></label>
     <label>Body<textarea bind:value={draft.copy} rows="5" maxlength="5000"></textarea></label>
@@ -155,6 +175,7 @@
      </div>
     </svelte:element>
    {/if}
+  </fieldset>
   </form>
   {#if post?.published_at}<MarketingResults result={post.result}/>{/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -173,7 +194,8 @@
  .links,.text-actions,.inline-heading{display:flex;align-items:center;flex-wrap:wrap;gap:.55rem}
  .inline-heading{margin-bottom:.55rem}
  a{color:var(--forest);text-decoration:underline}
- form,.settings{display:grid;gap:.65rem}
+ fieldset,.settings{display:grid;gap:.65rem}
+ fieldset{min-inline-size:0;margin:0;padding:0;border:0}
  .rules,details.advanced{border-top:1px solid var(--line);padding-top:.55rem}
  .advanced summary{margin-bottom:.5rem}
  h4{margin:0}
