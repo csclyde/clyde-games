@@ -61,9 +61,6 @@
   {:else}
    <p><strong>{coverageLabels[evidence.coverage.status]}</strong>{evidence.coverage.checked_at?' · Checked '+evidence.coverage.checked_at:''}</p>
    {#if evidence.coverage.note}<p>{evidence.coverage.note}</p>{/if}
-   {#if evidence.coverage.items?.length}
-    <ul>{#each evidence.coverage.items as item}<li><a href={item.url} rel="noreferrer" target="_blank">{item.title}</a> · {item.format}{item.date?' · '+item.date:''}</li>{/each}</ul>
-   {/if}
    <p><strong>{replyLabels[evidence.reply.status]}</strong>{evidence.reply.date?' · '+evidence.reply.date:''}{evidence.reply.checked_at?' · Checked '+evidence.reply.checked_at:''}</p>
    {#if evidence.reply.note}<p>{evidence.reply.note}</p>{/if}
   {/if}
@@ -75,8 +72,7 @@
  header{display:flex;gap:.5rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
  h3,p{margin:.4rem 0;text-align:left}
  h3{font-size:.92rem}
- p,li{font-size:.87rem}
- a{color:var(--forest);text-decoration:underline}
+ p{font-size:.87rem}
  form,fieldset,label{display:grid;gap:.5rem}
  form{margin-top:.6rem}
  fieldset{border:1px solid var(--line);border-radius:4px;min-width:0}

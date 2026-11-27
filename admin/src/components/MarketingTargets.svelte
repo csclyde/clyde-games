@@ -2,6 +2,8 @@
  import {createEventDispatcher} from 'svelte';
  import {portalRequest} from '../portal-auth.mjs';
  import {compareMarketingTargets,publicMarketingURL,targetPlatform} from '../marketing-targets.mjs';
+ import MarketingOutreachStatus from './MarketingOutreachStatus.svelte';
+ import MarketingCoverageHistory from './MarketingCoverageHistory.svelte';
  import MarketingCreatorEvidence from './MarketingCreatorEvidence.svelte';
  import MarketingTargetImpact from './MarketingTargetImpact.svelte';
  import MarketingTargetBadges from './MarketingTargetBadges.svelte';
@@ -180,8 +182,10 @@
       <div><dt>Public channels</dt><dd>{#each detail.creator.channel_urls.filter(publicMarketingURL) as link}<a href={publicMarketingURL(link)} rel="noreferrer" target="_blank">{link}</a>{:else}None saved{/each}</dd></div>
       <div><dt>Games covered</dt><dd>{detail.creator.games_covered.join(' · ')||'None saved'}</dd></div>
      </dl>
-     {#key detail.id}<MarketingCreatorEvidence target={detail} on:saved={creatorReportSaved}/>{/key}
     {:else if publicMarketingURL(detail.url)}<p><a href={publicMarketingURL(detail.url)} rel="noreferrer" target="_blank">{detail.url}</a></p>{/if}
+    {#if detail.creator}<MarketingOutreachStatus target={detail}/>{/if}
+    <MarketingCoverageHistory target={detail}/>
+    {#if detail.creator}{#key detail.id}<MarketingCreatorEvidence target={detail} on:saved={creatorReportSaved}/>{/key}{/if}
     {#if detail.history}
      <details aria-label="Prior outreach and coverage">
       <summary>Prior activity</summary>
