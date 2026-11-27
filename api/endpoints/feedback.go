@@ -35,15 +35,24 @@ func GetFeedback(c *gin.Context) {
 }
 
 func AddFeedback(c *gin.Context) {
-	var feedback models.Feedback
-
-	if err := c.ShouldBindJSON(&feedback); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	feedback, screenshot, err := parseFeedbackUpload(c)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		switch {
+		case errors.Is(err, errFeedbackLimit) || errors.As(err, &maxErr):
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"code": "FEEDBACK_UPLOAD_TOO_LARGE", "error": errFeedbackLimit.Error()})
+		case errors.Is(err, errFeedbackImage):
+			c.JSON(http.StatusUnsupportedMediaType, gin.H{"code": "FEEDBACK_IMAGE_INVALID", "error": errFeedbackImage.Error()})
+		case errors.Is(err, errFeedbackBusy):
+			c.Header("Retry-After", "2")
+			c.JSON(http.StatusTooManyRequests, gin.H{"code": "FEEDBACK_IMAGE_BUSY", "error": errFeedbackBusy.Error()})
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback upload."})
+		}
 		return
 	}
 
-	// open db connection
-	updatedFeedback, err := models.AddFeedback(feedback)
+	updatedFeedback, err := models.AddFeedback(feedback, screenshot)
 	if errors.Is(err, models.ErrFeedbackBlocked) {
 		c.JSON(http.StatusForbidden, gin.H{"code": "FEEDBACK_BLOCKED", "error": "Feedback submissions are blocked for this player."})
 		return

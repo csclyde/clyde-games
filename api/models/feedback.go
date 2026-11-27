@@ -44,6 +44,7 @@ type Feedback struct {
 	ClosureDisposition       string     `gorm:"type:varchar(16)" json:",omitempty"`
 	CompletionReactionDue    *time.Time `gorm:"index" json:"-"`
 	CompletionReactionSentAt *time.Time `json:"-"`
+	HasImage                 bool       `gorm:"not null;default:false" json:",omitempty"`
 	SavegameID               uint       `gorm:"-"`
 	DisplayAuthor            string     `gorm:"-" json:",omitempty"`
 	SavegameFilename         string     `gorm:"-"`
@@ -82,7 +83,16 @@ func SelectAllFeedback() ([]Feedback, error) {
 	return allFeedback, attachFeedbackReplies(allFeedback)
 }
 
-func AddFeedback(fb Feedback) (*Feedback, error) {
+func AddFeedback(fb Feedback, screenshots ...[]byte) (*Feedback, error) {
+	fb.HasImage = false
+	var screenshot []byte
+	if len(screenshots) > 0 {
+		screenshot = screenshots[0]
+	}
+	if len(screenshot) > 0 {
+		fb.Resolved = false
+		fb.DeletedAt = gorm.DeletedAt{}
+	}
 	fb.ParentFeedbackID, fb.ThreadActivityAt, fb.Replies = nil, nil, nil
 	fb.Markdown = ""
 	fb.DisplayAuthor = ""
@@ -108,7 +118,16 @@ func AddFeedback(fb Feedback) (*Feedback, error) {
 		if err := ensureProject(tx, fb.Project); err != nil {
 			return err
 		}
-		return tx.Create(&fb).Error
+		if err := tx.Create(&fb).Error; err != nil {
+			return err
+		}
+		if len(screenshot) > 0 {
+			if err := saveFeedbackImage(tx, fb.ID, screenshot); err != nil {
+				return err
+			}
+			fb.HasImage = true
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -179,6 +198,15 @@ func closeFeedback(id, disposition string, notifyDiscord bool) (*Feedback, error
 			return err
 		}
 
+		if existingFeedback.HasImage {
+			if err := tx.Delete(&FeedbackImage{}, existingFeedback.ID).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&existingFeedback).UpdateColumn("has_image", false).Error; err != nil {
+				return err
+			}
+			existingFeedback.HasImage = false
+		}
 		return tx.Where("feedback_id = ?", existingFeedback.ID).Delete(&Savegame{}).Error
 	})
 	if err != nil {

@@ -26,21 +26,21 @@ const discordFeedbackChannel = models.LegacyDiscordText
 var discordCollectionLock sync.Mutex
 
 type discordSnapshot struct {
-	ID               string          `json:"id"`
-	GuildID          string          `json:"guild_id"`
-	ChannelID        string          `json:"channel_id"`
-	ParentID         string          `json:"parent_id"`
-	ScopeID          string          `json:"scope_id"`
-	Kind             string          `json:"kind"`
-	Timestamp        time.Time       `json:"timestamp"`
-	ContextTimestamp time.Time       `json:"context_timestamp"`
-	Handled          bool            `json:"handled"`
-	ContextOnly      bool            `json:"context_only"`
-	Historical       bool            `json:"historical_identity_only"`
-	Payload          models.Feedback `json:"feedback"`
-	Trigger          struct {
-		ID string `json:"id"`
-	} `json:"trigger_message"`
+	ID               string                   `json:"id"`
+	GuildID          string                   `json:"guild_id"`
+	ChannelID        string                   `json:"channel_id"`
+	ParentID         string                   `json:"parent_id"`
+	ScopeID          string                   `json:"scope_id"`
+	Kind             string                   `json:"kind"`
+	Timestamp        time.Time                `json:"timestamp"`
+	ContextTimestamp time.Time                `json:"context_timestamp"`
+	Handled          bool                     `json:"handled"`
+	ContextOnly      bool                     `json:"context_only"`
+	Historical       bool                     `json:"historical_identity_only"`
+	Payload          models.Feedback          `json:"feedback"`
+	Attachments      []discordImageAttachment `json:"attachments"`
+	ThreadContext    []discordImageContext    `json:"thread_context"`
+	Trigger          discordImageContext      `json:"trigger_message"`
 }
 
 func discordBotCall(ctx context.Context, method, path string, body interface{}, out interface{}) error {
@@ -248,6 +248,12 @@ func mcpDiscordManual(c *gin.Context) {
 		return
 	}
 	saved, e := discordIntake(s, true)
+	if e == nil && !saved.HasImage && !saved.Resolved && !saved.DeletedAt.Valid {
+		if data := fetchDiscordScreenshot(c.Request.Context(), s); len(data) > 0 {
+			// Text is already durable. A failed image import must not fail the flag.
+			_ = models.AttachDiscordFeedbackImage(saved.ID, saved.Project, data)
+		}
+	}
 	if e != nil {
 		mcpDBError(c, e)
 		return

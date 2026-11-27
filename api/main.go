@@ -119,6 +119,7 @@ func registerRoutes(router *gin.Engine) {
 	router.GET("/metrics/:id", endpoints.MetricsAuth, endpoints.GetMetric)
 	router.GET("/feedback", endpoints.AdminAuth, endpoints.GetFeedback)
 	router.POST("/feedback", endpoints.AddFeedback)
+	router.GET("/feedback/image", endpoints.AdminAuth, endpoints.GetFeedbackImage)
 	router.PUT("/feedback/translation", endpoints.AdminAuth, endpoints.UpdateFeedbackTranslation)
 	router.POST("/resolvefeedback", endpoints.AdminAuth, endpoints.ResolveFeedback)
 	router.POST("/feedback/close", endpoints.AdminAuth, endpoints.CloseFeedback)

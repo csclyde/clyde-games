@@ -29,7 +29,7 @@ func MigrateAnalyticsDB() error {
 			return err
 		}
 	}
-	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &FeedbackBlock{}, &Project{}, &Crash{}, &CrashGroup{}, &EventSetting{}, &Feedback{}, &DiscordPendingMessage{}, &DiscordSnapshotRevision{}, &DiscordSyncSource{}, &Savegame{}, &SyncState{}, &PackratVersion{}); err != nil {
+	if err := AnalyticsDB.AutoMigrate(&BlockedUser{}, &FeedbackBlock{}, &Project{}, &Crash{}, &CrashGroup{}, &EventSetting{}, &Feedback{}, &FeedbackImage{}, &DiscordPendingMessage{}, &DiscordSnapshotRevision{}, &DiscordSyncSource{}, &Savegame{}, &SyncState{}, &PackratVersion{}); err != nil {
 		return err
 	}
 	if err := MigrateCrashGroups(); err != nil {
