@@ -1,13 +1,31 @@
 <script>
  export let src;
  let dialog;
+
+ function dismissOnBackground(node) {
+  let startedOnBackground = false;
+  function pointerDown(event) {
+   startedOnBackground = event.target === node;
+  }
+  function click(event) {
+   const shouldClose = startedOnBackground && event.target === node;
+   startedOnBackground = false;
+   if (shouldClose) node.close();
+  }
+  node.addEventListener('pointerdown', pointerDown);
+  node.addEventListener('click', click);
+  return { destroy() {
+   node.removeEventListener('pointerdown', pointerDown);
+   node.removeEventListener('click', click);
+  } };
+ }
 </script>
 
 <button class="thumbnail" type="button" aria-label="Open feedback screenshot" on:click={() => dialog.showModal()}>
  <img {src} alt="Feedback screenshot" loading="lazy" />
 </button>
 
-<dialog bind:this={dialog} aria-label="Feedback screenshot">
+<dialog bind:this={dialog} use:dismissOnBackground aria-label="Feedback screenshot">
  <div class="toolbar">
   <a href={src} target="_blank" rel="noopener noreferrer">Open full size</a>
   <form method="dialog"><button type="submit">Close</button></form>
