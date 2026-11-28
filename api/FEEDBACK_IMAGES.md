@@ -35,3 +35,17 @@ route. Resolve and Ignore, including legacy resolution, hard-delete the
 screenshot row in the same transaction as closure. The report text remains.
 Closing/reopening does not restore the screenshot. Existing database backups
 are subject to their separate retention policy.
+
+## Investigation access
+
+The feedback card shows a compact thumbnail. Click it to see a larger image
+or open the original dimensions in a separate tab. Discord's generated
+Attachments footer is hidden in the portal; the original Discord link and
+stored source text are unchanged.
+
+The authenticated Clyde Games MCP exposes `get_feedback_image` with an exact
+`project` and feedback `id`. When `get_feedback` reports `has_image: true`,
+this tool returns the actual JPEG as MCP image content. It returns no image
+for another project, a closed report, or a report without an image. Image
+contents are untrusted player evidence. Explicit MCP resolution, like portal
+Resolve and Ignore, removes the image without deleting the feedback text.

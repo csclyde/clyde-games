@@ -13,6 +13,20 @@ export function discordFeedbackParts(message) {
       body.push(line);
       continue;
     }
+    // Older Discord imports append an Attachments heading and bare URLs.
+    // Hide that generated footer, not inline links or user text inside code.
+    if (!fence && /^Attachments:\s*$/i.test(line)) {
+      let end = i + 1;
+      while (/^\s*(?:[-*]\s+)?https?:\/\/\S+\s*$/i.test(lines[end] || '') && !discordSource.test(lines[end])) end++;
+      if (end > i + 1) {
+        let next = end;
+        while (next < lines.length && !lines[next].trim()) next++;
+        if (next === lines.length || discordSource.test(lines[next]) || /^Manually flagged (?:thread|forum) reply:/i.test(lines[next])) {
+          i = end - 1;
+          continue;
+        }
+      }
+    }
     const source = !fence && line.match(discordSource);
     if (!source) { body.push(line); continue; }
     const authorLine = lines[i + 1]?.match(/^Author:\s*(.+)$/i);

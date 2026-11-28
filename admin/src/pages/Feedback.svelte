@@ -5,6 +5,7 @@
  import {loadInvestigationStatuses,statusKey} from "../investigation-status.mjs";
  import Panel from '../components/Panel.svelte';
  import ReportActions from '../components/ReportActions.svelte';
+ import FeedbackScreenshot from '../components/FeedbackScreenshot.svelte';
  import FeedbackMarkdown from '../components/FeedbackMarkdown.svelte';
  import {feedbackPresentation} from '../feedback-presentation.mjs';
 	import PlankaTicketModal from '../components/PlankaTicketModal.svelte';
@@ -526,9 +527,7 @@
 								<FeedbackMarkdown message={presentation.body} discord={presentation.discord}/>
 								{#if comment.HasImage}
 									{@const screenshot = '/api/feedback/image?id=' + encodeURIComponent(comment.ID) + '&project=' + encodeURIComponent(comment.Project)}
-									<a class="feedback-screenshot" href={screenshot} target="_blank" rel="noopener noreferrer" aria-label="Open feedback screenshot">
-										<img src={screenshot} alt="Feedback screenshot" loading="lazy" />
-									</a>
+									<FeedbackScreenshot src={screenshot}/>
 								{/if}
 								{#if comment.Translated}
 									<button class="original-toggle" type="button" on:click={() => toggleOriginal(comment)}>
@@ -617,8 +616,6 @@
 />
 
 <style>
-	.feedback-screenshot { display: inline-block; margin: .6rem 0; max-width: 100%; }
-	.feedback-screenshot img { display: block; width: auto; max-width: 100%; max-height: 320px; border: 1px solid var(--line); border-radius: 4px; }
 	.discussion-replies { border-top: 1px solid #56616d; margin-top: 1rem; padding-top: .6rem; }
 	.discussion-replies h3 { font-size: .85rem; margin: 0 0 .5rem; }
 	.discussion-reply { margin: .6rem 0 .6rem .4rem; border-left: 2px solid #56616d; padding: .35rem .65rem; overflow-wrap: anywhere; }

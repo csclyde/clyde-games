@@ -42,6 +42,7 @@ func RegisterMCPRoutes(router *gin.Engine) {
 	g.GET("/feedback", mcpFeedbackList)
 	g.GET("/feedback/:id", mcpFeedbackDetail)
 	g.GET("/feedback/:id/save", mcpFeedbackSave)
+	g.GET("/feedback/:id/image", mcpFeedbackImage)
 	g.POST("/feedback/:id/resolve", mcpResolveFeedback)
 	g.GET("/crashes", mcpCrashList)
 	g.GET("/crashes/:id", mcpCrashDetail)
@@ -90,6 +91,7 @@ type mcpReport struct {
 	ID                uint       `json:"id"`
 	Project           string     `json:"project"`
 	Message           string     `json:"message"`
+	HasImage          bool       `json:"has_image,omitempty"`
 	Translated        string     `json:"translated,omitempty"`
 	Stack             string     `json:"stack,omitempty"`
 	Rating            uint8      `json:"rating,omitempty"`
@@ -167,7 +169,7 @@ func mcpQuery(c *gin.Context, crash bool) *gorm.DB {
 		table = "crashes"
 		fields = append(fields, "stack", "count", "group_key", "group_identity", "occurrence_version", "ingested_at", "resolved_at")
 	} else {
-		fields = append(fields, "translated", "rating", "source", "source_id", "source_url", "ingested_at", "triage_state", "triage_note", "triage_at")
+		fields = append(fields, "has_image", "translated", "rating", "source", "source_id", "source_url", "ingested_at", "triage_state", "triage_note", "triage_at")
 	}
 	return mcpDB(c).Table(table).Select(fields).Where("deleted_at IS NULL")
 }
@@ -327,6 +329,14 @@ func mcpResolveFeedback(c *gin.Context) {
 		}
 		if err := tx.Model(&item).Update("resolved", true).Error; err != nil {
 			return err
+		}
+		if item.HasImage {
+			if err := tx.Delete(&models.FeedbackImage{}, id).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&item).UpdateColumn("has_image", false).Error; err != nil {
+				return err
+			}
 		}
 		return tx.Where("feedback_id = ?", id).Delete(&models.Savegame{}).Error
 	})
